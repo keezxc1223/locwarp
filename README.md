@@ -197,7 +197,7 @@ build-installer.bat
 
 **下載安裝檔**:https://github.com/keezxc1223/locwarp/releases
 
-拿到安裝檔的使用者需要以下四項前置:
+使用安裝檔的使用者需要以下四項前置:
 
 ### 1. 安裝 iTunes for Windows
 
