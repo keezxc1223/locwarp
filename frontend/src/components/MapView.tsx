@@ -362,9 +362,50 @@ const MapView: React.FC<MapViewProps> = ({
     return () => document.removeEventListener('click', handler);
   }, [closeContextMenu]);
 
+  const recenter = useCallback(() => {
+    const map = mapRef.current;
+    if (!map || !currentPosition) return;
+    map.setView([currentPosition.lat, currentPosition.lng], Math.max(map.getZoom(), 16), {
+      animate: true,
+    });
+  }, [currentPosition]);
+
   return (
     <div className="map-container" style={{ position: 'relative', flex: 1 }}>
       <div ref={mapContainerRef} style={{ width: '100%', height: '100%' }} />
+
+      {/* Recenter on user position */}
+      <button
+        onClick={recenter}
+        disabled={!currentPosition}
+        title="定位到目前位置"
+        style={{
+          position: 'absolute',
+          right: 16,
+          bottom: 96,
+          zIndex: 800,
+          width: 40,
+          height: 40,
+          borderRadius: '50%',
+          border: '1px solid rgba(255,255,255,0.15)',
+          background: currentPosition ? 'rgba(40, 44, 60, 0.95)' : 'rgba(40, 44, 60, 0.5)',
+          color: currentPosition ? '#6c8cff' : '#666',
+          cursor: currentPosition ? 'pointer' : 'not-allowed',
+          boxShadow: '0 2px 8px rgba(0,0,0,0.35)',
+          display: 'flex',
+          alignItems: 'center',
+          justifyContent: 'center',
+          padding: 0,
+        }}
+      >
+        <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
+          <circle cx="12" cy="12" r="3" />
+          <line x1="12" y1="2" x2="12" y2="5" />
+          <line x1="12" y1="19" x2="12" y2="22" />
+          <line x1="2" y1="12" x2="5" y2="12" />
+          <line x1="19" y1="12" x2="22" y2="12" />
+        </svg>
+      </button>
 
       {contextMenu.visible && (
         <div

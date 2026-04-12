@@ -1,6 +1,6 @@
 {
   "name": "locwarp",
-  "version": "0.1.4",
+  "version": "0.1.5",
   "description": "iOS Virtual Location Simulator",
   "author": "keezxc1223",
   "main": "electron/main.js",
