@@ -18,7 +18,7 @@ interface DeviceStatusProps {
   device: Device | null;
   devices: Device[];
   isConnected: boolean;
-  onScan: () => void;
+  onScan: () => void | Promise<void>;
   onSelect: (id: string) => void;
   onStartWifiTunnel?: (ip: string, port?: number) => Promise<any>;
   onStopTunnel?: () => Promise<void>;
@@ -45,6 +45,19 @@ const DeviceStatus: React.FC<DeviceStatusProps> = ({
   const [showIpHelp, setShowIpHelp] = useState(false);
   const [discovering, setDiscovering] = useState(false);
   const [wifiExpanded, setWifiExpanded] = useState(false);
+  const [scanning, setScanning] = useState(false);
+  const [scanDone, setScanDone] = useState(0); // counter to show brief "done" flash
+
+  const handleScan = async () => {
+    setScanning(true);
+    try {
+      await Promise.resolve(onScan());
+    } finally {
+      setScanning(false);
+      setScanDone((n) => n + 1);
+      setTimeout(() => setScanDone(0), 1200);
+    }
+  };
   const [wifiTab, setWifiTab] = useState<'ios17plus' | 'ios17minus'>('ios17plus');
   const [legacyIp, setLegacyIp] = useState('');
   const [legacyConnecting, setLegacyConnecting] = useState(false);
@@ -140,17 +153,36 @@ const DeviceStatus: React.FC<DeviceStatusProps> = ({
         </div>
         <button
           className="action-btn"
-          onClick={onScan}
-          style={{ padding: '4px 10px', fontSize: 12 }}
-          title="Scan USB"
+          onClick={handleScan}
+          disabled={scanning}
+          style={{ padding: '4px 10px', fontSize: 12, display: 'inline-flex', alignItems: 'center', gap: 4, minWidth: 70, justifyContent: 'center' }}
+          title="掃描 USB 裝置"
         >
-          <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2">
-            <path d="M1 1l4 4" />
-            <path d="M5 12a7 7 0 0114 0" />
-            <path d="M8.5 8.5a4 4 0 017 0" />
-            <circle cx="12" cy="12" r="1" fill="currentColor" />
-          </svg>
-          USB
+          {scanning ? (
+            <>
+              <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" style={{ animation: 'spin 1s linear infinite' }}>
+                <circle cx="12" cy="12" r="10" strokeDasharray="32" strokeDashoffset="16" />
+              </svg>
+              掃描中
+            </>
+          ) : scanDone > 0 ? (
+            <>
+              <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="#4caf50" strokeWidth="3">
+                <polyline points="20 6 9 17 4 12" />
+              </svg>
+              <span style={{ color: '#4caf50' }}>完成</span>
+            </>
+          ) : (
+            <>
+              <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2">
+                <path d="M1 1l4 4" />
+                <path d="M5 12a7 7 0 0114 0" />
+                <path d="M8.5 8.5a4 4 0 017 0" />
+                <circle cx="12" cy="12" r="1" fill="currentColor" />
+              </svg>
+              USB
+            </>
+          )}
         </button>
       </div>
 
