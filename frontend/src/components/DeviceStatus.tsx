@@ -38,8 +38,8 @@ const DeviceStatus: React.FC<DeviceStatusProps> = ({
   onWifiConnect,
 }) => {
   const [showDropdown, setShowDropdown] = useState(false);
-  const [tunnelIp, setTunnelIp] = useState('192.168.0.205');
-  const [tunnelPort, setTunnelPort] = useState('49152');
+  const [tunnelIp, setTunnelIp] = useState(() => localStorage.getItem('locwarp.tunnel.ip') || '192.168.0.205');
+  const [tunnelPort, setTunnelPort] = useState(() => localStorage.getItem('locwarp.tunnel.port') || '49152');
   const [tunnelConnecting, setTunnelConnecting] = useState(false);
   const [tunnelError, setTunnelError] = useState<string | null>(null);
   const [showIpHelp, setShowIpHelp] = useState(false);
@@ -412,6 +412,9 @@ const DeviceStatus: React.FC<DeviceStatusProps> = ({
                         setTunnelConnecting(true); setTunnelError(null);
                         try {
                           await onStartWifiTunnel(tunnelIp.trim(), parseInt(tunnelPort) || 49152);
+                          // Remember on success
+                          localStorage.setItem('locwarp.tunnel.ip', tunnelIp.trim());
+                          localStorage.setItem('locwarp.tunnel.port', tunnelPort || '49152');
                         } catch (err: any) {
                           setTunnelError(err.message || 'WiFi tunnel failed');
                         } finally { setTunnelConnecting(false); }

@@ -169,32 +169,95 @@ class WifiTunnelStartRequest(BaseModel):
     udid: str = "00008140-001C096E02EA801C"
 
 
+def _get_primary_local_ip() -> str | None:
+    """Return this machine's primary IPv4 (the one used to reach the internet)."""
+    import socket as _s
+    try:
+        s = _s.socket(_s.AF_INET, _s.SOCK_DGRAM)
+        s.settimeout(0.5)
+        s.connect(("8.8.8.8", 80))
+        ip = s.getsockname()[0]
+        s.close()
+        return ip
+    except Exception:
+        return None
+
+
+async def _tcp_probe(ip: str, port: int, timeout: float = 0.4) -> bool:
+    try:
+        reader, writer = await asyncio.wait_for(
+            asyncio.open_connection(ip, port), timeout=timeout,
+        )
+        writer.close()
+        try:
+            await writer.wait_closed()
+        except Exception:
+            pass
+        return True
+    except Exception:
+        return False
+
+
+async def _scan_subnet_for_port(port: int = 49152) -> list[str]:
+    """Scan the local /24 subnet for hosts responding on the given TCP port."""
+    my_ip = _get_primary_local_ip()
+    if not my_ip:
+        return []
+    try:
+        parts = my_ip.split(".")
+        prefix = ".".join(parts[:3])
+    except Exception:
+        return []
+
+    candidates = [f"{prefix}.{i}" for i in range(1, 255) if f"{prefix}.{i}" != my_ip]
+    results = await asyncio.gather(
+        *[_tcp_probe(ip, port, 0.4) for ip in candidates],
+        return_exceptions=True,
+    )
+    hits = [ip for ip, ok in zip(candidates, results) if ok is True]
+    return hits
+
+
 @router.get("/wifi/tunnel/discover")
 async def wifi_tunnel_discover():
-    """Browse the local network via Bonjour/mDNS for iOS devices advertising
-    the RemotePairing service. Returns a list of candidate (ip, port) pairs."""
+    """Find iPhones on the local network. First tries mDNS (Bonjour RemotePairing
+    broadcast); if that yields nothing, falls back to a /24 subnet TCP scan on the
+    standard RemotePairing port (49152)."""
+    results: list[dict] = []
+
+    # --- 1) mDNS / Bonjour broadcast ---
     try:
         from pymobiledevice3.bonjour import browse_remotepairing
-    except Exception as e:
-        raise HTTPException(status_code=500, detail=f"bonjour module unavailable: {e}")
-
-    try:
         instances = await browse_remotepairing(timeout=3.0)
+        for inst in instances:
+            ipv4s = [a for a in (inst.addresses or []) if ":" not in a]
+            addrs = ipv4s if ipv4s else list(inst.addresses or [])
+            for addr in addrs:
+                results.append({
+                    "ip": addr,
+                    "port": inst.port,
+                    "host": inst.host,
+                    "name": inst.instance or inst.host,
+                    "method": "mdns",
+                })
     except Exception as e:
-        raise HTTPException(status_code=500, detail=f"mDNS browse failed: {e}")
+        _tunnel_logger.warning("mDNS browse failed: %s", e)
 
-    results = []
-    for inst in instances:
-        # Prefer IPv4 addresses for WiFi tunnel use
-        ipv4s = [a for a in (inst.addresses or []) if ":" not in a]
-        addrs = ipv4s if ipv4s else list(inst.addresses or [])
-        for addr in addrs:
-            results.append({
-                "ip": addr,
-                "port": inst.port,
-                "host": inst.host,
-                "name": inst.instance or inst.host,
-            })
+    # --- 2) Fallback: TCP subnet scan on port 49152 ---
+    if not results:
+        _tunnel_logger.info("mDNS empty; falling back to /24 TCP scan on port 49152")
+        try:
+            hits = await _scan_subnet_for_port(49152)
+            for ip in hits:
+                results.append({
+                    "ip": ip,
+                    "port": 49152,
+                    "host": ip,
+                    "name": ip,
+                    "method": "tcp_scan",
+                })
+        except Exception as e:
+            _tunnel_logger.warning("TCP scan failed: %s", e)
 
     # De-dupe on (ip, port)
     seen = set()
