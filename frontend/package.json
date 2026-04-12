@@ -1,7 +1,8 @@
 {
   "name": "locwarp",
-  "version": "0.1.3",
+  "version": "0.1.4",
   "description": "iOS Virtual Location Simulator",
+  "author": "keezxc1223",
   "main": "electron/main.js",
   "scripts": {
     "dev": "vite",
@@ -63,7 +64,8 @@
         }
       ],
       "requestedExecutionLevel": "requireAdministrator",
-      "icon": "build/icon.ico"
+      "icon": "build/icon.ico",
+      "publisherName": "keezxc1223"
     },
     "nsis": {
       "oneClick": false,
