@@ -1639,13 +1639,15 @@ body {
 
 /* ---------- Status Bar (enhanced) ---------- */
 .status-bar {
-  height: var(--status-bar-height);
+  min-height: var(--status-bar-height);
   background: var(--bg-surface);
   border-top: 1px solid var(--border-color);
   display: flex;
   align-items: center;
-  padding: 0 12px;
-  gap: 12px;
+  flex-wrap: wrap;
+  padding: 4px 12px;
+  column-gap: 12px;
+  row-gap: 4px;
   font-size: 11px;
   color: var(--text-muted);
   z-index: 10;
