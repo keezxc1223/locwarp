@@ -30,9 +30,6 @@
   </a>
 </p>
 
-<p align="center">
-  <img src="docs/demo.gif" width="720" alt="LocWarp demo">
-</p>
 
 ---
 
