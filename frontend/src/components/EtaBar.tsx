@@ -1,4 +1,5 @@
 import React from 'react';
+import { useT } from '../i18n';
 
 interface EtaBarProps {
   state: string;
@@ -34,6 +35,7 @@ const EtaBar: React.FC<EtaBarProps> = ({
   traveledDistance,
   eta,
 }) => {
+  const t = useT();
   if (!ACTIVE_STATES.includes(state)) return null;
 
   const percent = Math.min(Math.max(progress * 100, 0), 100);
@@ -93,7 +95,7 @@ const EtaBar: React.FC<EtaBarProps> = ({
           <circle cx="12" cy="12" r="10" />
           <polyline points="12,6 12,12 16,14" />
         </svg>
-        <span>剩餘 {formatDistance(remainingDistance)}</span>
+        <span>{t('eta.remaining')} {formatDistance(remainingDistance)}</span>
       </div>
 
       {/* Separator */}
@@ -105,7 +107,7 @@ const EtaBar: React.FC<EtaBarProps> = ({
           <path d="M5 12h14" />
           <path d="M12 5l7 7-7 7" />
         </svg>
-        <span>預計到達 {formatTime(eta)}</span>
+        <span>{t('eta.eta')} {formatTime(eta)}</span>
       </div>
 
       {/* Separator */}
@@ -116,7 +118,7 @@ const EtaBar: React.FC<EtaBarProps> = ({
         <svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" style={{ opacity: 0.6 }}>
           <polyline points="22,12 18,12 15,21 9,3 6,12 2,12" />
         </svg>
-        <span>已行 {formatDistance(traveledDistance)}</span>
+        <span>{t('eta.traveled')} {formatDistance(traveledDistance)}</span>
       </div>
     </div>
   );

@@ -1,5 +1,7 @@
 import React, { useEffect, useState } from 'react';
 import { SimMode } from '../hooks/useSimulation';
+import { useT } from '../i18n';
+import LangToggle from './LangToggle';
 
 interface Position {
   lat: number;
@@ -19,13 +21,14 @@ interface StatusBarProps {
   onRestore?: () => void;
 }
 
-const modeLabels: Record<SimMode, string> = {
-  [SimMode.Teleport]: '瞬間移動',
-  [SimMode.Navigate]: '導航移動',
-  [SimMode.Loop]: '路線巡迴',
-  [SimMode.MultiStop]: '多點導航',
-  [SimMode.RandomWalk]: '隨機漫步',
-  [SimMode.Joystick]: '搖桿操控',
+import type { StringKey } from '../i18n';
+const modeLabelKeys: Record<SimMode, StringKey> = {
+  [SimMode.Teleport]: 'mode.teleport',
+  [SimMode.Navigate]: 'mode.navigate',
+  [SimMode.Loop]: 'mode.loop',
+  [SimMode.MultiStop]: 'mode.multi_stop',
+  [SimMode.RandomWalk]: 'mode.random_walk',
+  [SimMode.Joystick]: 'mode.joystick',
 };
 
 function formatCooldown(seconds: number): string {
@@ -46,6 +49,7 @@ const StatusBar: React.FC<StatusBarProps> = ({
   onToggleCooldown,
   onRestore,
 }) => {
+  const t = useT();
   const [cooldownDisplay, setCooldownDisplay] = useState(cooldown);
   const [copied, setCopied] = useState(false);
 
@@ -141,7 +145,7 @@ const StatusBar: React.FC<StatusBarProps> = ({
                 );
                 setTimeout(() => setCopied(false), 1500);
               }}
-              title="複製座標"
+              title={t('status.copy_coord')}
               style={{
                 background: 'transparent', border: 'none', cursor: 'pointer',
                 padding: '0 4px', color: copied ? '#4caf50' : 'rgba(255,255,255,0.6)',
@@ -173,13 +177,13 @@ const StatusBar: React.FC<StatusBarProps> = ({
         </svg>
         <span>{speed} km/h</span>
         <span style={{ opacity: 0.4 }}>|</span>
-        <span style={{ opacity: 0.7 }}>{modeLabels[mode]}</span>
+        <span style={{ opacity: 0.7 }}>{t(modeLabelKeys[mode])}</span>
       </div>
 
       {/* Cooldown enable toggle */}
       <div style={{ width: 1, height: 14, background: '#333' }} />
       <label
-        title="關閉後瞬移將不觸發冷卻"
+        title={t('status.cooldown_tooltip')}
         style={{ display: 'flex', alignItems: 'center', gap: 6, cursor: 'pointer', userSelect: 'none' }}
       >
         <input
@@ -188,7 +192,7 @@ const StatusBar: React.FC<StatusBarProps> = ({
           onChange={(e) => onToggleCooldown(e.target.checked)}
           style={{ cursor: 'pointer', margin: 0 }}
         />
-        <span style={{ opacity: cooldownEnabled ? 1 : 0.5 }}>冷卻{cooldownEnabled ? '啟用' : '關閉'}</span>
+        <span style={{ opacity: cooldownEnabled ? 1 : 0.5 }}>{cooldownEnabled ? t('status.cooldown_enabled') : t('status.cooldown_disabled')}</span>
       </label>
 
       {/* Restore button */}
@@ -197,7 +201,7 @@ const StatusBar: React.FC<StatusBarProps> = ({
           <div style={{ width: 1, height: 14, background: '#333' }} />
           <button
             onClick={onRestore}
-            title="清除 iPhone 上的虛擬定位,恢復真實 GPS"
+            title={t('status.restore_tooltip')}
             style={{
               display: 'flex',
               alignItems: 'center',
@@ -215,7 +219,7 @@ const StatusBar: React.FC<StatusBarProps> = ({
               <path d="M3 12a9 9 0 109-9" />
               <polyline points="3,3 3,9 9,9" />
             </svg>
-            一鍵還原
+            {t('status.restore')}
           </button>
         </>
       )}
@@ -237,13 +241,17 @@ const StatusBar: React.FC<StatusBarProps> = ({
               <circle cx="12" cy="12" r="10" />
               <polyline points="12,6 12,12 16,14" />
             </svg>
-            <span>冷卻中 {formatCooldown(cooldownDisplay)}</span>
+            <span>{t('status.cooldown_active')} {formatCooldown(cooldownDisplay)}</span>
           </div>
         </>
       )}
 
       {/* Spacer to push right-aligned items */}
       <div style={{ flex: 1 }} />
+
+      {/* Language toggle */}
+      <LangToggle />
+      <div style={{ width: 1, height: 14, background: '#333' }} />
 
       {/* Timestamp */}
       <span style={{ opacity: 0.4, fontSize: 10 }}>

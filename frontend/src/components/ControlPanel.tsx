@@ -1,5 +1,6 @@
 import React, { useState } from 'react';
 import { createPortal } from 'react-dom';
+import { useT } from '../i18n';
 import { SimMode, MoveMode } from '../hooks/useSimulation';
 import AddressSearch from './AddressSearch';
 import BookmarkList from './BookmarkList';
@@ -188,6 +189,7 @@ const ControlPanel: React.FC<ControlPanelProps> = ({
     routes: true,
   });
 
+  const t = useT();
   const [coordLat, setCoordLat] = useState('');
   const [coordLng, setCoordLng] = useState('');
   const [routeName, setRouteName] = useState('');
@@ -340,15 +342,15 @@ const ControlPanel: React.FC<ControlPanelProps> = ({
           onClick={() => toggleSection('speed')}
           style={{ cursor: 'pointer', display: 'flex', alignItems: 'center', gap: 6 }}
         >
-          {chevron(sections.speed)} 速度
+          {chevron(sections.speed)} {t('panel.speed')}
         </div>
         {sections.speed && (
           <div className="section-content">
             <div className="speed-selector">
               {[
-                { label: '走路', value: 5, mode: 'walking' as MoveMode },
-                { label: '跑步', value: 10, mode: 'running' as MoveMode },
-                { label: '開車', value: 40, mode: 'driving' as MoveMode },
+                { labelKey: 'move.walking' as const, value: 5, mode: 'walking' as MoveMode },
+                { labelKey: 'move.running' as const, value: 10, mode: 'running' as MoveMode },
+                { labelKey: 'move.driving' as const, value: 40, mode: 'driving' as MoveMode },
               ].map((opt) => (
                 <button
                   key={opt.value}
@@ -360,13 +362,13 @@ const ControlPanel: React.FC<ControlPanelProps> = ({
                   }}
                   style={{ padding: '6px 4px' }}
                 >
-                  <div style={{ fontSize: 12, fontWeight: 500 }}>{opt.label}</div>
+                  <div style={{ fontSize: 12, fontWeight: 500 }}>{t(opt.labelKey)}</div>
                   <div style={{ fontSize: 10, opacity: 0.6 }}>{opt.value} km/h</div>
                 </button>
               ))}
             </div>
             <div style={{ display: 'flex', gap: 6, marginTop: 8, alignItems: 'center' }}>
-              <span style={{ fontSize: 12, opacity: 0.7, whiteSpace: 'nowrap' }}>自訂:</span>
+              <span style={{ fontSize: 12, opacity: 0.7, whiteSpace: 'nowrap' }}>{t('panel.custom_speed')}:</span>
               <input
                 type="number"
                 className="search-input"
@@ -392,20 +394,20 @@ const ControlPanel: React.FC<ControlPanelProps> = ({
                   style={{ padding: '2px 8px', fontSize: 11 }}
                   onClick={() => onCustomSpeedChange(null)}
                 >
-                  清除
+                  {t('generic.clear')}
                 </button>
               )}
             </div>
             {customSpeedKmh && (
               <div style={{ fontSize: 11, color: '#4caf50', marginTop: 4 }}>
-                使用自訂速度: {customSpeedKmh} km/h ({(customSpeedKmh / 3.6).toFixed(1)} m/s)
+                {t('panel.custom_speed_active')}: {customSpeedKmh} km/h ({(customSpeedKmh / 3.6).toFixed(1)} m/s)
               </div>
             )}
 
             {/* Random range (overrides fixed) */}
             <div style={{ marginTop: 8 }}>
               <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', marginBottom: 4 }}>
-                <span style={{ fontSize: 12, opacity: 0.7 }}>隨機速度範圍 (km/h):</span>
+                <span style={{ fontSize: 12, opacity: 0.7 }}>{t('panel.speed_range')}:</span>
                 {(speedMinKmh != null || speedMaxKmh != null) && (
                   <button
                     className="action-btn"
@@ -420,7 +422,7 @@ const ControlPanel: React.FC<ControlPanelProps> = ({
                 <input
                   type="number"
                   className="search-input"
-                  placeholder="最小"
+                  placeholder={t('panel.speed_range_min')}
                   value={speedMinKmh ?? ''}
                   onChange={(e) => {
                     const v = e.target.value
@@ -436,7 +438,7 @@ const ControlPanel: React.FC<ControlPanelProps> = ({
                 <input
                   type="number"
                   className="search-input"
-                  placeholder="最大"
+                  placeholder={t('panel.speed_range_max')}
                   value={speedMaxKmh ?? ''}
                   onChange={(e) => {
                     const v = e.target.value
@@ -452,7 +454,7 @@ const ControlPanel: React.FC<ControlPanelProps> = ({
             </div>
             {speedMinKmh != null && speedMaxKmh != null && (
               <div style={{ fontSize: 11, color: '#ffb74d', marginTop: 4 }}>
-                隨機範圍: {Math.min(speedMinKmh, speedMaxKmh)}~{Math.max(speedMinKmh, speedMaxKmh)} km/h(每段路重抽)
+                {t('panel.speed_range_active')}: {Math.min(speedMinKmh, speedMaxKmh)}~{Math.max(speedMinKmh, speedMaxKmh)} km/h ({t('panel.speed_range_hint')})
               </div>
             )}
           </div>
@@ -475,7 +477,7 @@ const ControlPanel: React.FC<ControlPanelProps> = ({
               <svg width="14" height="14" viewBox="0 0 24 24" fill="currentColor">
                 <rect x="4" y="4" width="16" height="16" rx="2" />
               </svg>
-              停止
+              {t('generic.stop')}
             </button>
           )}
           {isRunning && !isPaused && (
@@ -484,7 +486,7 @@ const ControlPanel: React.FC<ControlPanelProps> = ({
                 <rect x="5" y="4" width="5" height="16" rx="1" />
                 <rect x="14" y="4" width="5" height="16" rx="1" />
               </svg>
-              暫停
+              {t('generic.pause')}
             </button>
           )}
           {isRunning && isPaused && (
@@ -492,7 +494,7 @@ const ControlPanel: React.FC<ControlPanelProps> = ({
               <svg width="14" height="14" viewBox="0 0 24 24" fill="currentColor">
                 <polygon points="5,3 19,12 5,21" />
               </svg>
-              繼續
+              {t('generic.resume')}
             </button>
           )}
         </div>
@@ -505,7 +507,7 @@ const ControlPanel: React.FC<ControlPanelProps> = ({
           onClick={() => toggleSection('coords')}
           style={{ cursor: 'pointer', display: 'flex', alignItems: 'center', gap: 6 }}
         >
-          {chevron(sections.coords)} 座標
+          {chevron(sections.coords)} {t('panel.coords')}
         </div>
         {sections.coords && (
           <div className="section-content">
@@ -632,13 +634,13 @@ const ControlPanel: React.FC<ControlPanelProps> = ({
               ) : (
                 <>
                   <div style={{ fontSize: 11, opacity: 0.6, marginBottom: 6 }}>
-                    目前路徑點: {currentWaypointsCount} 個,輸入名稱後按儲存即可保存
+                    {t('panel.route_save_hint', { n: currentWaypointsCount })}
                   </div>
                   <div style={{ display: 'flex', gap: 6, marginBottom: 6 }}>
                     <input
                       type="text"
                       className="search-input"
-                      placeholder="路線名稱"
+                      placeholder={t('panel.route_name')}
                       value={routeName}
                       onChange={(e) => setRouteName(e.target.value)}
                       style={{ flex: 1 }}
@@ -652,7 +654,7 @@ const ControlPanel: React.FC<ControlPanelProps> = ({
                           setRouteName('');
                         }
                       }}
-                    >儲存</button>
+                    >{t('generic.save')}</button>
                   </div>
                   {onRouteGpxImport && (
                     <div style={{ marginBottom: 10 }}>
@@ -668,7 +670,7 @@ const ControlPanel: React.FC<ControlPanelProps> = ({
                           <polyline points="17 8 12 3 7 8" />
                           <line x1="12" y1="3" x2="12" y2="15" />
                         </svg>
-                        匯入 GPX
+                        {t('panel.route_gpx_import')}
                         <input
                           type="file"
                           accept=".gpx,application/gpx+xml"
@@ -683,7 +685,7 @@ const ControlPanel: React.FC<ControlPanelProps> = ({
                     </div>
                   )}
                   {savedRoutes.length === 0 && (
-                    <div style={{ fontSize: 12, opacity: 0.5, padding: '8px 0' }}>尚無儲存的路線</div>
+                    <div style={{ fontSize: 12, opacity: 0.5, padding: '8px 0' }}>{t('panel.route_empty')}</div>
                   )}
                   {savedRoutes.map((route) => {
                     const isEditing = editingRouteId === route.id;
@@ -759,7 +761,7 @@ const ControlPanel: React.FC<ControlPanelProps> = ({
                             title="刪除路線"
                             onClick={(e) => {
                               e.stopPropagation();
-                              if (confirm(`刪除路線「${route.name}」?`)) onRouteDelete(route.id);
+                              if (confirm(t('panel.route_delete_confirm', { name: route.name }))) onRouteDelete(route.id);
                             }}
                             style={{ padding: '2px 6px', fontSize: 10, color: '#f44336' }}
                           >

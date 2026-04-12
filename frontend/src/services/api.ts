@@ -16,24 +16,33 @@ async function fetchWithRetry(url: string, opts: RequestInit, maxAttempts = 15):
   throw lastErr ?? new Error('fetch failed')
 }
 
-// Map of backend error codes → localised Chinese messages
-const ERROR_I18N: Record<string, string> = {
-  python313_missing: '需要 Python 3.13+ 才能啟動 WiFi Tunnel',
-  tunnel_script_missing: '找不到 wifi_tunnel.py 腳本',
-  tunnel_spawn_failed: '無法啟動 Tunnel 進程',
-  tunnel_exited: 'Tunnel 進程異常結束',
-  tunnel_timeout: 'Tunnel 啟動逾時,請確認 iPhone 解鎖且與電腦同網段',
-  no_device: '尚未連接任何 iOS 裝置,請先透過 USB 連線',
-  no_position: '尚未取得目前位置,請先跳點到一個座標',
-  tunnel_lost: 'WiFi Tunnel 連線中斷,請重新建立',
-  cooldown_active: '冷卻中,請等待後再跳點',
+// Bilingual backend error code → user-facing message.
+// Looks up the currently selected language from localStorage (set by i18n/index.ts).
+const ERROR_I18N: Record<string, { zh: string; en: string }> = {
+  python313_missing: { zh: '需要 Python 3.13+ 才能啟動 WiFi Tunnel', en: 'Python 3.13+ is required to start the Wi-Fi tunnel' },
+  tunnel_script_missing: { zh: '找不到 wifi_tunnel.py 腳本', en: 'wifi_tunnel.py script not found' },
+  tunnel_spawn_failed: { zh: '無法啟動 Tunnel 進程', en: 'Failed to spawn tunnel process' },
+  tunnel_exited: { zh: 'Tunnel 進程異常結束', en: 'Tunnel process exited unexpectedly' },
+  tunnel_timeout: { zh: 'Tunnel 啟動逾時,請確認 iPhone 解鎖且與電腦同網段', en: 'Tunnel startup timed out — ensure iPhone is unlocked and on the same subnet' },
+  no_device: { zh: '尚未連接任何 iOS 裝置,請先透過 USB 連線', en: 'No iOS device connected — connect via USB first' },
+  no_position: { zh: '尚未取得目前位置,請先跳點到一個座標', en: 'No current position — teleport to a coordinate first' },
+  tunnel_lost: { zh: 'WiFi Tunnel 連線中斷,請重新建立', en: 'Wi-Fi tunnel dropped — please reconnect' },
+  cooldown_active: { zh: '冷卻中,請等待後再跳點', en: 'Cooldown active — wait before teleporting' },
+}
+
+function currentLang(): 'zh' | 'en' {
+  try {
+    const v = localStorage.getItem('locwarp.lang')
+    if (v === 'en' || v === 'zh') return v
+  } catch { /* ignore */ }
+  return (typeof navigator !== 'undefined' && navigator.language?.toLowerCase().startsWith('zh')) ? 'zh' : 'en'
 }
 
 function formatError(detail: unknown, fallback: string): string {
   if (typeof detail === 'string') return detail
   if (detail && typeof detail === 'object') {
     const d = detail as { code?: string; message?: string }
-    if (d.code && ERROR_I18N[d.code]) return ERROR_I18N[d.code]
+    if (d.code && ERROR_I18N[d.code]) return ERROR_I18N[d.code][currentLang()]
     if (d.message) return d.message
   }
   return fallback
