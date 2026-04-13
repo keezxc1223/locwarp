@@ -236,7 +236,7 @@ The installer is self-contained — end users need no Python or Node installed.
 | Backend unreachable after tunnel started | Make sure LocWarp was launched as Administrator |
 | `No such service: com.apple.instruments.dtservicehub` (iOS 17+/26) | LocWarp auto-mounts the Developer Disk Image. If it still fails: (1) Settings → Privacy & Security → **Developer Mode** off, reboot, turn it back on; (2) make sure github.com is reachable (DDI is downloaded from there, ~20 MB); (3) unplug and reconnect the device. Since v0.1.34 LocWarp also falls back to the legacy `com.apple.dt.simulatelocation` service automatically. |
 | DDI download hangs / times out | Check that github.com / raw.githubusercontent.com is reachable — some corporate or campus networks block it. |
-| **Developer Mode option missing** (iOS 16+) | The device must have had a signed app deployed to it before the option appears in Settings. See **Appendix: Enabling Developer Mode on iPhone (Windows)** below. |
+| **Developer Mode option missing** (iOS 16+) | The device must have had a signed app deployed to it before the option appears in Settings. See [Appendix: Enabling Developer Mode on iPhone (Windows)](#appendix-enabling-developer-mode-on-iphone-windows) below. |
 
 ---
 

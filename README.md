@@ -350,7 +350,7 @@ locwarp/
 | Tunnel 啟動後 backend 連不上 | 確認以系統管理員身份啟動 |
 | `No such service: com.apple.instruments.dtservicehub` (iOS 17+/26) | LocWarp 會自動嘗試掛載 Developer Disk Image;若仍失敗,請:(1) 設定 → 隱私權與安全性 → **開發者模式** 關閉,重開機,再次開啟;(2) 確認可連線至 github.com(DDI 由此下載,約 20MB);(3) 拔除重插裝置再試。v0.1.34 起會自動回退到 legacy `com.apple.dt.simulatelocation` 服務。 |
 | DDI 下載卡住 / 逾時 | 檢查網路是否可到達 github.com;公司或校園網路可能封鎖 raw.githubusercontent.com。 |
-| **開發者模式未顯示**(iOS 16+) | 需先讓裝置被任一自簽 IPA 部署過,設定中方會出現該選項。請見下方「附錄:iPhone 開啟開發者模式(Windows 流程)」。 |
+| **開發者模式未顯示**(iOS 16+) | 需先讓裝置被任一自簽 IPA 部署過,設定中方會出現該選項。請見下方 [附錄:iPhone 開啟開發者模式(Windows 流程)](#附錄iphone-開啟開發者模式windows-流程)。 |
 
 ---
 
