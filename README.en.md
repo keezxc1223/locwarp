@@ -11,9 +11,9 @@
 >
 > | iOS Version | Source | Status |
 > | --- | --- | --- |
-> | **26.4.1** | Developer-tested | ✅ Verified working |
-> | **26.4** | Community-reported | ✅ Reported working |
-> | **18.1.1** | Community-reported | ✅ Reported working |
+> | **26.4.1** | Developer-tested | ![Verified](https://img.shields.io/badge/Verified-4caf50?style=flat-square) |
+> | **26.4** | Community-reported | ![Reported](https://img.shields.io/badge/Reported-6c8cff?style=flat-square) |
+> | **18.1.1** | Community-reported | ![Reported](https://img.shields.io/badge/Reported-6c8cff?style=flat-square) |
 >
 > Other versions are untested — please evaluate compatibility before use. Whether things work, break, or you have ideas for improvement, feedback is welcome in [Issues](https://github.com/keezxc1223/locwarp/issues).
 
@@ -120,7 +120,7 @@ Windows needs Apple's USB driver to communicate with iPhone.
 
 - **Required download**: [iTunes for Windows (64-bit)](https://secure-appldnld.apple.com/itunes12/047-76416-20260302-fefe4356-211d-4da1-8bc4-058eb36ea803/iTunes64Setup.exe)
 
-> ⚠ Do **not** use "Apple Devices" from the Microsoft Store — it is **incompatible** and LocWarp will not detect the device. You must install the classic iTunes linked above.
+> **Note:** Do **not** use "Apple Devices" from the Microsoft Store — it is **incompatible** and LocWarp will not detect the device. You must install the classic iTunes linked above.
 
 ### 2. Trust the computer via USB first
 
@@ -143,10 +143,10 @@ To disconnect the USB cable and operate over Wi-Fi:
 
 | Method | Lock-screen impact | Recommendation |
 | --- | --- | --- |
-| **USB** | ✔ Can lock screen freely | — |
-| **Wi-Fi Tunnel** | ✘ Screen lock causes the network interface to sleep, dropping the tunnel | Disable auto-lock during use |
+| **USB** | ![Yes](https://img.shields.io/badge/Lockable-4caf50?style=flat-square) Can lock screen freely | — |
+| **Wi-Fi Tunnel** | ![No](https://img.shields.io/badge/Not_Lockable-f44336?style=flat-square) Lock-screen drops the tunnel | Disable auto-lock during use |
 
-> ⚠ **Under Wi-Fi Tunnel, locking the iPhone's screen will cause the network interface to sleep and drop the RSD tunnel.**
+> **Note:** **Under Wi-Fi Tunnel, locking the iPhone's screen will cause the network interface to sleep and drop the RSD tunnel.**
 >
 > Mitigations (any one works):
 > - **Disable auto-lock**: Settings → Display & Brightness → Auto-Lock → **Never**

@@ -11,9 +11,9 @@
 >
 > | iOS 版本 | 驗證來源 | 狀態 |
 > | --- | --- | --- |
-> | **26.4.1** | 開發者實測 | ✅ 開發者驗證通過 |
-> | **26.4** | 社群使用者回報 | ✅ 回報可正常運作 |
-> | **18.1.1** | 社群使用者回報 | ✅ 回報可正常運作 |
+> | **26.4.1** | 開發者實測 | ![Verified](https://img.shields.io/badge/驗證通過-4caf50?style=flat-square) |
+> | **26.4** | 社群使用者回報 | ![Reported](https://img.shields.io/badge/回報可用-6c8cff?style=flat-square) |
+> | **18.1.1** | 社群使用者回報 | ![Reported](https://img.shields.io/badge/回報可用-6c8cff?style=flat-square) |
 >
 > 其餘版本尚未經過測試,使用前請自行評估相容性。無論是成功運作、遇到問題、發現 Bug,或有任何建議與回饋,皆歡迎至 [Issues](https://github.com/keezxc1223/locwarp/issues) 提出,以協助持續完善本專案。
 
@@ -250,7 +250,7 @@ Windows 需要 Apple 的 USB driver 才能與 iPhone 溝通。
 
 - **下載(必裝)**:[iTunes for Windows (64-bit)](https://secure-appldnld.apple.com/itunes12/047-76416-20260302-fefe4356-211d-4da1-8bc4-058eb36ea803/iTunes64Setup.exe)
 
-> ⚠ 請勿使用 Microsoft Store 的「Apple Devices」— 該版本**不相容**,LocWarp 會抓不到裝置。必須裝上面連結的傳統版 iTunes。
+> **注意:** 請勿使用 Microsoft Store 的「Apple Devices」— 該版本**不相容**,LocWarp 會抓不到裝置。必須裝上面連結的傳統版 iTunes。
 
 ### 2. USB 連接並信任此電腦
 
@@ -273,10 +273,10 @@ iPhone 上:**設定 → 隱私權與安全性 → 開發者模式 → 開啟**
 
 | 連線方式 | 鎖屏影響 | 建議設定 |
 | --- | --- | --- |
-| **USB 有線** | ✔ 可自由鎖定螢幕 | — |
-| **WiFi Tunnel** | ✘ 鎖屏會導致網路介面休眠,Tunnel 中斷 | 建議關閉自動鎖定以維持連線 |
+| **USB 有線** | ![Yes](https://img.shields.io/badge/可鎖屏-4caf50?style=flat-square) 可自由鎖定螢幕 | — |
+| **WiFi Tunnel** | ![No](https://img.shields.io/badge/不可鎖屏-f44336?style=flat-square) 鎖屏會導致網路介面休眠,Tunnel 中斷 | 建議關閉自動鎖定以維持連線 |
 
-> ⚠ **WiFi Tunnel 模式下 iPhone 螢幕熄滅會造成網路介面進入休眠狀態,導致 RSD Tunnel 中斷連線。**
+> **注意:** **WiFi Tunnel 模式下 iPhone 螢幕熄滅會造成網路介面進入休眠狀態,導致 RSD Tunnel 中斷連線。**
 >
 > 建議執行以下任一設定以避免連線中斷:
 > - **關閉自動鎖定**:設定 → 顯示與亮度 → 自動鎖定 → **永不**
