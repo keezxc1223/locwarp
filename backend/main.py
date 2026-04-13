@@ -301,11 +301,13 @@ from api.route import router as route_router
 from api.geocode import router as geocode_router
 from api.bookmarks import router as bookmarks_router
 from api.websocket import router as ws_router
+from api.system import router as system_router
 
 app.include_router(device_router)
 app.include_router(location_router)
 app.include_router(route_router)
 app.include_router(geocode_router)
+app.include_router(system_router)
 app.include_router(bookmarks_router)
 app.include_router(ws_router)
 

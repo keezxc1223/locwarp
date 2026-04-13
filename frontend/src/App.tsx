@@ -1,4 +1,5 @@
 import React, { useState, useCallback, useEffect } from 'react'
+import { createPortal } from 'react-dom'
 import { useT } from './i18n'
 import { useWebSocket } from './hooks/useWebSocket'
 import { useDevice } from './hooks/useDevice'
@@ -257,6 +258,17 @@ const App: React.FC = () => {
     const url = api.exportGpxUrl(id)
     window.open(url, '_blank')
   }, [])
+
+  const handleOpenLog = useCallback(async () => {
+    try {
+      // Open the folder, not the file — log can be large and copy/paste
+      // from a multi-MB Notepad window is painful. Folder lets the user
+      // attach the file directly to the Issue.
+      await api.openLogFolder()
+    } catch (err: any) {
+      showToast(t('status.open_log_failed') + (err?.message ? `: ${err.message}` : ''))
+    }
+  }, [showToast, t])
 
   const handleBookmarkImport = useCallback(async (file: File) => {
     try {
@@ -592,11 +604,12 @@ const App: React.FC = () => {
             onRelease={() => joystick.updateFromPad(0, 0)}
           />
         )}
-        {addBmDialog && (
+        {addBmDialog && createPortal(
           <div
+            onClick={(e) => e.stopPropagation()}
             style={{
-              position: 'absolute', top: 60, left: '50%', transform: 'translateX(-50%)',
-              zIndex: 2500, background: '#23232a', border: '1px solid #3a3a42',
+              position: 'fixed', top: 60, left: '50%', transform: 'translateX(-50%)',
+              zIndex: 100000, background: '#23232a', border: '1px solid #3a3a42',
               borderRadius: 8, padding: 14, width: 300,
               boxShadow: '0 8px 24px rgba(0,0,0,0.5)',
             }}
@@ -640,7 +653,8 @@ const App: React.FC = () => {
               >{t('generic.add')}</button>
               <button className="action-btn" onClick={() => setAddBmDialog(null)}>{t('generic.cancel')}</button>
             </div>
-          </div>
+          </div>,
+          document.body,
         )}
         {sim.error && (
           <div
@@ -666,6 +680,7 @@ const App: React.FC = () => {
           cooldownEnabled={cooldownEnabled}
           onToggleCooldown={handleToggleCooldown}
           onRestore={handleRestore}
+          onOpenLog={handleOpenLog}
         />
 
         {toastMsg && (

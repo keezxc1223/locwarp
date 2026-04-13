@@ -19,6 +19,7 @@ interface StatusBarProps {
   cooldownEnabled: boolean;
   onToggleCooldown: (enabled: boolean) => void;
   onRestore?: () => void;
+  onOpenLog?: () => void;
 }
 
 import type { StringKey } from '../i18n';
@@ -48,6 +49,7 @@ const StatusBar: React.FC<StatusBarProps> = ({
   cooldownEnabled,
   onToggleCooldown,
   onRestore,
+  onOpenLog,
 }) => {
   const t = useT();
   const [cooldownDisplay, setCooldownDisplay] = useState(cooldown);
@@ -225,6 +227,32 @@ const StatusBar: React.FC<StatusBarProps> = ({
             </svg>
             {t('status.restore')}
           </button>
+          {onOpenLog && (
+            <button
+              onClick={onOpenLog}
+              title={t('status.open_log_tooltip')}
+              style={{
+                display: 'flex',
+                alignItems: 'center',
+                gap: 4,
+                padding: '2px 8px',
+                fontSize: 12,
+                background: 'rgba(255, 193, 7, 0.12)',
+                border: '1px solid rgba(255, 193, 7, 0.4)',
+                color: '#ffc107',
+                borderRadius: 4,
+                cursor: 'pointer',
+              }}
+            >
+              <svg width="11" height="11" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2">
+                <path d="M14 2H6a2 2 0 00-2 2v16a2 2 0 002 2h12a2 2 0 002-2V8z" />
+                <polyline points="14 2 14 8 20 8" />
+                <line x1="8" y1="13" x2="16" y2="13" />
+                <line x1="8" y1="17" x2="16" y2="17" />
+              </svg>
+              {t('status.open_log')}
+            </button>
+          )}
         </>
       )}
 

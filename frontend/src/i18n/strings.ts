@@ -31,6 +31,9 @@ export const STRINGS = {
   'status.restore_tooltip': { zh: '清除 iPhone 上的虛擬定位,恢復真實 GPS', en: 'Clear the virtual location and restore real GPS' },
   'status.restore_success': { zh: '已清除虛擬定位', en: 'Virtual location cleared' },
   'status.restore_failed': { zh: '清除失敗', en: 'Clear failed' },
+  'status.open_log': { zh: 'Log 資料夾', en: 'Log Folder' },
+  'status.open_log_tooltip': { zh: '開啟 log 資料夾,方便將 backend.log 附到 Issue', en: 'Open the log folder so you can attach backend.log to an Issue' },
+  'status.open_log_failed': { zh: '無法開啟 log', en: 'Failed to open log' },
   'status.copy_coord': { zh: '複製座標', en: 'Copy coordinates' },
 
   // ── Modes ────────────────────────────────────
@@ -214,6 +217,7 @@ export const STRINGS = {
   'bm.import_tooltip': { zh: '從 JSON 匯入收藏與分類(合併,不覆蓋既有)', en: 'Import bookmarks and categories from JSON (merge, does not overwrite existing)' },
   'bm.import_success': { zh: '匯入成功:共 {n} 筆', en: 'Imported {n} entries' },
   'bm.import_failed': { zh: '匯入失敗:{error}', en: 'Import failed: {error}' },
+  'bm.copy': { zh: '複製名稱與座標', en: 'Copy name & coords' },
   'bm.name_placeholder': { zh: '收藏名稱', en: 'Bookmark name' },
   'bm.no_position': { zh: '目前無可用位置', en: 'No position available' },
   'bm.add_category': { zh: '新增分類', en: 'Add Category' },

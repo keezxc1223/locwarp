@@ -142,6 +142,9 @@ export const deleteCategory = (id: string) => request<any>('DELETE', `/api/bookm
 export const bookmarksExportUrl = () => `${API}/api/bookmarks/export`
 export const importBookmarks = (data: any) => request<{ imported: number }>('POST', '/api/bookmarks/import', data)
 
+export const openLog = () => request<{ status: string; path: string }>('POST', '/api/system/open-log')
+export const openLogFolder = () => request<{ status: string; path: string }>('POST', '/api/system/open-log-folder')
+
 // Routes
 export const planRoute = (start: any, end: any, profile: string) =>
   request<any>('POST', '/api/route/plan', { start, end, profile })
