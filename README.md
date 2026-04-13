@@ -52,7 +52,7 @@
 </p>
 
 <p align="center">
-  <img src="docs/demo.gif" width="720" alt="LocWarp demo">
+  <img src="docs/demo-v2.gif" width="720" alt="LocWarp demo">
 </p>
 
 ---
