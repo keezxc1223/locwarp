@@ -32,6 +32,17 @@ async def websocket_endpoint(ws: WebSocket):
     _connections.append(ws)
     logger.info("WebSocket client connected (%d total)", len(_connections))
 
+    async def _ping_loop():
+        """Send a ping every 20s to keep connection alive through NAT/VPN idle timeouts."""
+        while True:
+            await asyncio.sleep(20)
+            try:
+                await ws.send_text(json.dumps({"type": "ping"}))
+            except Exception:
+                break
+
+    ping_task = asyncio.create_task(_ping_loop())
+
     try:
         while True:
             text = await ws.receive_text()
@@ -42,7 +53,10 @@ async def websocket_endpoint(ws: WebSocket):
 
             msg_type = msg.get("type", "")
 
-            if msg_type == "joystick_input":
+            if msg_type == "pong":
+                pass  # keep-alive reply from client, nothing to do
+
+            elif msg_type == "joystick_input":
                 data = msg.get("data", {})
                 from main import app_state
                 engine = app_state.simulation_engine
@@ -64,6 +78,7 @@ async def websocket_endpoint(ws: WebSocket):
     except Exception as e:
         logger.error("WebSocket error: %s", e)
     finally:
+        ping_task.cancel()
         if ws in _connections:
             _connections.remove(ws)
         logger.info("WebSocket client disconnected (%d remaining)", len(_connections))
