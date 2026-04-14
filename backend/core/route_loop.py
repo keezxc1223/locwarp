@@ -7,7 +7,7 @@ import logging
 import random
 
 from models.schemas import Coordinate, MovementMode, SimulationState
-from config import resolve_speed_profile
+from config import resolve_speed_profile, get_osrm_profile
 
 logger = logging.getLogger(__name__)
 
@@ -47,7 +47,9 @@ class RouteLooper:
             raise ValueError("At least 2 waypoints are required for a loop")
 
         profile_name = mode.value
-        osrm_profile = "foot" if mode in (MovementMode.WALKING, MovementMode.RUNNING) else "car"
+        osrm_profile = get_osrm_profile(
+            profile_name, speed_kmh, speed_min_kmh, speed_max_kmh,
+        )
 
         # Close the loop: append the first waypoint at the end
         closed_waypoints = list(waypoints) + [waypoints[0]]

@@ -3,7 +3,7 @@
 from __future__ import annotations
 
 import logging
-from functools import lru_cache
+import time
 
 import httpx
 
@@ -25,8 +25,10 @@ _PROFILE_MAP = {
 _TIMEOUT = httpx.Timeout(15.0, connect=5.0)
 
 # 路線快取：最多保存 128 條不同路線，避免重複 OSRM 請求（降低延遲）
-_ROUTE_CACHE: dict[tuple, dict] = {}
+# 每條快取附帶存入時間戳；超過 _ROUTE_CACHE_TTL 秒的條目視為過期。
+_ROUTE_CACHE: dict[tuple, tuple[dict, float]] = {}   # key → (result, stored_at)
 _ROUTE_CACHE_MAX = 128
+_ROUTE_CACHE_TTL = 300.0  # 5 分鐘：路況不太可能在 5 分鐘內大幅改變
 
 
 class RouteService:
@@ -60,9 +62,15 @@ class RouteService:
             round(end_lat, 4),   round(end_lng, 4),
             profile,
         )
+        now = time.monotonic()
         if cache_key in _ROUTE_CACHE:
-            logger.debug("Route cache hit: %s", cache_key)
-            return _ROUTE_CACHE[cache_key]
+            cached_result, stored_at = _ROUTE_CACHE[cache_key]
+            if now - stored_at < _ROUTE_CACHE_TTL:
+                logger.debug("Route cache hit: %s", cache_key)
+                return cached_result
+            # 條目已過期：刪除並重新請求
+            logger.debug("Route cache expired: %s", cache_key)
+            del _ROUTE_CACHE[cache_key]
 
         waypoints = [
             (start_lat, start_lng),
@@ -70,11 +78,11 @@ class RouteService:
         ]
         result = await self._fetch_route(waypoints, profile)
 
-        # LRU 淘汰：超過上限時刪除最舊的項目
+        # LRU 淘汰：超過上限時刪除最舊的項目（dict 在 Python 3.7+ 保持插入順序）
         if len(_ROUTE_CACHE) >= _ROUTE_CACHE_MAX:
             oldest_key = next(iter(_ROUTE_CACHE))
             del _ROUTE_CACHE[oldest_key]
-        _ROUTE_CACHE[cache_key] = result
+        _ROUTE_CACHE[cache_key] = (result, now)
         return result
 
     async def get_multi_route(

@@ -7,7 +7,8 @@ import logging
 import random
 
 from models.schemas import Coordinate, MovementMode, SimulationState
-from config import resolve_speed_profile
+from config import resolve_speed_profile, get_osrm_profile
+from services.interpolator import RouteInterpolator
 
 logger = logging.getLogger(__name__)
 
@@ -57,7 +58,9 @@ class MultiStopNavigator:
             )
 
         profile_name = mode.value
-        osrm_profile = "foot" if mode in (MovementMode.WALKING, MovementMode.RUNNING) else "car"
+        osrm_profile = get_osrm_profile(
+            profile_name, speed_kmh, speed_min_kmh, speed_max_kmh,
+        )
 
         def _pick_profile() -> dict:
             return resolve_speed_profile(
@@ -98,7 +101,9 @@ class MultiStopNavigator:
         # If we're not near the first waypoint, navigate there first
         first = waypoints[0]
         start_pos = engine.current_position
-        start_dist = self._quick_distance(start_pos, first)
+        start_dist = RouteInterpolator.haversine(
+            start_pos.lat, start_pos.lng, first.lat, first.lng,
+        )
         if start_dist > 50:  # more than 50m away, route to the first waypoint
             route_data = await engine.route_service.get_route(
                 start_pos.lat, start_pos.lng,
@@ -196,11 +201,3 @@ class MultiStopNavigator:
             await engine._emit("state_change", {"state": engine.state.value})
 
         logger.info("Multi-stop finished after %d laps", engine.lap_count)
-
-    @staticmethod
-    def _quick_distance(a: Coordinate, b: Coordinate) -> float:
-        """Rough distance in meters (good enough for threshold checks)."""
-        import math
-        dlat = math.radians(b.lat - a.lat)
-        dlng = math.radians(b.lng - a.lng) * math.cos(math.radians(a.lat))
-        return 6_371_000 * math.sqrt(dlat ** 2 + dlng ** 2)

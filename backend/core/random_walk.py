@@ -6,11 +6,9 @@ import asyncio
 import logging
 import random
 
-from pymobiledevice3.exceptions import ConnectionTerminatedError
-
 from models.schemas import Coordinate, MovementMode, SimulationState
 from services.interpolator import RouteInterpolator
-from config import resolve_speed_profile
+from config import resolve_speed_profile, get_osrm_profile
 
 logger = logging.getLogger(__name__)
 
@@ -58,7 +56,9 @@ class RandomWalkHandler:
             )
 
         profile_name = mode.value
-        osrm_profile = "foot" if mode in (MovementMode.WALKING, MovementMode.RUNNING) else "car"
+        osrm_profile = get_osrm_profile(
+            profile_name, speed_kmh, speed_min_kmh, speed_max_kmh,
+        )
 
         engine.state = SimulationState.RANDOM_WALK
         engine.distance_traveled = 0.0
@@ -131,8 +131,8 @@ class RandomWalkHandler:
 
             except asyncio.CancelledError:
                 raise  # Don't swallow cancellation
-            except (ConnectionTerminatedError, ConnectionError, OSError) as exc:
-                # Device connection lost (WiFi drop, screen lock, etc.)
+            except (ConnectionError, OSError) as exc:
+                # Device connection lost (WiFi drop, screen lock, USB unplug, etc.)
                 # Use longer backoff and higher retry limit.
                 consecutive_conn_errors += 1
                 backoff = min(5.0 * (2 ** min(consecutive_conn_errors - 1, 5)), 30.0)

@@ -79,6 +79,42 @@ def resolve_speed_profile(
     return SPEED_PROFILES[profile_name]
 
 
+def get_osrm_profile(
+    mode: str,
+    speed_kmh: float | None = None,
+    speed_min_kmh: float | None = None,
+    speed_max_kmh: float | None = None,
+) -> str:
+    """Return the OSRM routing profile string (``"foot"`` or ``"car"``) that
+    best matches the requested movement mode and optional custom speed.
+
+    Decision logic (in order):
+    1. Custom speed > 30 km/h  → ``"car"``
+       (avoids pedestrian-only / footpath routing for fast movement)
+    2. Mode is walking or running → ``"foot"``
+    3. Everything else (driving, or custom speed ≤ 30 km/h) → ``"car"``
+
+    Parameters
+    ----------
+    mode:
+        Movement mode string: ``"walking"``, ``"running"``, or ``"driving"``.
+    speed_kmh:
+        Fixed custom speed in km/h (optional).
+    speed_min_kmh, speed_max_kmh:
+        Speed range in km/h (optional). Midpoint is used for the decision.
+    """
+    # Compute the representative speed to decide the profile
+    effective_kmh: float | None = speed_kmh
+    if effective_kmh is None and speed_min_kmh is not None and speed_max_kmh is not None:
+        effective_kmh = (float(speed_min_kmh) + float(speed_max_kmh)) / 2.0
+
+    if effective_kmh is not None and effective_kmh > 30:
+        return "car"
+    if mode in ("walking", "running"):
+        return "foot"
+    return "car"
+
+
 # Cooldown table: (max_distance_km, cooldown_seconds)
 COOLDOWN_TABLE = [
     (1, 0),
