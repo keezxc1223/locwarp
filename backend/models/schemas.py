@@ -53,45 +53,45 @@ class NavigateRequest(BaseModel):
     lat: float = Field(ge=-90.0, le=90.0)
     lng: float = Field(ge=-180.0, le=180.0)
     mode: MovementMode = MovementMode.WALKING
-    speed_kmh: float | None = None
-    speed_min_kmh: float | None = None
-    speed_max_kmh: float | None = None
+    speed_kmh: float | None = Field(default=None, gt=0, le=300)
+    speed_min_kmh: float | None = Field(default=None, gt=0, le=300)
+    speed_max_kmh: float | None = Field(default=None, gt=0, le=300)
 
 
 class LoopRequest(BaseModel):
-    waypoints: list[Coordinate]
+    waypoints: list[Coordinate] = Field(min_length=2)
     mode: MovementMode = MovementMode.WALKING
-    speed_kmh: float | None = None
-    speed_min_kmh: float | None = None
-    speed_max_kmh: float | None = None
+    speed_kmh: float | None = Field(default=None, gt=0, le=300)
+    speed_min_kmh: float | None = Field(default=None, gt=0, le=300)
+    speed_max_kmh: float | None = Field(default=None, gt=0, le=300)
     pause_enabled: bool = True
-    pause_min: float = 5.0
-    pause_max: float = 20.0
+    pause_min: float = Field(default=5.0, ge=0)
+    pause_max: float = Field(default=20.0, ge=0)
 
 
 class MultiStopRequest(BaseModel):
-    waypoints: list[Coordinate]
+    waypoints: list[Coordinate] = Field(min_length=2)
     mode: MovementMode = MovementMode.WALKING
-    stop_duration: int = 0
+    stop_duration: int = Field(default=0, ge=0)
     loop: bool = False
-    speed_kmh: float | None = None
-    speed_min_kmh: float | None = None
-    speed_max_kmh: float | None = None
+    speed_kmh: float | None = Field(default=None, gt=0, le=300)
+    speed_min_kmh: float | None = Field(default=None, gt=0, le=300)
+    speed_max_kmh: float | None = Field(default=None, gt=0, le=300)
     pause_enabled: bool = True
-    pause_min: float = 5.0
-    pause_max: float = 20.0
+    pause_min: float = Field(default=5.0, ge=0)
+    pause_max: float = Field(default=20.0, ge=0)
 
 
 class RandomWalkRequest(BaseModel):
     center: Coordinate
-    radius_m: float = 500.0
+    radius_m: float = Field(default=500.0, gt=0, le=50_000)
     mode: MovementMode = MovementMode.WALKING
-    speed_kmh: float | None = None
-    speed_min_kmh: float | None = None
-    speed_max_kmh: float | None = None
+    speed_kmh: float | None = Field(default=None, gt=0, le=300)
+    speed_min_kmh: float | None = Field(default=None, gt=0, le=300)
+    speed_max_kmh: float | None = Field(default=None, gt=0, le=300)
     pause_enabled: bool = True
-    pause_min: float = 5.0
-    pause_max: float = 20.0
+    pause_min: float = Field(default=5.0, ge=0)
+    pause_max: float = Field(default=20.0, ge=0)
 
 
 class JoystickStartRequest(BaseModel):

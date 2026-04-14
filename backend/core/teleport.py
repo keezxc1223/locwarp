@@ -24,7 +24,8 @@ class TeleportHandler:
         """
         engine = self.engine
 
-        # Stop any active simulation first
+        # Stop any active simulation first (including PAUSED — must unblock the
+        # pause event and cancel the active task before overwriting the position)
         if engine.state not in (SimulationState.IDLE, SimulationState.DISCONNECTED):
             await engine.stop()
 

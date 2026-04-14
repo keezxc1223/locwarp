@@ -37,10 +37,17 @@ const App: React.FC = () => {
   const [randomWalkRadius, setRandomWalkRadius] = useState(500)
   const [toastMsg, setToastMsg] = useState<string | null>(null)
 
+  const toastTimerRef = React.useRef<ReturnType<typeof setTimeout> | null>(null)
   const showToast = useCallback((msg: string, ms = 2000) => {
+    if (toastTimerRef.current) clearTimeout(toastTimerRef.current)
     setToastMsg(msg)
-    setTimeout(() => setToastMsg(null), ms)
+    toastTimerRef.current = setTimeout(() => {
+      setToastMsg(null)
+      toastTimerRef.current = null
+    }, ms)
   }, [])
+  // Clear timer if App unmounts
+  useEffect(() => () => { if (toastTimerRef.current) clearTimeout(toastTimerRef.current) }, [])
 
   const handleRestore = useCallback(async () => {
     try {
@@ -172,7 +179,7 @@ const App: React.FC = () => {
   }, [addBmDialog, bm])
 
   const handleAddWaypoint = useCallback((lat: number, lng: number) => {
-    sim.setWaypoints((prev: any[]) => [...prev, { lat, lng }])
+    sim.setWaypoints((prev) => [...prev, { lat, lng }])
   }, [sim])
 
   const handleClearWaypoints = useCallback(() => {
@@ -180,7 +187,7 @@ const App: React.FC = () => {
   }, [sim])
 
   const handleRemoveWaypoint = useCallback((index: number) => {
-    sim.setWaypoints((prev: any[]) => prev.filter((_: any, i: number) => i !== index))
+    sim.setWaypoints((prev) => prev.filter((_, i) => i !== index))
   }, [sim])
 
   const handleStartWaypointRoute = useCallback(() => {

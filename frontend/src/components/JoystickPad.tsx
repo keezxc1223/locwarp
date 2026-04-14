@@ -178,12 +178,14 @@ const JoystickPad: React.FC<JoystickPadProps> = ({
     };
   }, [onMove, onRelease]);
 
-  // Direction arrows around the pad
+  // Direction labels around the pad.
+  // Compass convention: 0=N, 90=E, 180=S, 270=W
+  // x/y offsets are in screen-space (x right +, y down +)
   const arrows = [
-    { deg: 0, label: t('joy.east'), x: PAD_RADIUS + 20, y: 0 },
-    { deg: 90, label: t('joy.north'), x: 0, y: -(PAD_RADIUS + 20) },
-    { deg: 180, label: t('joy.west'), x: -(PAD_RADIUS + 20), y: 0 },
-    { deg: 270, label: t('joy.south'), x: 0, y: PAD_RADIUS + 20 },
+    { deg: 0,   label: t('joy.north'), x: 0,                  y: -(PAD_RADIUS + 20) },
+    { deg: 90,  label: t('joy.east'),  x: PAD_RADIUS + 20,    y: 0 },
+    { deg: 180, label: t('joy.south'), x: 0,                  y: PAD_RADIUS + 20 },
+    { deg: 270, label: t('joy.west'),  x: -(PAD_RADIUS + 20), y: 0 },
   ];
 
   return (

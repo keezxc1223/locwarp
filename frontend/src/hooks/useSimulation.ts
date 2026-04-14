@@ -253,7 +253,7 @@ export function useSimulation(wsMessage: WsMessage | null) {
         throw err
       }
     },
-    [moveMode, customSpeedKmh, speedMinKmh, speedMaxKmh, pauseMultiStop, pauseLoop, pauseRandomWalk],
+    [moveMode, customSpeedKmh, speedMinKmh, speedMaxKmh],
   )
 
   const startLoop = useCallback(
@@ -271,7 +271,7 @@ export function useSimulation(wsMessage: WsMessage | null) {
         throw err
       }
     },
-    [moveMode, customSpeedKmh, speedMinKmh, speedMaxKmh, pauseMultiStop, pauseLoop, pauseRandomWalk],
+    [moveMode, customSpeedKmh, speedMinKmh, speedMaxKmh, pauseLoop],
   )
 
   const multiStop = useCallback(
@@ -289,7 +289,7 @@ export function useSimulation(wsMessage: WsMessage | null) {
         throw err
       }
     },
-    [moveMode, customSpeedKmh, speedMinKmh, speedMaxKmh, pauseMultiStop, pauseLoop, pauseRandomWalk],
+    [moveMode, customSpeedKmh, speedMinKmh, speedMaxKmh, pauseMultiStop],
   )
 
   const randomWalk = useCallback(
@@ -306,7 +306,7 @@ export function useSimulation(wsMessage: WsMessage | null) {
         throw err
       }
     },
-    [moveMode, customSpeedKmh, speedMinKmh, speedMaxKmh, pauseMultiStop, pauseLoop, pauseRandomWalk],
+    [moveMode, customSpeedKmh, speedMinKmh, speedMaxKmh, pauseRandomWalk],
   )
 
   const joystickStart = useCallback(async () => {
@@ -382,20 +382,29 @@ export function useSimulation(wsMessage: WsMessage | null) {
   useEffect(() => {
     if (initialFetched.current) return
     initialFetched.current = true
-    api.getStatus().then((res) => {
-      if (res.position) {
-        setCurrentPosition({ lat: res.position.lat, lng: res.position.lng })
+    api.getStatus().then((res: any) => {
+      // current_position (not position) is the backend field name
+      if (res.current_position) {
+        setCurrentPosition({ lat: res.current_position.lat, lng: res.current_position.lng })
       }
-      if (res.mode) setMode(res.mode)
-      if (res.running != null || res.paused != null) {
-        setStatus({
-          running: !!res.running,
-          paused: !!res.paused,
-          speed: res.speed ?? 0,
-        })
+      if (res.state) {
+        const running = !['idle', 'disconnected', 'teleporting'].includes(res.state)
+        const paused = res.state === 'paused' || !!res.is_paused
+        setStatus((prev) => ({
+          ...prev,
+          running,
+          paused,
+          state: res.state,
+          // speed_mps → km/h for display
+          speed: res.speed_mps != null ? Math.round(res.speed_mps * 3.6) : prev.speed,
+          distance_remaining: res.distance_remaining ?? prev.distance_remaining,
+          distance_traveled: res.distance_traveled ?? prev.distance_traveled,
+        }))
       }
+      if (res.progress != null) setProgress(res.progress)
+      if (res.eta_seconds != null) setEta(res.eta_seconds)
     }).catch(() => {
-      // backend may not be running yet
+      // backend may not be running yet — silent fail is intentional
     })
   }, [])
 
