@@ -142,6 +142,24 @@ def _coord_fmt():
     return app_state.coord_formatter
 
 
+def _require_position(engine) -> None:
+    """Raise HTTPException(400) if the engine has no current position.
+
+    Movement modes (navigate, loop, multi-stop, random walk) require a
+    starting position — either from a prior teleport or from the auto-set
+    initial position on device connect. Without it the handler would raise
+    a RuntimeError that gets silently swallowed inside _run_handler.
+    """
+    if engine.current_position is None:
+        raise HTTPException(
+            status_code=400,
+            detail={
+                "code": "no_position",
+                "message": "尚未取得目前位置,請先跳點到一個座標",
+            },
+        )
+
+
 # ── Simulation modes ─────────────────────────────────────
 
 @router.post("/teleport")
@@ -191,6 +209,7 @@ async def teleport(req: TeleportRequest):
 async def navigate(req: NavigateRequest):
     import asyncio
     engine = await _engine()
+    _require_position(engine)
     asyncio.create_task(engine.navigate(
         Coordinate(lat=req.lat, lng=req.lng), req.mode,
         speed_kmh=req.speed_kmh,
@@ -203,6 +222,7 @@ async def navigate(req: NavigateRequest):
 async def loop(req: LoopRequest):
     import asyncio
     engine = await _engine()
+    _require_position(engine)
     asyncio.create_task(engine.start_loop(
         req.waypoints, req.mode,
         speed_kmh=req.speed_kmh,
@@ -216,6 +236,7 @@ async def loop(req: LoopRequest):
 async def multi_stop(req: MultiStopRequest):
     import asyncio
     engine = await _engine()
+    _require_position(engine)
     asyncio.create_task(engine.multi_stop(
         req.waypoints, req.mode, req.stop_duration, req.loop,
         speed_kmh=req.speed_kmh,
@@ -229,6 +250,7 @@ async def multi_stop(req: MultiStopRequest):
 async def random_walk(req: RandomWalkRequest):
     import asyncio
     engine = await _engine()
+    _require_position(engine)
     asyncio.create_task(engine.random_walk(
         req.center, req.radius_m, req.mode,
         speed_kmh=req.speed_kmh,

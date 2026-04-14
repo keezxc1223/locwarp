@@ -520,7 +520,7 @@ class SimulationEngine:
 
             prev_lat, prev_lng = lat, lng
 
-            # 精確等待下一個 update_interval + ±200ms 自然抖動
+            # 精確等待下一個 update_interval + ±50ms 自然抖動（~5% of 1.0s interval）
             # 不做 burst 追趕：下一 tick 直接查詢正確時間位置即可
             elapsed_this_tick = loop.time() - tick_start
             randomness = random.uniform(-_TIMING_RANDOMNESS_MS, _TIMING_RANDOMNESS_MS) / 1000.0

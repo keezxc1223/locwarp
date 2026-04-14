@@ -55,17 +55,27 @@ const StatusBar: React.FC<StatusBarProps> = ({
   const [copied, setCopied] = useState(false);
   const [homePos, setHomePos] = useState<{ lat: number; lng: number } | null>(null);
   const [homeSaved, setHomeSaved] = useState(false);
+  const [now, setNow] = useState(() => new Date());
 
   // Load home position on mount
   useEffect(() => {
     api.getHomePosition().then(r => setHomePos(r.home_position)).catch(() => {});
   }, []);
 
+  // Keep the timestamp ticking every second
+  useEffect(() => {
+    const timer = setInterval(() => setNow(new Date()), 1000);
+    return () => clearInterval(timer);
+  }, []);
+
+  // ~10 m tolerance in decimal degrees (1° ≈ 111 km, so 0.0001° ≈ 11 m).
+  // GPS jitter can shift the displayed position by up to ~1.5 m, so a 10 m
+  // tolerance prevents the home button flickering "not set" after a jitter update.
   const isHomeSet =
     homePos !== null &&
     currentPosition !== null &&
-    Math.abs(homePos.lat - currentPosition!.lat) < 0.000001 &&
-    Math.abs(homePos.lng - currentPosition!.lng) < 0.000001;
+    Math.abs(homePos.lat - currentPosition!.lat) < 0.0001 &&
+    Math.abs(homePos.lng - currentPosition!.lng) < 0.0001;
 
   const handleSetHome = useCallback(async () => {
     if (!currentPosition) return;
@@ -310,9 +320,9 @@ const StatusBar: React.FC<StatusBarProps> = ({
       <LangToggle />
       <div style={{ width: 1, height: 14, background: '#333' }} />
 
-      {/* Timestamp */}
+      {/* Live clock */}
       <span style={{ opacity: 0.4, fontSize: 10 }}>
-        {new Date().toLocaleTimeString(undefined, { hour12: false })}
+        {now.toLocaleTimeString(undefined, { hour12: false })}
       </span>
     </div>
   );
