@@ -56,6 +56,7 @@ class AppState:
         self._last_position = None
         self._home_position: dict | None = None  # 手動設定的固定起始位置
         self._simulator_udid: str | None = None   # 目前連線的模擬器 UDID
+        self._adb_serial: str | None = None        # 目前連線的 ADB 裝置
         self._load_settings()
 
     def _load_settings(self):
@@ -265,6 +266,42 @@ class AppState:
 
         logger.info("Simulation engine created for simulator %s (%s)", name, udid)
 
+    async def create_engine_for_adb(self, serial: str, name: str, loc_service):
+        """Create a SimulationEngine for a BlueStacks / Android device via ADB."""
+        from core.simulation_engine import SimulationEngine
+        from api.websocket import broadcast
+
+        self._adb_serial = serial
+
+        async def event_callback(event_type: str, data: dict):
+            await broadcast(event_type, data)
+            if event_type == "position_update" and "lat" in data:
+                self.update_last_position(data["lat"], data["lng"])
+
+        self.simulation_engine = SimulationEngine(loc_service, event_callback)
+
+        init = await self.get_initial_position_async()
+        from models.schemas import Coordinate
+        self.simulation_engine.current_position = Coordinate(lat=init["lat"], lng=init["lng"])
+
+        for attempt in range(3):
+            try:
+                await loc_service.set(init["lat"], init["lng"])
+                logger.info("ADB initial position set: (%.6f, %.6f)", init["lat"], init["lng"])
+                break
+            except Exception as exc:
+                logger.warning("ADB initial position push failed (attempt %d/3): %s", attempt + 1, exc)
+                if attempt < 2:
+                    await asyncio.sleep(1.0)
+
+        try:
+            await broadcast("position_update", {"lat": init["lat"], "lng": init["lng"],
+                                                "bearing": 0.0, "speed_mps": 0.0})
+        except Exception:
+            pass
+
+        logger.info("Simulation engine created for ADB device %s (%s)", name, serial)
+
 
 app_state = AppState()
 
@@ -435,6 +472,7 @@ from api.geocode import router as geocode_router
 from api.bookmarks import router as bookmarks_router
 from api.websocket import router as ws_router
 from api.simulator import router as simulator_router
+from api.bluestacks import router as bluestacks_router
 
 app.include_router(device_router)
 app.include_router(location_router)
@@ -443,6 +481,7 @@ app.include_router(geocode_router)
 app.include_router(bookmarks_router)
 app.include_router(ws_router)
 app.include_router(simulator_router)
+app.include_router(bluestacks_router)
 
 
 @app.get("/")

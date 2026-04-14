@@ -138,6 +138,12 @@ export const setHomePosition = (lat: number, lng: number) =>
 export const clearHomePosition = () =>
   request<any>('DELETE', '/api/location/settings/home-position')
 
+// BlueStacks / Android Emulator
+export const listAdbDevices = () => request<{ devices: any[] }>('GET', '/api/bluestacks/list')
+export const connectAdb = (serial: string) => request<any>('POST', '/api/bluestacks/connect', { serial })
+export const disconnectAdb = () => request<any>('DELETE', '/api/bluestacks/connect')
+export const getAdbStatus = () => request<any>('GET', '/api/bluestacks/status')
+
 // iOS Simulator
 export const listSimulators = () => request<{ simulators: any[] }>('GET', '/api/simulator/list')
 export const connectSimulator = (udid: string) => request<any>('POST', `/api/simulator/${udid}/connect`)

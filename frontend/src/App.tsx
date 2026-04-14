@@ -11,6 +11,7 @@ import MapView from './components/MapView'
 import ControlPanel from './components/ControlPanel'
 import DeviceStatus from './components/DeviceStatus'
 import SimulatorPanel from './components/SimulatorPanel'
+import BlueStacksPanel from './components/BlueStacksPanel'
 import JoystickPad from './components/JoystickPad'
 import EtaBar from './components/EtaBar'
 import PauseControl from './components/PauseControl'
@@ -333,6 +334,7 @@ const App: React.FC = () => {
           tunnelStatus={device.tunnelStatus}
         />
         <SimulatorPanel />
+        <BlueStacksPanel />
         <ControlPanel
           simMode={sim.mode}
           moveMode={sim.moveMode}
