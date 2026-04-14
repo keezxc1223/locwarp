@@ -23,6 +23,9 @@ from services.bookmarks import BookmarkManager
 from services.coord_format import CoordinateFormatter
 from services.reconnect import ReconnectManager
 from services.scheduler import ScheduledReturn
+from services.location_history import LocationHistory
+from services.geofence import GeofenceService
+from services.schedule_service import ScheduleService
 
 # Configure logging — console + rotating file in ~/.locwarp/logs/
 _log_fmt = "%(asctime)s [%(name)s] %(levelname)s: %(message)s"
@@ -58,6 +61,10 @@ class AppState:
         self._home_position: dict | None = None  # 手動設定的固定起始位置
         self._adb_serial: str | None = None        # 目前連線的 ADB 裝置
         self.scheduled_return = ScheduledReturn()   # 定時回家
+        self.location_history = LocationHistory()   # 地點歷史
+        self.geofence = GeofenceService()           # 地理圍欄
+        self.schedule_service = ScheduleService()   # 排程跳點
+        self.jitter_enabled = True                  # GPS 抖動偽裝
         self._load_settings()
 
     def _load_settings(self):
@@ -168,7 +175,21 @@ class AppState:
         async def event_callback(event_type: str, data: dict):
             await broadcast(event_type, data)
             if event_type == "position_update" and "lat" in data:
-                self.update_last_position(data["lat"], data["lng"])
+                lat, lng = data["lat"], data["lng"]
+                self.update_last_position(lat, lng)
+                self.location_history.record(lat, lng)
+                # Geofence check
+                if await self.geofence.check(lat, lng):
+                    await broadcast("geofence_violated", {"lat": lat, "lng": lng,
+                        "center": {"lat": self.geofence.center_lat, "lng": self.geofence.center_lng},
+                        "radius_m": self.geofence.radius_m})
+                    if self.geofence.auto_return and self.simulation_engine:
+                        try:
+                            await self.simulation_engine.restore()
+                            await self.simulation_engine.teleport(
+                                self.geofence.center_lat, self.geofence.center_lng)
+                        except Exception:
+                            logger.exception("Geofence auto-return failed")
 
         self.simulation_engine = SimulationEngine(loc_service, event_callback)
 
@@ -240,7 +261,18 @@ class AppState:
         async def event_callback(event_type: str, data: dict):
             await broadcast(event_type, data)
             if event_type == "position_update" and "lat" in data:
-                self.update_last_position(data["lat"], data["lng"])
+                lat, lng = data["lat"], data["lng"]
+                self.update_last_position(lat, lng)
+                self.location_history.record(lat, lng)
+                if await self.geofence.check(lat, lng):
+                    await broadcast("geofence_violated", {"lat": lat, "lng": lng})
+                    if self.geofence.auto_return and self.simulation_engine:
+                        try:
+                            await self.simulation_engine.restore()
+                            await self.simulation_engine.teleport(
+                                self.geofence.center_lat, self.geofence.center_lng)
+                        except Exception:
+                            logger.exception("Geofence auto-return failed (ADB)")
 
         self.simulation_engine = SimulationEngine(loc_service, event_callback)
 
@@ -401,10 +433,12 @@ async def lifespan(application: FastAPI):
         logger.exception("Auto-connect on startup failed (device may need manual connect)")
 
     watchdog_task = asyncio.create_task(_usbmux_presence_watchdog())
+    app_state.schedule_service.start_background()
 
     yield
 
     # ── Shutdown ──
+    app_state.schedule_service.stop_background()
     watchdog_task.cancel()
     try:
         await watchdog_task
@@ -436,6 +470,9 @@ from api.geocode import router as geocode_router
 from api.bookmarks import router as bookmarks_router
 from api.websocket import router as ws_router
 from api.bluestacks import router as bluestacks_router
+from api.history import router as history_router
+from api.geofence import router as geofence_router
+from api.schedule import router as schedule_router
 
 app.include_router(device_router)
 app.include_router(location_router)
@@ -444,6 +481,9 @@ app.include_router(geocode_router)
 app.include_router(bookmarks_router)
 app.include_router(ws_router)
 app.include_router(bluestacks_router)
+app.include_router(history_router)
+app.include_router(geofence_router)
+app.include_router(schedule_router)
 
 
 @app.get("/")

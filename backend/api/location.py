@@ -202,6 +202,10 @@ async def teleport(req: TeleportRequest):
     if old_pos and cooldown.enabled:
         await cooldown.start(old_pos.lat, old_pos.lng, req.lat, req.lng)
 
+    # Record to location history
+    from main import app_state as _as
+    _as.location_history.record(req.lat, req.lng)
+
     return {"status": "ok", "lat": req.lat, "lng": req.lng}
 
 
@@ -445,3 +449,21 @@ async def timer_status():
     """取得定時回家計時器狀態。"""
     from main import app_state
     return app_state.scheduled_return.get_status()
+
+
+# ── GPS Jitter (抖動偽裝) ─────────────────────────────────
+
+class JitterRequest(BaseModel):
+    enabled: bool
+
+@router.put("/settings/jitter", tags=["settings"])
+async def set_jitter(req: JitterRequest):
+    """開關 GPS 抖動偽裝（讓 GPS 軌跡更像真實移動）。"""
+    from main import app_state
+    app_state.jitter_enabled = req.enabled
+    return {"jitter_enabled": app_state.jitter_enabled}
+
+@router.get("/settings/jitter", tags=["settings"])
+async def get_jitter():
+    from main import app_state
+    return {"jitter_enabled": app_state.jitter_enabled}

@@ -120,6 +120,29 @@ export const timerStart = (seconds: number) => request<any>('POST', '/api/locati
 export const timerCancel = () => request<any>('DELETE', '/api/location/timer/cancel')
 export const timerStatus = () => request<any>('GET', '/api/location/timer/status')
 
+// Location history
+export const getHistory = () => request<{ entries: any[] }>('GET', '/api/history')
+export const clearHistory = () => request<any>('DELETE', '/api/history')
+
+// Geofence
+export const setGeofence = (lat: number, lng: number, radius_m: number, auto_return: boolean) =>
+  request<any>('PUT', '/api/geofence', { lat, lng, radius_m, auto_return })
+export const clearGeofence = () => request<any>('DELETE', '/api/geofence')
+export const getGeofence = () => request<any>('GET', '/api/geofence')
+
+// Schedule
+export const getSchedule = () => request<{ entries: any[] }>('GET', '/api/schedule')
+export const addSchedule = (entry: any) => request<any>('POST', '/api/schedule', entry)
+export const removeSchedule = (id: string) => request<any>('DELETE', `/api/schedule/${id}`)
+export const toggleSchedule = (id: string, enabled: boolean) =>
+  request<any>('PATCH', `/api/schedule/${id}/toggle?enabled=${enabled}`)
+export const clearSchedule = () => request<any>('DELETE', '/api/schedule')
+
+// GPS Jitter
+export const getJitter = () => request<any>('GET', '/api/location/settings/jitter')
+export const setJitter = (enabled: boolean) =>
+  request<any>('PUT', '/api/location/settings/jitter', { enabled })
+
 // Cooldown
 export const getCooldownStatus = () => request<any>('GET', '/api/location/cooldown/status')
 export const setCooldownEnabled = (enabled: boolean) =>

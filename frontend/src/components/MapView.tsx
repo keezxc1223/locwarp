@@ -34,6 +34,10 @@ interface MapViewProps {
   onAddWaypoint?: (lat: number, lng: number) => void;
   showWaypointOption?: boolean;
   deviceConnected?: boolean;
+  /** When true, left-clicking the map directly adds a waypoint instead of showing pin */
+  drawingMode?: boolean;
+  /** Geofence circle to display on the map */
+  geofence?: { lat: number; lng: number; radius_m: number } | null;
 }
 
 const MapView: React.FC<MapViewProps> = ({
@@ -49,6 +53,8 @@ const MapView: React.FC<MapViewProps> = ({
   onAddWaypoint,
   showWaypointOption,
   deviceConnected = true,
+  drawingMode = false,
+  geofence,
 }) => {
   const t = useT();
   // The map-init useEffect only runs once, so its click handler captures the
@@ -65,6 +71,12 @@ const MapView: React.FC<MapViewProps> = ({
   const polylineRef = useRef<L.Polyline | null>(null);
   const clickMarkerRef = useRef<L.Marker | null>(null);
   const radiusCircleRef = useRef<L.Circle | null>(null);
+  const geofenceCircleRef = useRef<L.Circle | null>(null);
+  // Keep drawingMode accessible inside the stable map click handler
+  const drawingModeRef = useRef(drawingMode);
+  drawingModeRef.current = drawingMode;
+  const onAddWaypointRef = useRef(onAddWaypoint);
+  onAddWaypointRef.current = onAddWaypoint;
 
   const [contextMenu, setContextMenu] = useState<ContextMenuState>({
     visible: false,
@@ -118,6 +130,12 @@ const MapView: React.FC<MapViewProps> = ({
 
     map.on('click', (e: L.LeafletMouseEvent) => {
       closeContextMenu();
+
+      // Drawing mode: left-click directly adds waypoint
+      if (drawingModeRef.current && onAddWaypointRef.current) {
+        onAddWaypointRef.current(e.latlng.lat, e.latlng.lng);
+        return;
+      }
 
       // Reuse the same marker to avoid a visible remount flash at (0,0)
       // before CSS transform kicks in. setLatLng is atomic.
@@ -379,6 +397,31 @@ const MapView: React.FC<MapViewProps> = ({
     }
   }, [randomWalkRadius, currentPosition]);
 
+  // Update geofence circle
+  useEffect(() => {
+    const map = mapRef.current;
+    if (!map) return;
+
+    if (geofenceCircleRef.current) {
+      geofenceCircleRef.current.remove();
+      geofenceCircleRef.current = null;
+    }
+
+    if (geofence && geofence.radius_m > 0) {
+      const circle = L.circle([geofence.lat, geofence.lng], {
+        radius: geofence.radius_m,
+        color: '#06b6d4',
+        weight: 2,
+        opacity: 0.8,
+        fillColor: '#06b6d4',
+        fillOpacity: 0.06,
+        dashArray: '6, 4',
+      }).addTo(map);
+      circle.bindTooltip(`圍欄 ${geofence.radius_m}m`, { direction: 'top', sticky: true });
+      geofenceCircleRef.current = circle;
+    }
+  }, [geofence]);
+
   // Close context menu on outside click
   useEffect(() => {
     const handler = () => closeContextMenu();
@@ -396,7 +439,21 @@ const MapView: React.FC<MapViewProps> = ({
 
   return (
     <div className="map-container" style={{ position: 'relative', flex: 1 }}>
-      <div ref={mapContainerRef} style={{ width: '100%', height: '100%' }} />
+      <div
+        ref={mapContainerRef}
+        style={{ width: '100%', height: '100%', cursor: drawingMode ? 'crosshair' : undefined }}
+      />
+      {/* Drawing mode banner */}
+      {drawingMode && (
+        <div style={{
+          position: 'absolute', top: 8, left: '50%', transform: 'translateX(-50%)',
+          zIndex: 900, background: 'rgba(255,152,0,0.92)', color: '#1a1a1a',
+          padding: '5px 14px', borderRadius: 14, fontSize: 12, fontWeight: 600,
+          pointerEvents: 'none', boxShadow: '0 2px 8px rgba(0,0,0,0.3)',
+        }}>
+          ✏️ 繪圖模式：點擊地圖新增航點
+        </div>
+      )}
 
       {/* Recenter on user position */}
       <button

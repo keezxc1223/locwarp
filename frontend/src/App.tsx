@@ -12,6 +12,10 @@ import ControlPanel from './components/ControlPanel'
 import DeviceStatus from './components/DeviceStatus'
 import BlueStacksPanel from './components/BlueStacksPanel'
 import TimerPanel from './components/TimerPanel'
+import HistoryPanel from './components/HistoryPanel'
+import GamePresetsPanel from './components/GamePresetsPanel'
+import GeofencePanel from './components/GeofencePanel'
+import SchedulePanel from './components/SchedulePanel'
 import JoystickPad from './components/JoystickPad'
 import EtaBar from './components/EtaBar'
 import PauseControl from './components/PauseControl'
@@ -38,6 +42,8 @@ const App: React.FC = () => {
   const [cooldownEnabled, setCooldownEnabled] = useState(true)
   const [randomWalkRadius, setRandomWalkRadius] = useState(500)
   const [toastMsg, setToastMsg] = useState<string | null>(null)
+  const [drawingMode, setDrawingMode] = useState(false)
+  const [geofence, setGeofence] = useState<{ lat: number; lng: number; radius_m: number } | null>(null)
 
   const toastTimerRef = React.useRef<ReturnType<typeof setTimeout> | null>(null)
   const showToast = useCallback((msg: string, ms = 2000) => {
@@ -118,6 +124,14 @@ const App: React.FC = () => {
   const handleToggleCooldown = useCallback((enabled: boolean) => {
     setCooldownEnabled(enabled)
     api.setCooldownEnabled(enabled).catch(() => setCooldownEnabled((v) => !v))
+  }, [])
+
+  const handleApplyPreset = useCallback((speedKmh: number) => {
+    sim.setCustomSpeedKmh(speedKmh)
+  }, [sim])
+
+  const handleDrawingToggle = useCallback(() => {
+    setDrawingMode(v => !v)
   }, [])
 
   // Load saved routes on mount
@@ -335,6 +349,17 @@ const App: React.FC = () => {
         />
         <BlueStacksPanel />
         <TimerPanel wsMessage={ws.lastMessage} />
+        <GamePresetsPanel onApplyPreset={handleApplyPreset} />
+        <GeofencePanel
+          currentPosition={currentPos}
+          wsMessage={ws.lastMessage}
+          onGeofenceChange={setGeofence}
+        />
+        <SchedulePanel
+          currentPosition={currentPos}
+          wsMessage={ws.lastMessage}
+        />
+        <HistoryPanel onJump={handleTeleport} />
         <ControlPanel
           simMode={sim.mode}
           moveMode={sim.moveMode}
@@ -495,6 +520,34 @@ const App: React.FC = () => {
           traveledDistance={sim.status?.distance_traveled ?? 0}
           eta={sim.eta ?? 0}
         />
+        {/* Drawing mode toggle — only visible in loop/multistop modes */}
+        {(sim.mode === SimMode.Loop || sim.mode === SimMode.MultiStop) && (
+          <button
+            onClick={handleDrawingToggle}
+            title={drawingMode ? '關閉繪圖模式' : '開啟繪圖模式（點地圖新增航點）'}
+            style={{
+              position: 'absolute',
+              right: 16,
+              bottom: 70,
+              zIndex: 800,
+              width: 40,
+              height: 40,
+              borderRadius: '50%',
+              border: `1px solid ${drawingMode ? 'rgba(255,152,0,0.6)' : 'rgba(255,255,255,0.15)'}`,
+              background: drawingMode ? 'rgba(255,152,0,0.85)' : 'rgba(40, 44, 60, 0.95)',
+              color: drawingMode ? '#1a1a1a' : '#94a3b8',
+              cursor: 'pointer',
+              boxShadow: '0 2px 8px rgba(0,0,0,0.35)',
+              display: 'flex',
+              alignItems: 'center',
+              justifyContent: 'center',
+              fontSize: 18,
+              padding: 0,
+            }}
+          >
+            ✏️
+          </button>
+        )}
         {sim.ddiMounting && (
           <div
             style={{
@@ -580,6 +633,8 @@ const App: React.FC = () => {
           onAddWaypoint={handleAddWaypoint}
           showWaypointOption={sim.mode === SimMode.Loop || sim.mode === SimMode.MultiStop || sim.mode === SimMode.Navigate}
           deviceConnected={device.connectedDevice !== null}
+          drawingMode={drawingMode && (sim.mode === SimMode.Loop || sim.mode === SimMode.MultiStop)}
+          geofence={geofence}
         />
         {sim.mode === SimMode.Joystick && (
           <JoystickPad
