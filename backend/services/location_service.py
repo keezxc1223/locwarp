@@ -173,6 +173,45 @@ class DvtLocationService(LocationService):
             raise
 
 
+class SimulatorLocationService(LocationService):
+    """
+    Location simulation for iOS Simulator via ``xcrun simctl location``.
+
+    No persistent connection is needed — each set/clear spawns a short-lived
+    simctl subprocess.  Works with any booted simulator UDID.
+    """
+
+    def __init__(self, udid: str) -> None:
+        self._udid = udid
+        self._active = False
+
+    async def set(self, lat: float, lng: float) -> None:
+        proc = await asyncio.create_subprocess_exec(
+            "xcrun", "simctl", "location", self._udid, "set", f"{lat},{lng}",
+            stdout=asyncio.subprocess.DEVNULL,
+            stderr=asyncio.subprocess.PIPE,
+        )
+        _, stderr = await proc.communicate()
+        if proc.returncode != 0:
+            msg = stderr.decode().strip()
+            logger.error("simctl location set failed: %s", msg)
+            raise RuntimeError(f"simctl location set failed: {msg}")
+        self._active = True
+        logger.debug("Simulator location set to (%.6f, %.6f)", lat, lng)
+
+    async def clear(self) -> None:
+        if not self._active:
+            return
+        proc = await asyncio.create_subprocess_exec(
+            "xcrun", "simctl", "location", self._udid, "clear",
+            stdout=asyncio.subprocess.DEVNULL,
+            stderr=asyncio.subprocess.PIPE,
+        )
+        await proc.communicate()
+        self._active = False
+        logger.info("Simulator location cleared")
+
+
 class LegacyLocationService(LocationService):
     """
     Location simulation for iOS < 17 devices via DtSimulateLocation.

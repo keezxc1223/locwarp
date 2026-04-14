@@ -138,6 +138,12 @@ export const setHomePosition = (lat: number, lng: number) =>
 export const clearHomePosition = () =>
   request<any>('DELETE', '/api/location/settings/home-position')
 
+// iOS Simulator
+export const listSimulators = () => request<{ simulators: any[] }>('GET', '/api/simulator/list')
+export const connectSimulator = (udid: string) => request<any>('POST', `/api/simulator/${udid}/connect`)
+export const disconnectSimulator = (udid: string) => request<any>('DELETE', `/api/simulator/${udid}/connect`)
+export const getSimulatorStatus = () => request<any>('GET', '/api/simulator/status')
+
 // Geocoding
 export const searchAddress = (q: string) => request<any[]>('GET', `/api/geocode/search?q=${encodeURIComponent(q)}`)
 export const reverseGeocode = (lat: number, lng: number) =>
