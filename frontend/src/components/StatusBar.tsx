@@ -1,7 +1,8 @@
-import React, { useEffect, useState } from 'react';
+import React, { useEffect, useState, useCallback } from 'react';
 import { SimMode } from '../hooks/useSimulation';
 import { useT } from '../i18n';
 import LangToggle from './LangToggle';
+import * as api from '../services/api';
 
 interface Position {
   lat: number;
@@ -52,6 +53,33 @@ const StatusBar: React.FC<StatusBarProps> = ({
   const t = useT();
   const [cooldownDisplay, setCooldownDisplay] = useState(cooldown);
   const [copied, setCopied] = useState(false);
+  const [homePos, setHomePos] = useState<{ lat: number; lng: number } | null>(null);
+  const [homeSaved, setHomeSaved] = useState(false);
+
+  // Load home position on mount
+  useEffect(() => {
+    api.getHomePosition().then(r => setHomePos(r.home_position)).catch(() => {});
+  }, []);
+
+  const isHomeSet =
+    homePos !== null &&
+    currentPosition !== null &&
+    Math.abs(homePos.lat - currentPosition!.lat) < 0.000001 &&
+    Math.abs(homePos.lng - currentPosition!.lng) < 0.000001;
+
+  const handleSetHome = useCallback(async () => {
+    if (!currentPosition) return;
+    if (isHomeSet) {
+      // Already home → clear it
+      await api.clearHomePosition().catch(() => {});
+      setHomePos(null);
+    } else {
+      await api.setHomePosition(currentPosition.lat, currentPosition.lng).catch(() => {});
+      setHomePos({ lat: currentPosition.lat, lng: currentPosition.lng });
+      setHomeSaved(true);
+      setTimeout(() => setHomeSaved(false), 1500);
+    }
+  }, [currentPosition, isHomeSet]);
 
   useEffect(() => {
     setCooldownDisplay(cooldown);
@@ -162,6 +190,31 @@ const StatusBar: React.FC<StatusBarProps> = ({
                 <svg width="11" height="11" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2">
                   <rect x="9" y="9" width="13" height="13" rx="2" />
                   <path d="M5 15H4a2 2 0 01-2-2V4a2 2 0 012-2h9a2 2 0 012 2v1" />
+                </svg>
+              )}
+            </button>
+            {/* Home position button */}
+            <button
+              onClick={handleSetHome}
+              title={isHomeSet ? '取消固定起始位置' : homeSaved ? '已設定！' : '設為起始位置（每次啟動從此處開始）'}
+              style={{
+                background: 'transparent', border: 'none', cursor: 'pointer',
+                padding: '0 4px',
+                color: isHomeSet ? '#ff9800' : homeSaved ? '#4caf50' : 'rgba(255,255,255,0.45)',
+                display: 'inline-flex', alignItems: 'center',
+                transition: 'color 0.2s',
+              }}
+            >
+              {homeSaved && !isHomeSet ? (
+                /* tick flash */
+                <svg width="11" height="11" viewBox="0 0 24 24" fill="none" stroke="#4caf50" strokeWidth="3">
+                  <polyline points="20 6 9 17 4 12" />
+                </svg>
+              ) : (
+                /* house icon — filled if this position is the pinned home */
+                <svg width="12" height="12" viewBox="0 0 24 24" fill={isHomeSet ? '#ff9800' : 'none'} stroke={isHomeSet ? '#ff9800' : 'currentColor'} strokeWidth="2">
+                  <path d="M3 9.5L12 3l9 6.5V20a1 1 0 01-1 1H4a1 1 0 01-1-1V9.5z" />
+                  <polyline points="9,21 9,12 15,12 15,21" />
                 </svg>
               )}
             </button>

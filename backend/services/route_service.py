@@ -3,6 +3,7 @@
 from __future__ import annotations
 
 import logging
+from functools import lru_cache
 
 import httpx
 
@@ -22,6 +23,10 @@ _PROFILE_MAP = {
 }
 
 _TIMEOUT = httpx.Timeout(15.0, connect=5.0)
+
+# 路線快取：最多保存 128 條不同路線，避免重複 OSRM 請求（降低延遲）
+_ROUTE_CACHE: dict[tuple, dict] = {}
+_ROUTE_CACHE_MAX = 128
 
 
 class RouteService:
@@ -49,11 +54,28 @@ class RouteService:
             distance:        total distance in meters
             leg_durations:   list of per-leg durations (seconds)
         """
+        # 快取 key：座標四捨五入到小數第4位（~11m 精度），避免浮點微差造成 cache miss
+        cache_key = (
+            round(start_lat, 4), round(start_lng, 4),
+            round(end_lat, 4),   round(end_lng, 4),
+            profile,
+        )
+        if cache_key in _ROUTE_CACHE:
+            logger.debug("Route cache hit: %s", cache_key)
+            return _ROUTE_CACHE[cache_key]
+
         waypoints = [
             (start_lat, start_lng),
             (end_lat, end_lng),
         ]
-        return await self._fetch_route(waypoints, profile)
+        result = await self._fetch_route(waypoints, profile)
+
+        # LRU 淘汰：超過上限時刪除最舊的項目
+        if len(_ROUTE_CACHE) >= _ROUTE_CACHE_MAX:
+            oldest_key = next(iter(_ROUTE_CACHE))
+            del _ROUTE_CACHE[oldest_key]
+        _ROUTE_CACHE[cache_key] = result
+        return result
 
     async def get_multi_route(
         self,

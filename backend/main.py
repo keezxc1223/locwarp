@@ -1,6 +1,13 @@
 import asyncio
 import json
 import logging
+
+# 使用 uvloop 替換預設事件迴圈，提升計時精度與效能（macOS/Linux）
+try:
+    import uvloop
+    asyncio.set_event_loop_policy(uvloop.EventLoopPolicy())
+except ImportError:
+    pass  # Windows 不支援 uvloop，靜默跳過
 from contextlib import asynccontextmanager
 from logging.handlers import RotatingFileHandler
 from pathlib import Path
@@ -47,6 +54,7 @@ class AppState:
         self.coord_formatter = CoordinateFormatter()
         self.reconnect_manager = None
         self._last_position = None
+        self._home_position: dict | None = None  # 手動設定的固定起始位置
         self._load_settings()
 
     def _load_settings(self):
@@ -56,6 +64,9 @@ class AppState:
                 pos = data.get("last_position")
                 if pos:
                     self._last_position = pos
+                home = data.get("home_position")
+                if home:
+                    self._home_position = home
                 fmt = data.get("coord_format")
                 if fmt:
                     from models.schemas import CoordinateFormat
@@ -69,6 +80,7 @@ class AppState:
     def save_settings(self):
         data = {
             "last_position": self._last_position,
+            "home_position": self._home_position,
             "coord_format": self.coord_formatter.format.value,
             "cooldown_enabled": self.cooldown_timer.enabled,
         }
@@ -78,13 +90,70 @@ class AppState:
             logger.warning("Failed to save settings: %s", e)
 
     def get_initial_position(self) -> dict:
+        """Return last saved position, or DEFAULT_LOCATION as synchronous fallback."""
         if self._last_position:
             return self._last_position
-        # Could try IP geolocation here; fallback to default
+        return DEFAULT_LOCATION
+
+    async def _fetch_ip_location(self) -> dict | None:
+        """Fetch approximate location via IP geolocation (ip-api.com, free, no key).
+
+        Returns a ``{"lat": float, "lng": float}`` dict on success, or ``None``
+        if the request fails or the response is not actionable.
+        """
+        try:
+            import httpx
+            async with httpx.AsyncClient(timeout=5.0) as client:
+                resp = await client.get(
+                    "http://ip-api.com/json?fields=status,lat,lon,city,country"
+                )
+                data = resp.json()
+                if data.get("status") == "success":
+                    lat, lng = float(data["lat"]), float(data["lon"])
+                    city = data.get("city", "")
+                    country = data.get("country", "")
+                    logger.info(
+                        "IP geolocation: (%.4f, %.4f) — %s, %s",
+                        lat, lng, city, country,
+                    )
+                    return {"lat": lat, "lng": lng}
+                logger.debug("IP geolocation returned non-success status: %s", data)
+        except Exception as exc:
+            logger.debug("IP geolocation failed (%s: %s); using default", type(exc).__name__, exc)
+        return None
+
+    async def get_initial_position_async(self) -> dict:
+        """Return the best available initial position, in priority order:
+
+        1. Manually pinned home position (user-set via UI)
+        2. Last saved position from settings.json
+        3. IP geolocation (city-level, no API key required)
+        4. DEFAULT_LOCATION (Taipei City Hall hardcoded fallback)
+        """
+        if self._home_position:
+            logger.info(
+                "Using home position: (%.6f, %.6f)",
+                self._home_position["lat"], self._home_position["lng"],
+            )
+            return self._home_position
+        if self._last_position:
+            logger.info(
+                "Using last saved position: (%.6f, %.6f)",
+                self._last_position["lat"], self._last_position["lng"],
+            )
+            return self._last_position
+        ip_loc = await self._fetch_ip_location()
+        if ip_loc:
+            return ip_loc
+        logger.info("Falling back to DEFAULT_LOCATION")
         return DEFAULT_LOCATION
 
     def update_last_position(self, lat: float, lng: float):
         self._last_position = {"lat": lat, "lng": lng}
+        # 每 10 次位置更新儲存一次，防止異常退出遺失資料
+        self._position_update_count = getattr(self, "_position_update_count", 0) + 1
+        if self._position_update_count % 10 == 0:
+            self.save_settings()
 
     async def create_engine_for_device(self, udid: str):
         """Create a SimulationEngine for the connected device."""
@@ -100,29 +169,55 @@ class AppState:
 
         self.simulation_engine = SimulationEngine(loc_service, event_callback)
 
-        # Set initial position and push to device
-        init = self.get_initial_position()
+        # 決定起始位置（優先順序：home > last > IP > 預設）
+        init = await self.get_initial_position_async()
         from models.schemas import Coordinate
         self.simulation_engine.current_position = Coordinate(
             lat=init["lat"], lng=init["lng"]
         )
 
-        # Actually simulate the position on the device
-        try:
-            await loc_service.set(init["lat"], init["lng"])
-            logger.info("Initial position set on device: (%.6f, %.6f)", init["lat"], init["lng"])
-        except Exception as exc:
-            # Don't leave a half-constructed engine behind — the location
-            # service channel is broken; drop the engine so _engine() will
-            # lazy-rebuild on the next movement command instead of reusing
-            # a dead service. Broadcast so the UI knows.
-            logger.exception("Failed to push initial position to device; clearing engine")
-            self.simulation_engine = None
+        # 將起始位置注入手機 GPS，最多重試 3 次（冷啟動時 DVT 可能需要時間初始化）
+        _set_ok = False
+        for _attempt in range(3):
+            try:
+                await loc_service.set(init["lat"], init["lng"])
+                _set_ok = True
+                logger.info(
+                    "Initial position set on device: (%.6f, %.6f) [attempt %d]",
+                    init["lat"], init["lng"], _attempt + 1,
+                )
+                break
+            except Exception as exc:
+                logger.warning(
+                    "Initial position push failed (attempt %d/3): %s",
+                    _attempt + 1, exc,
+                )
+                if _attempt < 2:
+                    await asyncio.sleep(1.0)
+
+        if not _set_ok:
+            # 3 次均失敗：保留 engine（current_position 已設定，UI 仍可顯示位置）
+            # 讓使用者自行操作（如 Teleport）觸發下一次 set()
+            logger.error(
+                "Could not push initial position to device after 3 attempts. "
+                "Engine kept alive; user action will trigger next push."
+            )
             try:
                 await broadcast("device_error", {
                     "udid": udid,
                     "stage": "initial_position",
-                    "error": f"{exc.__class__.__name__}: {exc}",
+                    "error": "Initial GPS set failed after 3 retries. Try teleporting manually.",
+                })
+            except Exception:
+                pass
+        else:
+            # 成功後廣播 position_update 讓前端地圖立即定位
+            try:
+                await broadcast("position_update", {
+                    "lat": init["lat"],
+                    "lng": init["lng"],
+                    "bearing": 0.0,
+                    "speed_mps": 0.0,
                 })
             except Exception:
                 pass

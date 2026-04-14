@@ -42,7 +42,14 @@ class Navigator:
         speed_profile = resolve_speed_profile(profile_name, speed_kmh, speed_min_kmh, speed_max_kmh)
 
         # Map movement mode to OSRM routing profile
-        osrm_profile = "foot" if mode in (MovementMode.WALKING, MovementMode.RUNNING) else "car"
+        # 若自訂速度超過 30 km/h，強制使用 car 路線避免行人路徑（轉角多、繞路長）
+        _effective_kmh = speed_kmh or (speed_min_kmh and speed_max_kmh and (speed_min_kmh + speed_max_kmh) / 2)
+        if _effective_kmh and _effective_kmh > 30:
+            osrm_profile = "car"
+        elif mode in (MovementMode.WALKING, MovementMode.RUNNING):
+            osrm_profile = "foot"
+        else:
+            osrm_profile = "car"
 
         logger.info(
             "Navigating from (%.6f, %.6f) to (%.6f, %.6f) [%s]",

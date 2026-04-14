@@ -4,6 +4,7 @@ from __future__ import annotations
 
 import asyncio
 import logging
+import random
 import time
 from datetime import datetime, timedelta, timezone
 
@@ -392,10 +393,6 @@ class SimulationEngine:
         self._current_speed_mps = speed_mps
 
         # Calculate total route distance
-        total_distance = RouteInterpolator.haversine(
-            coords[0].lat, coords[0].lng,
-            coords[0].lat, coords[0].lng,
-        )  # will be recalculated below
         total_distance = 0.0
         for i in range(len(coords) - 1):
             total_distance += RouteInterpolator.haversine(
@@ -406,47 +403,84 @@ class SimulationEngine:
         self.eta_tracker.start(total_distance, speed_mps)
         self.distance_remaining = total_distance
 
+        # 先用 RDP 去除 OSRM 多餘的密集點，再做時間插值
+        simplified_coords = RouteInterpolator.rdp_simplify(coords, epsilon_m=2.0)
+
         # Interpolate the route into dense timed points
         timed_points = RouteInterpolator.interpolate(
-            coords, speed_mps, update_interval,
+            simplified_coords, speed_mps, update_interval,
         )
 
         if not timed_points:
             return
 
-        accumulated_distance = 0.0
+        total_duration = timed_points[-1]["timestamp_offset"]
         prev_lat = timed_points[0]["lat"]
         prev_lng = timed_points[0]["lng"]
+        accumulated_distance = 0.0  # 實際累計距離（用於 ETA 和進度追蹤）
+        smooth_bearing = timed_points[0].get("bearing", 0.0)  # 平滑方位角
 
-        for idx, point in enumerate(timed_points):
+        # ── 時間驅動迴圈 ──────────────────────────────────────────────
+        # 每次 tick 以「牆鐘經過時間」查詢路線上的正確位置，
+        # 而不是逐點迭代。好處：
+        #   1. tick 慢了 → 直接跳到應有位置，不 burst 連射
+        #   2. 不受 carry 計算影響，位移永遠固定為 speed × interval
+        #   3. 暫停後繼續，時間自動補償
+        #
+        # timing_randomness: ±50ms 自然抖動（約 5% of 1.0s interval）
+        # 舊版 ±200ms 相當於 ±67% of 0.3s，造成速度感知混亂。
+        _TIMING_RANDOMNESS_MS = 50
+        loop = asyncio.get_running_loop()
+        route_start_time = loop.time()
+        pause_offset = 0.0
+
+        while True:
+            tick_start = loop.time()
+
             # ── Check stop ──
             if self._stop_event.is_set():
-                logger.debug("Stop event detected at point %d/%d", idx, len(timed_points))
                 break
 
             # ── Check pause ──
             if not self._pause_event.is_set():
-                logger.debug("Paused at point %d/%d", idx, len(timed_points))
+                pause_begin = loop.time()
                 await self._pause_event.wait()
-                # After resume, re-check stop
+                pause_offset += loop.time() - pause_begin
                 if self._stop_event.is_set():
                     break
+                tick_start = loop.time()
 
-            lat = point["lat"]
-            lng = point["lng"]
-            bearing = point.get("bearing", 0.0)
+            # 計算本次 tick 對應的路線時間位移
+            elapsed = tick_start - route_start_time - pause_offset
 
-            # Calculate distance from previous point
+            # 路線結束
+            if elapsed >= total_duration:
+                lat, lng, bearing = RouteInterpolator.get_position_at_time(timed_points, total_duration)
+                jittered_lat, jittered_lng = RouteInterpolator.add_jitter(lat, lng, jitter)
+                try:
+                    await self._set_position(jittered_lat, jittered_lng)
+                except Exception:
+                    pass
+                break
+
+            # 查詢此時刻的精確位置（二分搜尋 + 線性插值）
+            lat, lng, bearing = RouteInterpolator.get_position_at_time(timed_points, elapsed)
+
+            # 計算本步實際位移和方位角
             step_dist = RouteInterpolator.haversine(prev_lat, prev_lng, lat, lng)
             accumulated_distance += step_dist
+
+            # 從實際移動方向計算方位角（低通濾波平滑，避免抖動）
+            if step_dist > 0.5:  # 只在有明顯移動時更新方位角
+                raw_bearing = RouteInterpolator.bearing(prev_lat, prev_lng, lat, lng)
+                # 低通濾波：alpha=0.3 → 新值佔 30%，舊值佔 70%，轉角不突變
+                diff = ((raw_bearing - smooth_bearing + 180) % 360) - 180
+                smooth_bearing = (smooth_bearing + 0.3 * diff) % 360
 
             # Add GPS jitter for realism
             jittered_lat, jittered_lng = RouteInterpolator.add_jitter(lat, lng, jitter)
 
-            # Push position to device, with limited retry on transient
-            # connection errors (USB jiggle, WiFi blip, screen-lock dip).
-            # After max retries on the same point, give up cleanly so the
-            # handler can run its finally-cleanup.
+            # Push position to device, with limited retry on transient errors
             pushed = False
             for attempt in range(3):
                 try:
@@ -467,17 +501,16 @@ class SimulationEngine:
                 logger.error("Giving up on this route after repeated push failures")
                 break
 
-            # Update tracking
+            # 更新距離追蹤（使用實際累計距離，而非速度估算）
             self.distance_traveled += step_dist
             self.distance_remaining = max(total_distance - accumulated_distance, 0.0)
             self.eta_tracker.update(accumulated_distance)
-            self.segment_index = min(idx, self.total_segments)
 
             # Emit position update
             await self._emit("position_update", {
                 "lat": jittered_lat,
                 "lng": jittered_lng,
-                "bearing": bearing,
+                "bearing": smooth_bearing,
                 "speed_mps": speed_mps,
                 "progress": self.eta_tracker.progress,
                 "distance_remaining": self.distance_remaining,
@@ -487,21 +520,19 @@ class SimulationEngine:
 
             prev_lat, prev_lng = lat, lng
 
-            # Wait for the next tick (unless this is the last point)
-            if idx < len(timed_points) - 1:
-                next_point = timed_points[idx + 1]
-                wait_time = next_point["timestamp_offset"] - point["timestamp_offset"]
-                if wait_time > 0:
-                    try:
-                        await asyncio.wait_for(
-                            self._stop_event.wait(),
-                            timeout=wait_time,
-                        )
-                        # Stop event was set during the wait
-                        break
-                    except asyncio.TimeoutError:
-                        # Normal -- time to move to the next point
-                        pass
+            # 精確等待下一個 update_interval + ±200ms 自然抖動
+            # 不做 burst 追趕：下一 tick 直接查詢正確時間位置即可
+            elapsed_this_tick = loop.time() - tick_start
+            randomness = random.uniform(-_TIMING_RANDOMNESS_MS, _TIMING_RANDOMNESS_MS) / 1000.0
+            sleep_time = max(0.05, update_interval - elapsed_this_tick + randomness)
+            try:
+                await asyncio.wait_for(
+                    self._stop_event.wait(),
+                    timeout=sleep_time,
+                )
+                break  # stop event fired
+            except asyncio.TimeoutError:
+                pass  # 正常，繼續下一個 tick
 
         self._current_speed_mps = 0.0
 

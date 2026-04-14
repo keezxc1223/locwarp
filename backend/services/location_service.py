@@ -135,7 +135,7 @@ class DvtLocationService(LocationService):
             sim = await self._ensure_instrument()
             await sim.set(lat, lng)
             self._active = True
-            logger.info("DVT location set to (%.6f, %.6f)", lat, lng)
+            logger.debug("DVT location set to (%.6f, %.6f)", lat, lng)
         except (ConnectionTerminatedError, OSError, EOFError, BrokenPipeError,
                 ConnectionResetError, asyncio.TimeoutError) as exc:
             logger.warning("DVT channel dropped (%s: %s); reconnecting and retrying",
@@ -210,7 +210,7 @@ class LegacyLocationService(LocationService):
             svc = self._ensure_service()
             svc.set(lat, lng)
             self._active = True
-            logger.info("Legacy location set to (%.6f, %.6f)", lat, lng)
+            logger.debug("Legacy location set to (%.6f, %.6f)", lat, lng)
         except (OSError, EOFError, BrokenPipeError, ConnectionResetError) as exc:
             logger.warning("Legacy location channel dropped (%s: %s); reconnecting and retrying",
                            type(exc).__name__, exc)

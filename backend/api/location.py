@@ -348,3 +348,30 @@ async def set_coord_format(req: CoordFormatRequest):
     fmt = _coord_fmt()
     fmt.format = req.format
     return {"format": fmt.format.value}
+
+
+# ── Home position (fixed startup location) ───────────────
+
+@router.get("/settings/home-position", tags=["settings"])
+async def get_home_position():
+    """Return the manually pinned home (startup) position, or null if not set."""
+    from main import app_state
+    return {"home_position": app_state._home_position}
+
+
+@router.put("/settings/home-position", tags=["settings"])
+async def set_home_position(req: Coordinate):
+    """Pin a fixed startup position. On next device connect this position is used first."""
+    from main import app_state
+    app_state._home_position = {"lat": req.lat, "lng": req.lng}
+    app_state.save_settings()
+    return {"status": "ok", "home_position": app_state._home_position}
+
+
+@router.delete("/settings/home-position", tags=["settings"])
+async def clear_home_position():
+    """Clear the pinned home position (will fall back to last position or IP geolocation)."""
+    from main import app_state
+    app_state._home_position = None
+    app_state.save_settings()
+    return {"status": "cleared"}

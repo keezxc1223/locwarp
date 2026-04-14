@@ -425,20 +425,66 @@ def _find_python313() -> list[str] | None:
     """Find a Python 3.13+ interpreter on the system.  Returns the
     command as a list of strings suitable for ``subprocess.Popen``."""
     import shutil
+    import os
 
-    for name in ("py", "python3.13", "python3", "python"):
-        path = shutil.which(name)
-        if path is None:
-            continue
+    # Build a search list: explicit version names first, then generic ones.
+    # Also prepend Homebrew paths (/opt/homebrew/bin, /usr/local/bin) so macOS
+    # can find python3.13 even when PATH isn't fully set by the parent process.
+    candidates = ["py", "python3.13", "python3.14", "python3.15", "python3", "python"]
+
+    # Prepend well-known macOS Homebrew locations
+    homebrew_bins = ["/opt/homebrew/bin", "/usr/local/bin"]
+    extra_paths = [
+        os.path.join(base, name)
+        for base in homebrew_bins
+        for name in ("python3.13", "python3.14", "python3.15")
+    ]
+
+    checked: set[str] = set()
+
+    def _try(path: str, is_py_launcher: bool = False) -> list[str] | None:
+        if path in checked:
+            return None
+        checked.add(path)
+        if not os.path.isfile(path):
+            return None
         try:
-            cmd = [path, "-3.13", "--version"] if name == "py" else [path, "--version"]
+            cmd = [path, "-3.13", "--version"] if is_py_launcher else [path, "--version"]
             out = subprocess.check_output(cmd, stderr=subprocess.STDOUT, timeout=5)
             ver = out.decode().strip()
             parts = ver.split()[-1].split(".")
             if int(parts[0]) >= 3 and int(parts[1]) >= 13:
-                return [path, "-3.13"] if name == "py" else [path]
+                return [path, "-3.13"] if is_py_launcher else [path]
         except (subprocess.SubprocessError, ValueError, IndexError, OSError):
-            continue
+            pass
+        return None
+
+    # 0. Highest priority: project-local .venv313 (has pymobiledevice3 pre-installed)
+    try:
+        project_root = Path(__file__).resolve().parent.parent.parent
+        venv313_py = project_root / ".venv313" / "bin" / "python3.13"
+        result = _try(str(venv313_py))
+        if result:
+            _tunnel_logger.info("Using .venv313 Python 3.13: %s", venv313_py)
+            return result
+    except Exception:
+        pass
+
+    # 1. Try absolute Homebrew paths (macOS)
+    for p in extra_paths:
+        result = _try(p)
+        if result:
+            return result
+
+    # 2. Try PATH-resolved names
+    for name in candidates:
+        is_py = (name == "py")
+        path = shutil.which(name)
+        if path:
+            result = _try(path, is_py_launcher=is_py)
+            if result:
+                return result
+
     return None
 
 

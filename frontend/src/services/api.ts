@@ -122,6 +122,14 @@ export const getCoordFormat = () => request<any>('GET', '/api/location/settings/
 export const setCoordFormat = (format: string) =>
   request<any>('PUT', '/api/location/settings/coord-format', { format })
 
+// Home position (fixed startup location)
+export const getHomePosition = () =>
+  request<{ home_position: { lat: number; lng: number } | null }>('GET', '/api/location/settings/home-position')
+export const setHomePosition = (lat: number, lng: number) =>
+  request<any>('PUT', '/api/location/settings/home-position', { lat, lng })
+export const clearHomePosition = () =>
+  request<any>('DELETE', '/api/location/settings/home-position')
+
 // Geocoding
 export const searchAddress = (q: string) => request<any[]>('GET', `/api/geocode/search?q=${encodeURIComponent(q)}`)
 export const reverseGeocode = (lat: number, lng: number) =>

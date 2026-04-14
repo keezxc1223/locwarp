@@ -17,6 +17,13 @@ ROOT = os.path.dirname(os.path.abspath(__file__))
 BACKEND = os.path.join(ROOT, "backend")
 FRONTEND = os.path.join(ROOT, "frontend")
 
+# 優先使用專案虛擬環境的 Python
+_venv_python = os.path.join(ROOT, ".venv", "bin", "python3")
+if os.path.isfile(_venv_python):
+    PYTHON = _venv_python
+else:
+    PYTHON = sys.executable
+
 BACKEND_PORT = 8777
 FRONTEND_PORT = 5173
 
@@ -62,6 +69,13 @@ def kill_port(port):
                 pid = parts[-1]
                 subprocess.run(f"taskkill /pid {pid} /f",
                                shell=True, capture_output=True)
+    else:
+        result = subprocess.run(
+            ["lsof", "-ti", f":{port}"],
+            capture_output=True, text=True,
+        )
+        for pid in result.stdout.strip().splitlines():
+            subprocess.run(["kill", "-9", pid], capture_output=True)
 
 
 def wait_for_port(port, label, timeout=60):
@@ -82,7 +96,7 @@ def install_backend():
     req = os.path.join(BACKEND, "requirements.txt")
 
     dry = subprocess.run(
-        [sys.executable, "-m", "pip", "install", "-r", req, "--dry-run", "-q"],
+        [PYTHON, "-m", "pip", "install", "-r", req, "--dry-run"],
         capture_output=True, text=True,
     )
 
@@ -91,7 +105,7 @@ def install_backend():
     else:
         print("安裝中...")
         subprocess.run(
-            [sys.executable, "-m", "pip", "install", "-r", req, "-q"],
+            [PYTHON, "-m", "pip", "install", "-r", req, "-q"],
             cwd=BACKEND,
         )
         print("        完成 ✓")
@@ -104,7 +118,10 @@ def install_frontend():
         print("已就緒 ✓")
     else:
         print("安裝中...")
-        subprocess.run(["npm", "install"], cwd=FRONTEND, shell=True)
+        if os.name == "nt":
+            subprocess.run(["npm", "install"], cwd=FRONTEND, shell=True)
+        else:
+            subprocess.run(["npm", "install"], cwd=FRONTEND)
         print("        完成 ✓")
 
 
@@ -117,8 +134,13 @@ def start_backend():
         kill_port(BACKEND_PORT)
         time.sleep(1)
 
+    if os.name == "nt":
+        cmd = [PYTHON, "main.py"]
+    else:
+        cmd = ["sudo", PYTHON, "main.py"]
+
     p = subprocess.Popen(
-        [sys.executable, "main.py"],
+        cmd,
         cwd=BACKEND,
         creationflags=subprocess.CREATE_NEW_PROCESS_GROUP if os.name == "nt" else 0,
     )
@@ -139,7 +161,7 @@ def start_frontend():
     p = subprocess.Popen(
         ["npx", "vite", "--host", "--port", str(FRONTEND_PORT), "--strictPort"],
         cwd=FRONTEND,
-        shell=True,
+        shell=(os.name == "nt"),
         creationflags=subprocess.CREATE_NEW_PROCESS_GROUP if os.name == "nt" else 0,
     )
     procs.append(p)
@@ -173,7 +195,8 @@ def check_admin():
 
 
 def main():
-    os.system("title LocWarp")
+    if os.name == "nt":
+        os.system("title LocWarp")
     print_banner()
 
     # 檢查管理員權限 (iOS 17+ 需要)
@@ -185,7 +208,8 @@ def main():
 
     # 檢查環境
     ok = True
-    ok = check_tool("python", "https://www.python.org/downloads/") and ok
+    python_cmd = "python" if os.name == "nt" else "python3"
+    ok = check_tool(python_cmd, "https://www.python.org/downloads/") and ok
     ok = check_tool("node", "https://nodejs.org/") and ok
     ok = check_tool("npm", "隨 Node.js 一起安裝") and ok
     print()
