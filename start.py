@@ -248,6 +248,26 @@ def main():
     except Exception:
         pass
 
+    # 偵測 Tailscale IP（跨網路存取）
+    tailscale_ip = None
+    for ts_bin in [
+        "/Applications/Tailscale.app/Contents/MacOS/Tailscale",
+        "/usr/local/bin/tailscale",
+        "/usr/bin/tailscale",
+    ]:
+        if os.path.isfile(ts_bin):
+            try:
+                result = subprocess.run(
+                    [ts_bin, "ip", "-4"],
+                    capture_output=True, text=True, timeout=3,
+                )
+                ip = result.stdout.strip().splitlines()[0].strip()
+                if ip and ip.startswith("100."):
+                    tailscale_ip = ip
+            except Exception:
+                pass
+            break
+
     # 等待 Vite 完成首次編譯後再開瀏覽器
     time.sleep(2)
     url = f"http://localhost:{FRONTEND_PORT}"
@@ -256,11 +276,15 @@ def main():
     print("  ╔══════════════════════════════════════════╗")
     print("  ║          LocWarp 已就緒！                ║")
     print("  ╠══════════════════════════════════════════╣")
-    print(f"  ║  本機:   http://localhost:{FRONTEND_PORT}           ║")
-    print(f"  ║  手機:   http://{lan_ip}:{FRONTEND_PORT}      ║")
-    print(f"  ║  後端API: http://localhost:{BACKEND_PORT}           ║")
+    print(f"  ║  本機:      http://localhost:{FRONTEND_PORT}        ║")
+    print(f"  ║  區域網路:  http://{lan_ip}:{FRONTEND_PORT}   ║")
+    if tailscale_ip:
+        print(f"  ║  Tailscale: http://{tailscale_ip}:{FRONTEND_PORT}  ║")
+    else:
+        print( "  ║  Tailscale: (未偵測到，請確認已啟動)  ║")
     print("  ╠══════════════════════════════════════════╣")
-    print("  ║  📱 手機與電腦需在同一 WiFi 網路         ║")
+    print("  ║  同 WiFi 用區域網路 IP，跨網路用        ║")
+    print("  ║  Tailscale IP，手機加入主畫面即為 App   ║")
     print("  ║  按 Enter 停止所有服務                   ║")
     print("  ╚══════════════════════════════════════════╝")
     print()
