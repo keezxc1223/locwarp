@@ -1,6 +1,6 @@
 # LocWarp
 
-**iOS Virtual Location Simulator** — a Windows-based tool that controls an iPhone's GPS location. Supports Teleport, Navigate, Route Loop, Multi-Stop, Random Walk, and Joystick modes over USB or Wi-Fi.
+**iOS Virtual Location Simulator**, a Windows-based tool that controls an iPhone's GPS location. Supports Teleport, Navigate, Route Loop, Multi-Stop, Random Walk, and Joystick modes over USB or Wi-Fi.
 
 <p align="right">
   <a href="README.md"><img alt="繁體中文" src="https://img.shields.io/badge/繁體中文-gray?style=flat-square"></a>
@@ -9,7 +9,7 @@
 
 > ### Project Nature
 >
-> LocWarp is an independently-maintained open source hobby project — not a commercial product, and without a dedicated team. The author will make reasonable efforts to add features, respond to issues, fix bugs and track iOS / pymobiledevice3 updates, however:
+> LocWarp is an independently-maintained open source hobby project, not a commercial product, and without a dedicated team. The author will make reasonable efforts to add features, respond to issues, fix bugs and track iOS / pymobiledevice3 updates, however:
 >
 > - Stable operation is only guaranteed in **the developer's own test environment** (currently iPhone 16 Pro Max / iOS 26.4.1 + Windows 11 Pro);
 > - **Stability on other devices, iOS patch revisions, network environments or system configurations is not guaranteed**;
@@ -32,9 +32,10 @@
 > | **18.7.7** | Community-reported | ![Reported](https://img.shields.io/badge/Reported-6c8cff?style=flat-square) |
 > | **18.5** (iPadOS) | Community-reported | ![Reported](https://img.shields.io/badge/Reported-6c8cff?style=flat-square) |
 > | **18.1.1** | Community-reported | ![Reported](https://img.shields.io/badge/Reported-6c8cff?style=flat-square) |
-> | **16.x and below** | — | ![Unsupported](https://img.shields.io/badge/Unsupported-f44336?style=flat-square) |
+> | **17.6.1** | Community-reported | ![Reported](https://img.shields.io/badge/Reported-6c8cff?style=flat-square) |
+> | **16.x and below** | n/a | ![Unsupported](https://img.shields.io/badge/Unsupported-f44336?style=flat-square) |
 >
-> **Note**: The table above aggregates developer-tested results and a handful of community reports. It **does not guarantee that every device on the same iOS version, network environment, or system configuration will work**. iOS virtual location stability depends on the exact iOS patch revision, pymobiledevice3's support for that revision, whether the Developer Disk Image mounts successfully, and the Windows host's driver / VPN / firewall / AV stack. "Reported" therefore means **at least one user succeeded in their specific environment** — it is not a universal compatibility claim.
+> **Note**: The table above aggregates developer-tested results and a handful of community reports. It **does not guarantee that every device on the same iOS version, network environment, or system configuration will work**. iOS virtual location stability depends on the exact iOS patch revision, pymobiledevice3's support for that revision, whether the Developer Disk Image mounts successfully, and the Windows host's driver / VPN / firewall / AV stack. "Reported" therefore means **at least one user succeeded in their specific environment**, it is not a universal compatibility claim.
 >
 > iOS 17+ versions not listed are not confirmed incompatible; they simply have not been reported yet. Please evaluate the risk before use. If you encounter issues, spot bugs, or confirm a version works, please open an [Issue](https://github.com/keezxc1223/locwarp/issues) so we can build up compatibility data.
 
@@ -71,12 +72,29 @@
 | **Random Walk** | Wander randomly within a radius, with configurable pause between legs |
 | **Joystick** | Realtime direction + intensity control; supports **WASD / arrow keys** |
 
+
+### Dual-device Group Mode (v0.2.0+)
+
+Connect **two iPhones at once**. Every action (teleport, navigate, loop, multi-stop, random walk, joystick, pause, resume, stop, apply speed, restore-all) fans out to both devices in parallel.
+
+- Two device chips in the sidebar header show connection state and sim state. Right-click for per-device restore / enable dev mode / disconnect.
+- Status bar dual pills show coords, speed, mode for each device. "Restore all" wipes both at once.
+- **Auto pre-sync start**: before any group action, both devices teleport to the same coordinate so they follow identical paths.
+- **Random walk shared seed**: both devices use the same RNG seed, producing identical destination sequences. Runs for hours without drifting apart.
+- **Cooldown is force-off in dual mode**: per-device cooldowns would otherwise block fan-out actions.
+- **Auto-connect**: USB watchdog polls every 1 s and auto-connects new devices up to the cap of 2. **A third plugged-in iPhone is completely ignored** (no Trust prompt, no connect attempt).
+- The map keeps the single-device view (both devices overlap perfectly after pre-sync, so dual markers were just visual noise). Device identity stays visible via chips and status pills.
+
+### OSRM Regional Smart Fallback (v0.2.0+)
+
+The world is bucketed into 1° x 1° grid cells with a per-region OSRM-coverage cache. The first request to a new cell uses a 2.5 s short timeout; if it succeeds the cell is marked ok, if it fails the cell is marked down. **Uncovered regions (e.g. parts of South America or remote Africa) no longer wait 8 s per leg**, they go straight to a densified straight-line route in 0 s. Cache TTL is 10 minutes (auto re-probe in case OSRM coverage changes).
+
 ### Speed Control
 
 - **Three presets**: Walking 5 / Running 10 / Driving 40 km/h
 - **Custom fixed speed**: override with any km/h value
 - **Random range**: enter min–max (e.g., 40–80 km/h); backend re-picks per leg for realistic variation
-- **Apply new speed mid-route**: change speed during navigate / loop / multi-stop / random-walk / joystick and press **Apply** — backend re-interpolates the remaining route from the device's current position with the new speed and continues, **no stop+restart needed**
+- **Apply new speed mid-route**: change speed during navigate / loop / multi-stop / random-walk / joystick and press **Apply**, backend re-interpolates the remaining route from the device's current position with the new speed and continues, **no stop+restart needed**
 - Status bar shows the **backend-reported active speed** (typed-but-not-applied values don't lie about what's running)
 - Orange countdown banner shows on top of the map during pauses
 
@@ -112,7 +130,7 @@
 
 ### UX
 
-- Auto-retry on startup races (up to ~20 s window) — no manual relaunch required
+- Auto-retry on startup races (up to ~20 s window), no manual relaunch required
 - Real-time WebSocket push for position, progress, ETA, remaining distance, device connection state, DDI mount progress
 - **Open Log Folder** button (status bar): opens `~/.locwarp/logs/` so you can attach `backend.log` to bug reports
 - Current app version shown in the bottom-right corner
@@ -157,7 +175,7 @@ Windows needs Apple's USB driver to communicate with iPhone.
 
 - **Required download**: [iTunes for Windows (64-bit)](https://secure-appldnld.apple.com/itunes12/047-76416-20260302-fefe4356-211d-4da1-8bc4-058eb36ea803/iTunes64Setup.exe)
 
-> **Note:** Do **not** use "Apple Devices" from the Microsoft Store — it is **incompatible** and LocWarp will not detect the device. You must install the classic iTunes linked above.
+> **Note:** Do **not** use "Apple Devices" from the Microsoft Store, it is **incompatible** and LocWarp will not detect the device. You must install the classic iTunes linked above.
 
 ### 2. Trust the computer via USB first
 
@@ -180,7 +198,7 @@ To disconnect the USB cable and operate over Wi-Fi:
 
 | Method | Lock-screen impact | Recommendation |
 | --- | --- | --- |
-| **USB** | ![Yes](https://img.shields.io/badge/Lockable-4caf50?style=flat-square) Can lock screen freely | — |
+| **USB** | ![Yes](https://img.shields.io/badge/Lockable-4caf50?style=flat-square) Can lock screen freely | n/a |
 | **Wi-Fi Tunnel** | ![No](https://img.shields.io/badge/Not_Lockable-f44336?style=flat-square) Lock-screen drops the tunnel | Disable auto-lock during use |
 
 > **Note:** **Under Wi-Fi Tunnel, locking the iPhone's screen will cause the network interface to sleep and drop the RSD tunnel.**
@@ -221,7 +239,7 @@ npm install
 
 ### Run (dev mode)
 
-Double-click `LocWarp.bat` — it auto-elevates and invokes `start.py`, which launches:
+Double-click `LocWarp.bat`, it auto-elevates and invokes `start.py`, which launches:
 - backend (`:8777`)
 - Vite dev server (`:5173`)
 - Electron (loading from the dev server)
@@ -250,7 +268,7 @@ Pipeline:
 3. **Vite** → `frontend/dist/`
 4. **electron-builder** → NSIS installer `frontend/release/LocWarp Setup X.Y.Z.exe` (~140 MB)
 
-The installer is self-contained — end users need no Python or Node installed.
+The installer is self-contained, end users need no Python or Node installed.
 
 ---
 
@@ -260,7 +278,7 @@ The installer is self-contained — end users need no Python or Node installed.
 | --- | --- |
 | Backend unreachable after tunnel started | Make sure LocWarp was launched as Administrator |
 | `No such service: com.apple.instruments.dtservicehub` (iOS 17+/26) | LocWarp auto-mounts the Developer Disk Image. If it still fails: (1) Settings → Privacy & Security → **Developer Mode** off, reboot, turn it back on; (2) make sure github.com is reachable (DDI is downloaded from there, ~20 MB); (3) unplug and reconnect the device. Since v0.1.34 LocWarp also falls back to the legacy `com.apple.dt.simulatelocation` service automatically. |
-| DDI download hangs / times out | Check that github.com / raw.githubusercontent.com is reachable — some corporate or campus networks block it. |
+| DDI download hangs / times out | Check that github.com / raw.githubusercontent.com is reachable, some corporate or campus networks block it. |
 | **Developer Mode option missing** (iOS 17+) | The device must have had a signed app deployed to it before the option appears in Settings. See [Appendix: Enabling Developer Mode on iPhone (Windows)](#appendix-enabling-developer-mode-on-iphone-windows) below. |
 
 ---
@@ -279,13 +297,13 @@ On iOS 17+, **Settings → Privacy & Security → Developer Mode** is hidden by 
 
 Once done, return to LocWarp and connect. On first connection LocWarp will download and mount the Developer Disk Image automatically if needed.
 
-> Procedure adapted from community feedback — thanks for sharing.
+> Procedure adapted from community feedback, thanks for sharing.
 
 ---
 
 ## License
 
-Released under the **MIT License** — see [LICENSE](LICENSE).
+Released under the **MIT License**, see [LICENSE](LICENSE).
 
 Free for use, modification, redistribution, and commercial use, provided the original copyright and license notice are retained.
 
