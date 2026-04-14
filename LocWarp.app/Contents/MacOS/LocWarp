@@ -1,0 +1,5 @@
+#!/bin/bash
+export PATH="/usr/local/bin:/usr/bin:/bin:/usr/sbin:/sbin:$PATH"
+SCRIPT_DIR="/Users/q84722/Desktop/Claude作業區/locwarp"
+PYTHON="/Users/q84722/Desktop/Claude作業區/locwarp/.venv/bin/python3"
+exec "$PYTHON" "$SCRIPT_DIR/locwarp_menubar.py"
