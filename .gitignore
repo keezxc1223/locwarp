@@ -36,3 +36,9 @@ Thumbs.db
 S__*.png
 S__*.jpg
 _geoport/
+
+# py2app build artifacts
+build/
+dist/
+*.app/
+setup_app.py
