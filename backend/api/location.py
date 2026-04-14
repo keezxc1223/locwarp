@@ -397,3 +397,20 @@ async def clear_home_position():
     app_state._home_position = None
     app_state.save_settings()
     return {"status": "cleared"}
+
+
+# ── Startup / initial position ────────────────────────────
+
+@router.get("/initial-position", tags=["settings"])
+async def get_initial_position():
+    """Return the best available initial position without requiring a device
+    connection.  Priority: home_position > last_position > DEFAULT_LOCATION.
+
+    Used by the frontend on first load so the map centers somewhere meaningful
+    even before the device is connected.
+    Note: does NOT perform async IP geolocation (use this for immediate UI
+    feedback; the full async priority chain runs inside create_engine_for_device).
+    """
+    from main import app_state
+    pos = app_state.get_initial_position()   # sync: home > last > DEFAULT
+    return {"lat": pos["lat"], "lng": pos["lng"]}

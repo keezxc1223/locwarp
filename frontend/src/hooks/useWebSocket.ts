@@ -5,7 +5,9 @@ export interface WsMessage {
   data: any
 }
 
-const WS_URL = 'ws://127.0.0.1:8777/ws/status'
+// Mirror the host from window.location so WebSocket works from any network address
+const WS_HOST = typeof window !== 'undefined' ? window.location.hostname : '127.0.0.1'
+const WS_URL = `ws://${WS_HOST}:8777/ws/status`
 const RECONNECT_INTERVAL = 3000
 const MAX_RECONNECT_INTERVAL = 30000
 

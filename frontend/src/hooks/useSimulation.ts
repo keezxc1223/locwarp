@@ -377,11 +377,15 @@ export function useSimulation(wsMessage: WsMessage | null) {
     }
   }, [])
 
-  // Fetch initial status on mount
+  // Fetch initial status on mount.
+  // Two-phase: first try the live engine status; if no position is available
+  // (device not yet connected), fall back to the startup position so the map
+  // always opens on a meaningful location.
   const initialFetched = useRef(false)
   useEffect(() => {
     if (initialFetched.current) return
     initialFetched.current = true
+
     api.getStatus().then((res: any) => {
       // current_position (not position) is the backend field name
       if (res.current_position) {
@@ -403,8 +407,18 @@ export function useSimulation(wsMessage: WsMessage | null) {
       }
       if (res.progress != null) setProgress(res.progress)
       if (res.eta_seconds != null) setEta(res.eta_seconds)
+
+      // If engine had no position (no device), load startup position for map centering
+      if (!res.current_position) {
+        api.getInitialPosition().then((pos) => {
+          setCurrentPosition({ lat: pos.lat, lng: pos.lng })
+        }).catch(() => {})
+      }
     }).catch(() => {
-      // backend may not be running yet — silent fail is intentional
+      // Backend not running yet — try startup position directly
+      api.getInitialPosition().then((pos) => {
+        setCurrentPosition({ lat: pos.lat, lng: pos.lng })
+      }).catch(() => {})
     })
   }, [])
 

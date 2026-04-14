@@ -239,6 +239,15 @@ def main():
         return
     print()
 
+    # 偵測本機 LAN IP（用於手機存取）
+    lan_ip = "127.0.0.1"
+    try:
+        with socket.socket(socket.AF_INET, socket.SOCK_DGRAM) as s:
+            s.connect(("8.8.8.8", 80))
+            lan_ip = s.getsockname()[0]
+    except Exception:
+        pass
+
     # 等待 Vite 完成首次編譯後再開瀏覽器
     time.sleep(2)
     url = f"http://localhost:{FRONTEND_PORT}"
@@ -247,10 +256,11 @@ def main():
     print("  ╔══════════════════════════════════════════╗")
     print("  ║          LocWarp 已就緒！                ║")
     print("  ╠══════════════════════════════════════════╣")
-    print(f"  ║  前端畫面:  http://localhost:{FRONTEND_PORT}        ║")
-    print(f"  ║  後端 API:  http://localhost:{BACKEND_PORT}        ║")
-    print(f"  ║  API 文件:  http://localhost:{BACKEND_PORT}/docs   ║")
+    print(f"  ║  本機:   http://localhost:{FRONTEND_PORT}           ║")
+    print(f"  ║  手機:   http://{lan_ip}:{FRONTEND_PORT}      ║")
+    print(f"  ║  後端API: http://localhost:{BACKEND_PORT}           ║")
     print("  ╠══════════════════════════════════════════╣")
+    print("  ║  📱 手機與電腦需在同一 WiFi 網路         ║")
     print("  ║  按 Enter 停止所有服務                   ║")
     print("  ╚══════════════════════════════════════════╝")
     print()

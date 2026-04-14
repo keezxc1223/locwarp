@@ -1,4 +1,8 @@
-const API = 'http://127.0.0.1:8777'
+// Derive backend URL from the current browser location so the app works both
+// on localhost and when accessed from a phone on the local network
+// (e.g. http://192.168.1.101:5173  →  API = http://192.168.1.101:8777).
+const API_HOST = typeof window !== 'undefined' ? window.location.hostname : '127.0.0.1'
+const API = `http://${API_HOST}:8777`
 
 // Connection-refused means backend isn't up yet — retry with backoff.
 // Other HTTP errors (4xx/5xx) are real errors and propagate immediately.
@@ -121,6 +125,10 @@ export const dismissCooldown = () => request<any>('POST', '/api/location/cooldow
 export const getCoordFormat = () => request<any>('GET', '/api/location/settings/coord-format')
 export const setCoordFormat = (format: string) =>
   request<any>('PUT', '/api/location/settings/coord-format', { format })
+
+// Initial (startup) position — available even before any device connects
+export const getInitialPosition = () =>
+  request<{ lat: number; lng: number }>('GET', '/api/location/initial-position')
 
 // Home position (fixed startup location)
 export const getHomePosition = () =>
