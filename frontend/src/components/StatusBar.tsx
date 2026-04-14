@@ -1,8 +1,13 @@
 import React, { useEffect, useState } from 'react';
 import { SimMode } from '../hooks/useSimulation';
+import type { RuntimesMap } from '../hooks/useSimulation';
+import type { DeviceInfo } from '../hooks/useDevice';
 import { useT } from '../i18n';
 import LangToggle from './LangToggle';
 import pkg from '../../package.json';
+
+const DEVICE_COLORS = ['#4285f4', '#ff9800'];
+const DEVICE_LETTERS = ['A', 'B'];
 
 const APP_VERSION = (pkg as { version: string }).version;
 
@@ -23,6 +28,24 @@ interface StatusBarProps {
   onToggleCooldown: (enabled: boolean) => void;
   onRestore?: () => void;
   onOpenLog?: () => void;
+  // Group mode: when two devices are connected, cooldown toggle is force-off
+  // and displays a different tooltip. Does not modify the saved setting.
+  dualDevice?: boolean;
+  runtimes?: RuntimesMap;
+  devices?: DeviceInfo[];
+}
+
+function stateToMode(state: string): SimMode | null {
+  switch (state) {
+    case 'navigating': return SimMode.Navigate;
+    case 'looping': return SimMode.Loop;
+    case 'multi_stop': return SimMode.MultiStop;
+    case 'random_walk': return SimMode.RandomWalk;
+    case 'joystick': return SimMode.Joystick;
+    case 'teleport':
+    case 'idle':
+    default: return null;
+  }
 }
 
 import type { StringKey } from '../i18n';
@@ -53,6 +76,9 @@ const StatusBar: React.FC<StatusBarProps> = ({
   onToggleCooldown,
   onRestore,
   onOpenLog,
+  dualDevice = false,
+  runtimes,
+  devices,
 }) => {
   const t = useT();
   const [cooldownDisplay, setCooldownDisplay] = useState(cooldown);
@@ -106,8 +132,43 @@ const StatusBar: React.FC<StatusBarProps> = ({
           the left-side DeviceStatus panel already shows all of this, so
           repeating it here only ate horizontal space. */}
 
-      {/* Current coordinates */}
-      {currentPosition && (
+      {/* Dual-device pills */}
+      {dualDevice && devices && runtimes && devices.slice(0, 2).map((dev, i) => {
+        const rt = runtimes[dev.udid];
+        const color = DEVICE_COLORS[i];
+        const letter = DEVICE_LETTERS[i];
+        const coord = rt?.currentPos
+          ? `${rt.currentPos.lat.toFixed(4)},${rt.currentPos.lng.toFixed(4)}`
+          : '—';
+        const spd = rt?.currentSpeedKmh ? rt.currentSpeedKmh.toFixed(0) : String(speed);
+        const dMode = rt ? stateToMode(rt.state) : null;
+        const modeLabel = dMode ? t(modeLabelKeys[dMode]) : t(modeLabelKeys[mode]);
+        return (
+          <div
+            key={dev.udid}
+            style={{
+              display: 'flex', alignItems: 'center', gap: 6,
+              padding: '2px 8px 2px 6px',
+              borderLeft: `3px solid ${color}`,
+              borderRadius: 4,
+              background: 'rgba(255,255,255,0.04)',
+              fontFamily: 'monospace', fontSize: 11,
+            }}
+            title={dev.name}
+          >
+            <span style={{ color, fontWeight: 700 }}>{letter}</span>
+            <span>{coord}</span>
+            <span style={{ opacity: 0.4 }}>·</span>
+            <span>{spd}km/h</span>
+            <span style={{ opacity: 0.4 }}>·</span>
+            <span style={{ opacity: 0.75 }}>{modeLabel}</span>
+          </div>
+        );
+      })}
+      {dualDevice && <div style={{ width: 1, height: 14, background: 'rgba(255,255,255,0.12)' }} />}
+
+      {/* Current coordinates (single-device mode only) */}
+      {!dualDevice && currentPosition && (
         <>
           <div style={{ display: 'flex', alignItems: 'center', gap: 4, fontFamily: 'monospace', fontSize: 11 }}>
             <svg width="11" height="11" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" style={{ opacity: 0.5 }}>
@@ -148,8 +209,8 @@ const StatusBar: React.FC<StatusBarProps> = ({
         </>
       )}
 
-      {/* Speed + Mode */}
-      <div style={{ display: 'flex', alignItems: 'center', gap: 4 }}>
+      {/* Speed + Mode (single-device mode only) */}
+      {!dualDevice && <div style={{ display: 'flex', alignItems: 'center', gap: 4 }}>
         <svg width="11" height="11" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" style={{ opacity: 0.5 }}>
           <path d="M12 2L2 7l10 5 10-5-10-5z" />
           <path d="M2 17l10 5 10-5" />
@@ -158,23 +219,24 @@ const StatusBar: React.FC<StatusBarProps> = ({
         <span>{speed} km/h</span>
         <span style={{ opacity: 0.4 }}>|</span>
         <span style={{ opacity: 0.7 }}>{t(modeLabelKeys[mode])}</span>
-      </div>
+      </div>}
 
       {/* Force wrap to a second row here */}
       <div style={{ flexBasis: '100%', height: 0 }} />
 
       {/* Cooldown enable toggle */}
       <label
-        title={t('status.cooldown_tooltip')}
-        style={{ display: 'flex', alignItems: 'center', gap: 6, cursor: 'pointer', userSelect: 'none' }}
+        title={dualDevice ? t('status.cooldown_dual_disabled') : t('status.cooldown_tooltip')}
+        style={{ display: 'flex', alignItems: 'center', gap: 6, cursor: dualDevice ? 'not-allowed' : 'pointer', userSelect: 'none', opacity: dualDevice ? 0.55 : 1 }}
       >
         <input
           type="checkbox"
-          checked={cooldownEnabled}
-          onChange={(e) => onToggleCooldown(e.target.checked)}
-          style={{ cursor: 'pointer', margin: 0 }}
+          checked={dualDevice ? false : cooldownEnabled}
+          disabled={dualDevice}
+          onChange={(e) => { if (!dualDevice) onToggleCooldown(e.target.checked) }}
+          style={{ cursor: dualDevice ? 'not-allowed' : 'pointer', margin: 0 }}
         />
-        <span style={{ opacity: cooldownEnabled ? 1 : 0.5 }}>{cooldownEnabled ? t('status.cooldown_enabled') : t('status.cooldown_disabled')}</span>
+        <span style={{ opacity: (dualDevice || !cooldownEnabled) ? 0.5 : 1 }}>{(dualDevice || !cooldownEnabled) ? t('status.cooldown_disabled') : t('status.cooldown_enabled')}</span>
       </label>
 
       {/* Restore button */}
@@ -201,7 +263,7 @@ const StatusBar: React.FC<StatusBarProps> = ({
               <path d="M3 12a9 9 0 109-9" />
               <polyline points="3,3 3,9 9,9" />
             </svg>
-            {t('status.restore')}
+            {dualDevice ? t('status.restore_all') : t('status.restore')}
           </button>
           {onOpenLog && (
             <button

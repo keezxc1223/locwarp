@@ -20,7 +20,7 @@ class CooldownTimer:
     """
 
     def __init__(self) -> None:
-        self.enabled: bool = True
+        self.enabled: bool = False
         self.is_active: bool = False
         self.remaining: float = 0.0
         self.total: float = 0.0

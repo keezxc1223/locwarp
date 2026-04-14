@@ -206,13 +206,18 @@ class RouteInterpolator:
         center_lat: float,
         center_lng: float,
         radius_m: float,
+        rng: random.Random | None = None,
     ) -> tuple[float, float]:
         """Generate a uniformly random point within *radius_m* of the centre.
 
         Uses the square-root trick so points are evenly distributed across the
-        circle's area rather than clustering near the centre.
+        circle's area rather than clustering near the centre. When *rng* is
+        supplied (a seeded ``random.Random`` instance), two callers that share
+        the seed generate the exact same sequence; this enables dual-device
+        group mode to keep both phones on the same random walk path.
         """
-        angle = random.uniform(0, 2 * math.pi)
-        dist = radius_m * math.sqrt(random.random())
+        r = rng if rng is not None else random
+        angle = r.uniform(0, 2 * math.pi)
+        dist = radius_m * math.sqrt(r.random())
 
         return RouteInterpolator.move_point(center_lat, center_lng, math.degrees(angle), dist)

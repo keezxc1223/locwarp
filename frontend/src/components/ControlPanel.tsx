@@ -284,11 +284,8 @@ const ControlPanel: React.FC<ControlPanelProps> = ({
   };
 
   const handleSearchSelect = (lat: number, lng: number, _name: string) => {
-    if (simMode === SimMode.Teleport) {
-      onTeleport(lat, lng);
-    } else {
-      onNavigate(lat, lng);
-    }
+    // Address search always teleports, regardless of current mode.
+    onTeleport(lat, lng);
   };
 
   const chevron = (open: boolean) => (

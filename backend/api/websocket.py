@@ -45,19 +45,30 @@ async def websocket_endpoint(ws: WebSocket):
             if msg_type == "joystick_input":
                 data = msg.get("data", {})
                 from main import app_state
-                engine = app_state.simulation_engine
-                if engine:
-                    inp = JoystickInput(
-                        direction=data.get("direction", 0),
-                        intensity=data.get("intensity", 0),
-                    )
-                    engine.joystick_move(inp)
+                # Route per-udid if provided; otherwise fan out to all engines.
+                udid = msg.get("udid") or data.get("udid")
+                inp = JoystickInput(
+                    direction=data.get("direction", 0),
+                    intensity=data.get("intensity", 0),
+                )
+                if udid:
+                    engine = app_state.get_engine(udid)
+                    if engine:
+                        engine.joystick_move(inp)
+                else:
+                    for engine in list(app_state.simulation_engines.values()):
+                        engine.joystick_move(inp)
 
             elif msg_type == "joystick_stop":
                 from main import app_state
-                engine = app_state.simulation_engine
-                if engine:
-                    await engine.joystick_stop()
+                udid = msg.get("udid") or msg.get("data", {}).get("udid")
+                if udid:
+                    engine = app_state.get_engine(udid)
+                    if engine:
+                        await engine.joystick_stop()
+                else:
+                    for engine in list(app_state.simulation_engines.values()):
+                        await engine.joystick_stop()
 
     except WebSocketDisconnect:
         pass

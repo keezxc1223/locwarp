@@ -37,6 +37,28 @@ export const STRINGS = {
   'status.open_log_tooltip': { zh: '開啟 log 資料夾,方便將 backend.log 附到 Issue', en: 'Open the log folder so you can attach backend.log to an Issue' },
   'status.open_log_failed': { zh: '無法開啟 log', en: 'Failed to open log' },
   'status.copy_coord': { zh: '複製座標', en: 'Copy coordinates' },
+  'status.restore_all': { zh: '全部還原', en: 'Restore all' },
+  'status.cooldown_dual_disabled': { zh: '雙裝置模式不支援冷卻保護', en: 'Cooldown protection disabled in dual-device mode' },
+
+  // ── Group mode (dual device) ─────────────────
+  'group.action_all_success': { zh: '{action} 已啟動於全部裝置', en: '{action} started on all devices' },
+  'group.action_partial': { zh: '{action}:A {aStatus},B {bStatus}', en: '{action}: A {aStatus}, B {bStatus}' },
+  'group.action_all_failed': { zh: '{action} 失敗', en: '{action} failed on all devices' },
+
+  // ── Device chip ──────────────────────────────
+  'device.add_device': { zh: '新增裝置', en: 'Add device' },
+  'device.max_reached': { zh: '已連接最多 2 台', en: 'Maximum 2 devices connected' },
+  'device.chip_disconnect': { zh: '中斷此裝置', en: 'Disconnect this device' },
+  'device.chip_restore': { zh: '還原此裝置', en: 'Restore this device' },
+  'device.chip_enable_dev': { zh: '啟用開發者模式', en: 'Enable Developer Mode' },
+  'device.chip_state_idle': { zh: '已連線', en: 'Connected' },
+  'device.chip_state_running': { zh: '模擬中', en: 'Running' },
+  'device.chip_state_paused': { zh: '暫停', en: 'Paused' },
+  'device.chip_state_error': { zh: '錯誤', en: 'Error' },
+  'device.chip_state_disconnected': { zh: '已斷線', en: 'Disconnected' },
+
+  // ── ETA group ────────────────────────────────
+  'eta.group_progress': { zh: '平均進度', en: 'Average progress' },
 
   // ── Modes ────────────────────────────────────
   'mode.teleport': { zh: '瞬間移動', en: 'Teleport' },
@@ -100,7 +122,7 @@ export const STRINGS = {
   'device.no_device': { zh: '未偵測到裝置', en: 'No device detected' },
   'device.scan': { zh: 'USB', en: 'USB' },
   'device.scan_scanning': { zh: '掃描中', en: 'Scanning' },
-  'device.scan_found': { zh: '已找到裝置', en: 'Device found' },
+  'device.scan_found': { zh: '找到 {n} 台裝置', en: 'Found {n} device(s)' },
   'device.scan_none': { zh: '未偵測到', en: 'Not found' },
   'device.scan_tooltip': { zh: '掃描 USB 裝置', en: 'Scan USB devices' },
   'wifi.section_title': { zh: 'WiFi 無線連線', en: 'Wi-Fi Connection' },

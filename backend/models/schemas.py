@@ -47,6 +47,7 @@ class DeviceInfo(BaseModel):
 class TeleportRequest(BaseModel):
     lat: float = Field(ge=-90.0, le=90.0)
     lng: float = Field(ge=-180.0, le=180.0)
+    udid: str | None = None
 
 
 class NavigateRequest(BaseModel):
@@ -56,6 +57,7 @@ class NavigateRequest(BaseModel):
     speed_kmh: float | None = None
     speed_min_kmh: float | None = None
     speed_max_kmh: float | None = None
+    udid: str | None = None
 
 
 class LoopRequest(BaseModel):
@@ -67,6 +69,7 @@ class LoopRequest(BaseModel):
     pause_enabled: bool = True
     pause_min: float = 5.0
     pause_max: float = 20.0
+    udid: str | None = None
 
 
 class MultiStopRequest(BaseModel):
@@ -80,6 +83,7 @@ class MultiStopRequest(BaseModel):
     pause_enabled: bool = True
     pause_min: float = 5.0
     pause_max: float = 20.0
+    udid: str | None = None
 
 
 class RandomWalkRequest(BaseModel):
@@ -92,11 +96,16 @@ class RandomWalkRequest(BaseModel):
     pause_enabled: bool = True
     pause_min: float = 5.0
     pause_max: float = 20.0
+    udid: str | None = None
+    # Dual-device group mode: both devices pass the same seed so they pick
+    # identical sequences of random destinations, keeping their paths synced.
+    seed: int | None = None
 
 
 class JoystickStartRequest(BaseModel):
     mode: MovementMode = MovementMode.WALKING
     speed_kmh: float | None = None
+    udid: str | None = None
 
 
 class JoystickInput(BaseModel):

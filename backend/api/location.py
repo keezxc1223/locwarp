@@ -22,25 +22,29 @@ from models.schemas import (
 router = APIRouter(prefix="/api/location", tags=["location"])
 
 
-async def _engine():
-    """Return the active SimulationEngine, lazily rebuilding it when the
-    device is reachable but the engine slot is empty. On the first attempt
-    we just rebuild the engine; if that fails we force a full disconnect +
-    reconnect + engine rebuild (covers the common iOS 17+ case where the
-    RSD tunnel is alive but the DVT channel has silently gone stale)."""
+async def _engine(udid: str | None = None):
+    """Return the active SimulationEngine for *udid* (or the primary one if
+    unspecified), lazily rebuilding when the slot is empty. On the first
+    attempt we just rebuild the engine; if that fails we force a full
+    disconnect + reconnect + engine rebuild (covers the common iOS 17+ case
+    where the RSD tunnel is alive but the DVT channel has silently gone stale)."""
     from main import app_state
     import logging as _logging
     _log = _logging.getLogger("locwarp")
 
-    if app_state.simulation_engine is not None:
+    # Direct hit on the requested udid.
+    if udid is not None:
+        eng = app_state.get_engine(udid)
+        if eng is not None:
+            return eng
+
+    if udid is None and app_state.simulation_engine is not None:
         return app_state.simulation_engine
 
     dm = app_state.device_manager
 
-    # Pick a target UDID — already-connected first, then any discoverable device.
-    # usbmuxd can transiently return an empty list right after device re-enum,
-    # so retry up to 10× with 1s gap (matches GeoPort's get_devices_with_retry).
-    target_udid = next(iter(dm._connections.keys()), None)
+    # Pick a target UDID — requested udid first, then already-connected, then any discoverable device.
+    target_udid = udid or next(iter(dm._connections.keys()), None)
     if target_udid is None:
         import asyncio as _asyncio
         for attempt in range(10):
@@ -113,8 +117,12 @@ async def _handle_device_lost(exc: Exception) -> "HTTPException":
             _log.info("device_lost cleanup: disconnected %s", udid)
         except Exception:
             _log.exception("device_lost cleanup: disconnect failed for %s", udid)
-
-    app_state.simulation_engine = None
+        # Only remove this udid's engine; the legacy `= None` setter clears
+        # every engine (bad for dual mode).
+        app_state.simulation_engines.pop(udid, None)
+        if app_state._primary_udid == udid:
+            remaining = next(iter(app_state.simulation_engines.keys()), None)
+            app_state._primary_udid = remaining
 
     try:
         await broadcast("device_disconnected", {
@@ -151,6 +159,7 @@ class ApplySpeedRequest(BaseModel):
     speed_kmh: float | None = None
     speed_min_kmh: float | None = None
     speed_max_kmh: float | None = None
+    udid: str | None = None
 
 
 @router.post("/apply-speed")
@@ -159,7 +168,7 @@ async def apply_speed(req: ApplySpeedRequest):
     _move_along_route loop re-interpolates from the current position
     with the new speed; already-completed progress is kept."""
     from config import resolve_speed_profile
-    engine = await _engine()
+    engine = await _engine(getattr(req, "udid", None) if 'req' in dir() else None)
     profile = resolve_speed_profile(
         req.mode.value,
         speed_kmh=req.speed_kmh,
@@ -178,12 +187,18 @@ async def apply_speed(req: ApplySpeedRequest):
 
 @router.post("/teleport")
 async def teleport(req: TeleportRequest):
-    engine = await _engine()
+    engine = await _engine(getattr(req, "udid", None) if 'req' in dir() else None)
     cooldown = _cooldown()
+
+    # Group mode (2+ engines): bypass cooldown entirely. The UI also locks the
+    # toggle off, but the saved cooldown_enabled value is preserved so single-
+    # device mode restores the user's preference automatically.
+    from main import app_state as _app_state
+    dual_mode = len(_app_state.simulation_engines) >= 2
 
     # Enforce cooldown server-side: if enabled and currently active,
     # refuse the teleport so API clients cannot bypass the UI guard.
-    if cooldown.enabled and cooldown.is_active and cooldown.remaining > 0:
+    if not dual_mode and cooldown.enabled and cooldown.is_active and cooldown.remaining > 0:
         raise HTTPException(
             status_code=429,
             detail={
@@ -212,18 +227,42 @@ async def teleport(req: TeleportRequest):
             cause = cause.__cause__
         raise HTTPException(status_code=500, detail=str(e))
 
-    # Start cooldown if enabled and there was a previous position
-    if old_pos and cooldown.enabled:
+    # Start cooldown if enabled and there was a previous position.
+    # Skipped in dual mode for the same reason the check above is skipped.
+    if old_pos and cooldown.enabled and not dual_mode:
         await cooldown.start(old_pos.lat, old_pos.lng, req.lat, req.lng)
 
     return {"status": "ok", "lat": req.lat, "lng": req.lng}
 
 
+# Module-level background task set to keep strong references to fire-and-forget
+# tasks. Without this, asyncio only keeps weak refs and Python can GC a task
+# mid-execution (documented asyncio footgun). Tasks self-remove on completion.
+_bg_tasks: set = set()
+
+
+def _spawn(coro):
+    import asyncio
+    task = asyncio.create_task(coro)
+    _bg_tasks.add(task)
+
+    def _on_done(t):
+        _bg_tasks.discard(t)
+        exc = t.exception()
+        if exc is not None:
+            import logging as _logging
+            _logging.getLogger("locwarp").exception(
+                "background task crashed: %s", exc, exc_info=exc
+            )
+
+    task.add_done_callback(_on_done)
+    return task
+
+
 @router.post("/navigate")
 async def navigate(req: NavigateRequest):
-    import asyncio
-    engine = await _engine()
-    asyncio.create_task(engine.navigate(
+    engine = await _engine(getattr(req, "udid", None) if 'req' in dir() else None)
+    _spawn(engine.navigate(
         Coordinate(lat=req.lat, lng=req.lng), req.mode,
         speed_kmh=req.speed_kmh,
         speed_min_kmh=req.speed_min_kmh, speed_max_kmh=req.speed_max_kmh,
@@ -233,9 +272,8 @@ async def navigate(req: NavigateRequest):
 
 @router.post("/loop")
 async def loop(req: LoopRequest):
-    import asyncio
-    engine = await _engine()
-    asyncio.create_task(engine.start_loop(
+    engine = await _engine(getattr(req, "udid", None) if 'req' in dir() else None)
+    _spawn(engine.start_loop(
         req.waypoints, req.mode,
         speed_kmh=req.speed_kmh,
         speed_min_kmh=req.speed_min_kmh, speed_max_kmh=req.speed_max_kmh,
@@ -246,9 +284,8 @@ async def loop(req: LoopRequest):
 
 @router.post("/multistop")
 async def multi_stop(req: MultiStopRequest):
-    import asyncio
-    engine = await _engine()
-    asyncio.create_task(engine.multi_stop(
+    engine = await _engine(getattr(req, "udid", None) if 'req' in dir() else None)
+    _spawn(engine.multi_stop(
         req.waypoints, req.mode, req.stop_duration, req.loop,
         speed_kmh=req.speed_kmh,
         speed_min_kmh=req.speed_min_kmh, speed_max_kmh=req.speed_max_kmh,
@@ -259,20 +296,20 @@ async def multi_stop(req: MultiStopRequest):
 
 @router.post("/randomwalk")
 async def random_walk(req: RandomWalkRequest):
-    import asyncio
-    engine = await _engine()
-    asyncio.create_task(engine.random_walk(
+    engine = await _engine(getattr(req, "udid", None) if 'req' in dir() else None)
+    _spawn(engine.random_walk(
         req.center, req.radius_m, req.mode,
         speed_kmh=req.speed_kmh,
         speed_min_kmh=req.speed_min_kmh, speed_max_kmh=req.speed_max_kmh,
         pause_enabled=req.pause_enabled, pause_min=req.pause_min, pause_max=req.pause_max,
+        seed=req.seed,
     ))
     return {"status": "started", "radius_m": req.radius_m, "mode": req.mode}
 
 
 @router.post("/joystick/start")
 async def joystick_start(req: JoystickStartRequest):
-    engine = await _engine()
+    engine = await _engine(getattr(req, "udid", None) if 'req' in dir() else None)
     try:
         await engine.joystick_start(req.mode)
     except Exception as e:
@@ -281,48 +318,48 @@ async def joystick_start(req: JoystickStartRequest):
 
 
 @router.post("/joystick/stop")
-async def joystick_stop():
-    engine = await _engine()
+async def joystick_stop(udid: str | None = None):
+    engine = await _engine(udid)
     await engine.joystick_stop()
     return {"status": "stopped"}
 
 
 @router.post("/pause")
-async def pause():
-    engine = await _engine()
+async def pause(udid: str | None = None):
+    engine = await _engine(udid)
     await engine.pause()
     return {"status": "paused"}
 
 
 @router.post("/resume")
-async def resume():
-    engine = await _engine()
+async def resume(udid: str | None = None):
+    engine = await _engine(udid)
     await engine.resume()
     return {"status": "resumed"}
 
 
 @router.post("/restore")
-async def restore():
-    engine = await _engine()
+async def restore(udid: str | None = None):
+    engine = await _engine(udid)
     await engine.restore()
     return {"status": "restored"}
 
 
 @router.post("/stop")
-async def stop_movement():
+async def stop_movement(udid: str | None = None):
     """Stop active movement without clearing the simulated location.
     Keeps the device at its last reported position instead of restoring
-    real GPS — restore() is a separate endpoint for that."""
-    engine = await _engine()
+    real GPS. restore() is a separate endpoint for that."""
+    engine = await _engine(udid)
     await engine.stop()
     return {"status": "stopped"}
 
 
 @router.delete("/simulation")
-async def stop_simulation():
+async def stop_simulation(udid: str | None = None):
     """Legacy endpoint: stop + restore. Kept for backwards compatibility,
     prefer /stop (movement only) or /restore (clear location)."""
-    engine = await _engine()
+    engine = await _engine(udid)
     await engine.restore()
     return {"status": "stopped"}
 
@@ -345,8 +382,8 @@ async def debug_info():
 
 
 @router.get("/status", response_model=SimulationStatus)
-async def get_status():
-    engine = await _engine()
+async def get_status(udid: str | None = None):
+    engine = await _engine(udid)
     status = engine.get_status()
     cooldown = _cooldown()
     cs = cooldown.get_status()

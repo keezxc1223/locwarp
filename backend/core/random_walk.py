@@ -34,6 +34,7 @@ class RandomWalkHandler:
         pause_enabled: bool = True,
         pause_min: float = 5.0,
         pause_max: float = 20.0,
+        seed: int | None = None,
     ) -> None:
         """Begin a random walk around *center* within *radius_m*.
 
@@ -83,10 +84,15 @@ class RandomWalkHandler:
         consecutive_conn_errors = 0
         max_consecutive_conn_errors = 60  # ~30 min at max backoff
 
+        # Seeded RNG for group-mode sync: both devices pass the same seed from
+        # the frontend and therefore pick the exact same sequence of
+        # destinations. Unseeded → use the global random for a fresh walk.
+        rng: random.Random | None = random.Random(seed) if seed is not None else None
+
         while not engine._stop_event.is_set():
             # Pick a random destination within the radius
             dest_lat, dest_lng = RouteInterpolator.random_point_in_radius(
-                center.lat, center.lng, radius_m,
+                center.lat, center.lng, radius_m, rng=rng,
             )
 
             current = engine.current_position
@@ -206,7 +212,7 @@ class RandomWalkHandler:
                 continue
             if lo < 0:
                 lo = 0.0
-            pause_duration = random.uniform(lo, hi)
+            pause_duration = (rng or random).uniform(lo, hi)
             logger.info("Random walk pausing for %.1fs before next leg", pause_duration)
 
             await engine._emit("pause_countdown", {

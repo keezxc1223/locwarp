@@ -33,6 +33,10 @@ const ERROR_I18N: Record<string, { zh: string; en: string }> = {
   trust_failed: { zh: 'USB 信任失敗, 請在 iPhone 上點「信任」後再試', en: 'USB trust failed, tap Trust on the iPhone and retry' },
   remote_pair_failed: { zh: 'RemotePairing 記錄重建失敗, 請以系統管理員身分重啟 LocWarp', en: 'RemotePairing record rebuild failed, restart LocWarp as Administrator' },
   device_lost: { zh: '裝置連線中斷(USB 拔除或 Tunnel 死亡),請重新插上 USB 後再操作', en: 'Device connection lost (USB unplugged or tunnel died), please reconnect USB and try again' },
+  max_devices_reached: {
+    zh: '已連接最多 2 台裝置',
+    en: 'Maximum 2 devices connected',
+  },
   ios_unsupported: {
     zh: '裝置 iOS 版本過舊,LocWarp 僅支援 iOS 17 以上。請升級 iOS 後再試。',
     en: 'This device runs an unsupported iOS version. LocWarp requires iOS 17 or later. Please update and try again.',
@@ -85,8 +89,13 @@ export const wifiTunnelStop = () => request<any>('POST', '/api/device/wifi/tunne
 export const wifiRepair = () => request<{ status: string; udid: string; name: string; ios_version: string; remote_record_regenerated: boolean }>('POST', '/api/device/wifi/repair')
 
 // Location simulation
-export const teleport = (lat: number, lng: number) =>
-  request<any>('POST', '/api/location/teleport', { lat, lng })
+// Every action accepts an optional `udid` so the caller can target a specific
+// device in group mode. When omitted, the backend routes to the primary engine.
+const ud = (udid?: string | null) => (udid ? { udid } : {})
+const qs = (udid?: string | null) => (udid ? `?udid=${encodeURIComponent(udid)}` : '')
+
+export const teleport = (lat: number, lng: number, udid?: string) =>
+  request<any>('POST', '/api/location/teleport', { lat, lng, ...ud(udid) })
 export interface SpeedOpts { speed_kmh?: number | null; speed_min_kmh?: number | null; speed_max_kmh?: number | null }
 export interface PauseOpts { pause_enabled?: boolean; pause_min?: number; pause_max?: number }
 const sp = (o?: SpeedOpts) => ({
@@ -99,22 +108,22 @@ const pp = (o?: PauseOpts) => (o ? {
   pause_min: o.pause_min ?? 5,
   pause_max: o.pause_max ?? 20,
 } : {})
-export const navigate = (lat: number, lng: number, mode: string, speed?: SpeedOpts) =>
-  request<any>('POST', '/api/location/navigate', { lat, lng, mode, ...sp(speed) })
-export const startLoop = (waypoints: { lat: number; lng: number }[], mode: string, speed?: SpeedOpts, pause?: PauseOpts) =>
-  request<any>('POST', '/api/location/loop', { waypoints, mode, ...sp(speed), ...pp(pause) })
-export const multiStop = (waypoints: { lat: number; lng: number }[], mode: string, stop_duration: number, loop: boolean, speed?: SpeedOpts, pause?: PauseOpts) =>
-  request<any>('POST', '/api/location/multistop', { waypoints, mode, stop_duration, loop, ...sp(speed), ...pp(pause) })
-export const randomWalk = (center: { lat: number; lng: number }, radius_m: number, mode: string, speed?: SpeedOpts, pause?: PauseOpts) =>
-  request<any>('POST', '/api/location/randomwalk', { center, radius_m, mode, ...sp(speed), ...pp(pause) })
-export const joystickStart = (mode: string) =>
-  request<any>('POST', '/api/location/joystick/start', { mode })
-export const joystickStop = () => request<any>('POST', '/api/location/joystick/stop')
-export const pauseSim = () => request<any>('POST', '/api/location/pause')
-export const resumeSim = () => request<any>('POST', '/api/location/resume')
-export const restoreSim = () => request<any>('POST', '/api/location/restore')
-export const stopSim = () => request<any>('POST', '/api/location/stop')
-export const getStatus = () => request<any>('GET', '/api/location/status')
+export const navigate = (lat: number, lng: number, mode: string, speed?: SpeedOpts, udid?: string) =>
+  request<any>('POST', '/api/location/navigate', { lat, lng, mode, ...sp(speed), ...ud(udid) })
+export const startLoop = (waypoints: { lat: number; lng: number }[], mode: string, speed?: SpeedOpts, pause?: PauseOpts, udid?: string) =>
+  request<any>('POST', '/api/location/loop', { waypoints, mode, ...sp(speed), ...pp(pause), ...ud(udid) })
+export const multiStop = (waypoints: { lat: number; lng: number }[], mode: string, stop_duration: number, loop: boolean, speed?: SpeedOpts, pause?: PauseOpts, udid?: string) =>
+  request<any>('POST', '/api/location/multistop', { waypoints, mode, stop_duration, loop, ...sp(speed), ...pp(pause), ...ud(udid) })
+export const randomWalk = (center: { lat: number; lng: number }, radius_m: number, mode: string, speed?: SpeedOpts, pause?: PauseOpts, udid?: string, seed?: number | null) =>
+  request<any>('POST', '/api/location/randomwalk', { center, radius_m, mode, ...sp(speed), ...pp(pause), ...ud(udid), ...(seed != null ? { seed } : {}) })
+export const joystickStart = (mode: string, udid?: string) =>
+  request<any>('POST', '/api/location/joystick/start', { mode, ...ud(udid) })
+export const joystickStop = (udid?: string) => request<any>('POST', `/api/location/joystick/stop${qs(udid)}`)
+export const pauseSim = (udid?: string) => request<any>('POST', `/api/location/pause${qs(udid)}`)
+export const resumeSim = (udid?: string) => request<any>('POST', `/api/location/resume${qs(udid)}`)
+export const restoreSim = (udid?: string) => request<any>('POST', `/api/location/restore${qs(udid)}`)
+export const stopSim = (udid?: string) => request<any>('POST', `/api/location/stop${qs(udid)}`)
+export const getStatus = (udid?: string) => request<any>('GET', `/api/location/status${qs(udid)}`)
 
 // Cooldown
 export const getCooldownStatus = () => request<any>('GET', '/api/location/cooldown/status')
@@ -150,12 +159,13 @@ export const importBookmarks = (data: any) => request<{ imported: number }>('POS
 export const openLog = () => request<{ status: string; path: string }>('POST', '/api/system/open-log')
 export const openLogFolder = () => request<{ status: string; path: string }>('POST', '/api/system/open-log-folder')
 
-export const applySpeed = (mode: string, opts: { speed_kmh?: number | null; speed_min_kmh?: number | null; speed_max_kmh?: number | null }) =>
+export const applySpeed = (mode: string, opts: { speed_kmh?: number | null; speed_min_kmh?: number | null; speed_max_kmh?: number | null }, udid?: string) =>
   request<{ status: string; speed_mps: number }>('POST', '/api/location/apply-speed', {
     mode,
     speed_kmh: opts.speed_kmh ?? null,
     speed_min_kmh: opts.speed_min_kmh ?? null,
     speed_max_kmh: opts.speed_max_kmh ?? null,
+    ...ud(udid),
   })
 
 // Routes

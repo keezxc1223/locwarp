@@ -42,9 +42,26 @@ async def wifi_tunnel_connect(req: WifiTunnelConnectRequest):
     from main import app_state
     from core.device_manager import UnsupportedIosVersionError
     dm = _dm()
+    # Max 2 devices (group mode). connect_wifi_tunnel may reconnect an existing udid;
+    # we can only cheaply check the pre-state here.
+    if len(dm._connections) >= 2:
+        raise HTTPException(
+            status_code=409,
+            detail={"code": "max_devices_reached", "message": "已連接最多 2 台裝置"},
+        )
     try:
         info = await dm.connect_wifi_tunnel(req.rsd_address, req.rsd_port)
         await app_state.create_engine_for_device(info.udid)
+        try:
+            from api.websocket import broadcast
+            await broadcast("device_connected", {
+                "udid": info.udid,
+                "name": info.name,
+                "ios_version": info.ios_version,
+                "connection_type": "Network",
+            })
+        except Exception:
+            pass
         return {
             "status": "connected",
             "udid": info.udid,
@@ -454,8 +471,11 @@ async def _cleanup_wifi_connections() -> list[str]:
                 _tunnel_logger.info("Disconnected WiFi device %s", udid)
             except (OSError, RuntimeError):
                 _tunnel_logger.exception("Failed to disconnect %s", udid)
-        if udids and app_state.simulation_engine is not None:
-            app_state.simulation_engine = None
+        for udid in udids:
+            app_state.simulation_engines.pop(udid, None)
+            if app_state._primary_udid == udid:
+                remaining = next(iter(app_state.simulation_engines.keys()), None)
+                app_state._primary_udid = remaining
         if udids:
             try:
                 from api.websocket import broadcast
@@ -691,7 +711,10 @@ async def wifi_tunnel_stop():
                         await dm.disconnect(usb_dev.udid)
                     except Exception:
                         pass
-                    app_state.simulation_engine = None
+                    app_state.simulation_engines.pop(usb_dev.udid, None)
+                    if app_state._primary_udid == usb_dev.udid:
+                        remaining = next(iter(app_state.simulation_engines.keys()), None)
+                        app_state._primary_udid = remaining
                     try:
                         from api.websocket import broadcast
                         await broadcast("device_error", {
@@ -725,6 +748,11 @@ async def wifi_tunnel_start_and_connect(req: WifiTunnelStartRequest):
 
     # Connect through the tunnel
     dm = _dm()
+    if len(dm._connections) >= 2:
+        raise HTTPException(
+            status_code=409,
+            detail={"code": "max_devices_reached", "message": "已連接最多 2 台裝置"},
+        )
     try:
         info = await dm.connect_wifi_tunnel(rsd_address, rsd_port)
         await app_state.create_engine_for_device(info.udid)
@@ -749,9 +777,27 @@ async def connect_device(udid: str):
     from main import app_state
     from core.device_manager import UnsupportedIosVersionError
     dm = _dm()
+    # Max 2 devices (group mode). Allow re-connect of an already-connected udid.
+    if udid not in dm._connections and len(dm._connections) >= 2:
+        raise HTTPException(
+            status_code=409,
+            detail={"code": "max_devices_reached", "message": "已連接最多 2 台裝置"},
+        )
     try:
         await dm.connect(udid)
         await app_state.create_engine_for_device(udid)
+        try:
+            from api.websocket import broadcast
+            devs = await dm.discover_devices()
+            info = next((d for d in devs if d.udid == udid), None)
+            await broadcast("device_connected", {
+                "udid": udid,
+                "name": info.name if info else "",
+                "ios_version": info.ios_version if info else "",
+                "connection_type": info.connection_type if info else "USB",
+            })
+        except Exception:
+            pass
         return {"status": "connected", "udid": udid}
     except UnsupportedIosVersionError as e:
         raise HTTPException(
@@ -773,8 +819,18 @@ async def connect_device(udid: str):
 
 @router.delete("/{udid}/connect")
 async def disconnect_device(udid: str):
+    from main import app_state
     dm = _dm()
     await dm.disconnect(udid)
+    # Drop the per-udid engine (if any) so _engine() won't route to a dead service.
+    app_state.simulation_engines.pop(udid, None)
+    if app_state._primary_udid == udid:
+        app_state._primary_udid = next(iter(app_state.simulation_engines), None)
+    try:
+        from api.websocket import broadcast
+        await broadcast("device_disconnected", {"udid": udid, "udids": [udid], "reason": "user"})
+    except Exception:
+        pass
     return {"status": "disconnected", "udid": udid}
 
 
