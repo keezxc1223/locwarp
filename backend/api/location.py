@@ -414,3 +414,34 @@ async def get_initial_position():
     from main import app_state
     pos = app_state.get_initial_position()   # sync: home > last > DEFAULT
     return {"lat": pos["lat"], "lng": pos["lng"]}
+
+
+# ── Scheduled Return (定時回家) ───────────────────────────
+
+from pydantic import BaseModel, Field as _Field
+
+class TimerRequest(BaseModel):
+    seconds: int = _Field(gt=0, le=86400)
+
+
+@router.post("/timer/start", tags=["timer"])
+async def timer_start(req: TimerRequest):
+    """啟動定時回家計時器。到期後自動停止模擬並跳回 home position。"""
+    from main import app_state
+    await app_state.scheduled_return.start(req.seconds)
+    return {"status": "started", "seconds": req.seconds}
+
+
+@router.delete("/timer/cancel", tags=["timer"])
+async def timer_cancel():
+    """取消定時回家計時器。"""
+    from main import app_state
+    app_state.scheduled_return.cancel()
+    return {"status": "cancelled"}
+
+
+@router.get("/timer/status", tags=["timer"])
+async def timer_status():
+    """取得定時回家計時器狀態。"""
+    from main import app_state
+    return app_state.scheduled_return.get_status()

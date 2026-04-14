@@ -10,8 +10,8 @@ import * as api from './services/api'
 import MapView from './components/MapView'
 import ControlPanel from './components/ControlPanel'
 import DeviceStatus from './components/DeviceStatus'
-import SimulatorPanel from './components/SimulatorPanel'
 import BlueStacksPanel from './components/BlueStacksPanel'
+import TimerPanel from './components/TimerPanel'
 import JoystickPad from './components/JoystickPad'
 import EtaBar from './components/EtaBar'
 import PauseControl from './components/PauseControl'
@@ -333,8 +333,8 @@ const App: React.FC = () => {
           onStopTunnel={device.stopTunnel}
           tunnelStatus={device.tunnelStatus}
         />
-        <SimulatorPanel />
         <BlueStacksPanel />
+        <TimerPanel wsMessage={ws.lastMessage} />
         <ControlPanel
           simMode={sim.mode}
           moveMode={sim.moveMode}

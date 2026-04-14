@@ -115,6 +115,11 @@ export const resumeSim = () => request<any>('POST', '/api/location/resume')
 export const restoreSim = () => request<any>('POST', '/api/location/restore')
 export const getStatus = () => request<any>('GET', '/api/location/status')
 
+// Scheduled return (定時回家)
+export const timerStart = (seconds: number) => request<any>('POST', '/api/location/timer/start', { seconds })
+export const timerCancel = () => request<any>('DELETE', '/api/location/timer/cancel')
+export const timerStatus = () => request<any>('GET', '/api/location/timer/status')
+
 // Cooldown
 export const getCooldownStatus = () => request<any>('GET', '/api/location/cooldown/status')
 export const setCooldownEnabled = (enabled: boolean) =>
@@ -143,12 +148,6 @@ export const listAdbDevices = () => request<{ devices: any[] }>('GET', '/api/blu
 export const connectAdb = (serial: string) => request<any>('POST', '/api/bluestacks/connect', { serial })
 export const disconnectAdb = () => request<any>('DELETE', '/api/bluestacks/connect')
 export const getAdbStatus = () => request<any>('GET', '/api/bluestacks/status')
-
-// iOS Simulator
-export const listSimulators = () => request<{ simulators: any[] }>('GET', '/api/simulator/list')
-export const connectSimulator = (udid: string) => request<any>('POST', `/api/simulator/${udid}/connect`)
-export const disconnectSimulator = (udid: string) => request<any>('DELETE', `/api/simulator/${udid}/connect`)
-export const getSimulatorStatus = () => request<any>('GET', '/api/simulator/status')
 
 // Geocoding
 export const searchAddress = (q: string) => request<any[]>('GET', `/api/geocode/search?q=${encodeURIComponent(q)}`)
