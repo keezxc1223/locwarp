@@ -86,6 +86,12 @@ export const STRINGS = {
   'panel.route_empty': { zh: '尚無儲存的路線', en: 'No saved routes' },
   'panel.route_gpx_import': { zh: '匯入 GPX', en: 'Import GPX' },
   'panel.route_gpx_export_tooltip': { zh: '匯出為 GPX', en: 'Export as GPX' },
+  'panel.routes_export_all': { zh: '全部匯出', en: 'Export all' },
+  'panel.routes_export_all_tooltip': { zh: '將所有已存路線匯出成單一 JSON 檔', en: 'Export every saved route as a single JSON file' },
+  'panel.routes_import_all': { zh: '全部匯入', en: 'Import all' },
+  'panel.routes_import_all_tooltip': { zh: '匯入先前「全部匯出」產生的 JSON 檔', en: 'Import a JSON file produced by "Export all"' },
+  'toast.routes_imported': { zh: '已匯入 {n} 條路線', en: 'Imported {n} routes' },
+  'toast.routes_import_failed': { zh: '匯入失敗:{msg}', en: 'Import failed: {msg}' },
   'panel.route_delete_confirm': { zh: '刪除路線「{name}」?', en: 'Delete route "{name}"?' },
   'panel.random_walk_radius': { zh: '隨機漫步半徑 (m)', en: 'Random walk radius (m)' },
 

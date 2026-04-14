@@ -290,6 +290,22 @@ const App: React.FC = () => {
     window.open(url, '_blank')
   }, [])
 
+  const handleRoutesImportAll = useCallback(async (file: File) => {
+    try {
+      const text = await file.text()
+      const data = JSON.parse(text)
+      if (!Array.isArray(data?.routes)) {
+        throw new Error('invalid file: missing routes array')
+      }
+      const res = await api.importAllRoutes({ routes: data.routes })
+      const routes = await api.getSavedRoutes()
+      setSavedRoutes(routes)
+      showToast(t('toast.routes_imported', { n: res.imported }))
+    } catch (err: any) {
+      showToast(t('toast.routes_import_failed', { msg: err.message || '' }))
+    }
+  }, [showToast])
+
   const handleApplySpeed = useCallback(async () => {
     try {
       await sim.applySpeed()
@@ -448,6 +464,8 @@ const App: React.FC = () => {
           savedRoutes={savedRoutes.map(r => ({ id: r.id, name: r.name, waypoints: r.waypoints ?? [] }))}
           onRouteGpxImport={handleGpxImport}
           onRouteGpxExport={handleGpxExport}
+          onRoutesImportAll={handleRoutesImportAll}
+          routesExportAllUrl={api.exportAllRoutesUrl()}
           onRouteRename={handleRouteRename}
           onRouteDelete={handleRouteDelete}
           onRouteLoad={handleRouteLoad}

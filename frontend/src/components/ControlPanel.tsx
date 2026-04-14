@@ -94,6 +94,8 @@ interface ControlPanelProps {
   onRouteDelete?: (id: string) => void;
   onRouteGpxImport?: (file: File) => Promise<void>;
   onRouteGpxExport?: (id: string) => void;
+  onRoutesImportAll?: (file: File) => Promise<void>;
+  routesExportAllUrl?: string;
   randomWalkRadius: number;
   pauseRandomWalk?: { enabled: boolean; min: number; max: number };
   onPauseRandomWalkChange?: (v: { enabled: boolean; min: number; max: number }) => void;
@@ -214,6 +216,8 @@ const ControlPanel: React.FC<ControlPanelProps> = ({
   onRouteDelete,
   onRouteGpxImport,
   onRouteGpxExport,
+  onRoutesImportAll,
+  routesExportAllUrl,
   randomWalkRadius,
   pauseRandomWalk,
   onPauseRandomWalkChange,
@@ -689,10 +693,11 @@ const ControlPanel: React.FC<ControlPanelProps> = ({
                       }}
                     >{t('generic.save')}</button>
                   </div>
-                  {onRouteGpxImport && (
-                    <div style={{ marginBottom: 10 }}>
+                  <div style={{ display: 'flex', flexWrap: 'wrap', gap: 6, marginBottom: 10 }}>
+                    {onRouteGpxImport && (
                       <label
                         className="action-btn"
+                        title={t('panel.route_gpx_import')}
                         style={{
                           display: 'inline-flex', alignItems: 'center', gap: 4,
                           padding: '4px 10px', fontSize: 11, cursor: 'pointer',
@@ -715,8 +720,61 @@ const ControlPanel: React.FC<ControlPanelProps> = ({
                           }}
                         />
                       </label>
-                    </div>
-                  )}
+                    )}
+                    {routesExportAllUrl && savedRoutes.length > 0 && (
+                      <a
+                        className="action-btn"
+                        href={routesExportAllUrl}
+                        download="locwarp-routes.json"
+                        title={t('panel.routes_export_all_tooltip')}
+                        style={{
+                          display: 'inline-flex', alignItems: 'center', gap: 4,
+                          padding: '4px 10px', fontSize: 11, cursor: 'pointer',
+                          textDecoration: 'none',
+                          color: '#4ecdc4',
+                          background: 'rgba(78, 205, 196, 0.12)',
+                          border: '1px solid rgba(78, 205, 196, 0.35)',
+                        }}
+                      >
+                        <svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2">
+                          <path d="M21 15v4a2 2 0 01-2 2H5a2 2 0 01-2-2v-4" />
+                          <polyline points="7 10 12 15 17 10" />
+                          <line x1="12" y1="15" x2="12" y2="3" />
+                        </svg>
+                        {t('panel.routes_export_all')}
+                      </a>
+                    )}
+                    {onRoutesImportAll && (
+                      <label
+                        className="action-btn"
+                        title={t('panel.routes_import_all_tooltip')}
+                        style={{
+                          display: 'inline-flex', alignItems: 'center', gap: 4,
+                          padding: '4px 10px', fontSize: 11, cursor: 'pointer',
+                          color: '#4ecdc4',
+                          background: 'rgba(78, 205, 196, 0.12)',
+                          border: '1px solid rgba(78, 205, 196, 0.35)',
+                        }}
+                      >
+                        <svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2">
+                          <path d="M21 15v4a2 2 0 01-2 2H5a2 2 0 01-2-2v-4" />
+                          <polyline points="17 8 12 3 7 8" />
+                          <line x1="12" y1="3" x2="12" y2="15" />
+                        </svg>
+                        {t('panel.routes_import_all')}
+                        <input
+                          type="file"
+                          accept=".json,application/json"
+                          style={{ display: 'none' }}
+                          onChange={async (e) => {
+                            const f = e.target.files?.[0];
+                            if (f) await onRoutesImportAll(f);
+                            e.target.value = '';
+                          }}
+                        />
+                      </label>
+                    )}
+                  </div>
                   {savedRoutes.length === 0 && (
                     <div style={{ fontSize: 12, opacity: 0.5, padding: '8px 0' }}>{t('panel.route_empty')}</div>
                   )}

@@ -181,3 +181,11 @@ export async function importGpx(file: File): Promise<{ status: string; id: strin
 export function exportGpxUrl(routeId: string): string {
   return `${API}/api/route/gpx/export/${routeId}`
 }
+
+// Bulk JSON export / import for saved routes
+export function exportAllRoutesUrl(): string {
+  return `${API}/api/route/saved/export`
+}
+
+export const importAllRoutes = (data: { routes: any[] }) =>
+  request<{ imported: number }>('POST', '/api/route/saved/import', data)

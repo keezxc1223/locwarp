@@ -97,6 +97,35 @@ async def rename_saved(route_id: str, req: _RouteRenameRequest):
     return _saved_routes[route_id]
 
 
+@router.get("/saved/export")
+async def export_all_saved_routes():
+    """Export every saved route as a single JSON bundle."""
+    payload = {"routes": [r.model_dump(mode="json") for r in _saved_routes.values()]}
+    from fastapi.responses import Response
+    import json as _json
+    body = _json.dumps(payload, ensure_ascii=False, indent=2)
+    return Response(content=body, media_type="application/json",
+                    headers={"Content-Disposition": 'attachment; filename="locwarp-routes.json"'})
+
+
+class _RouteImportBody(_BM):
+    routes: list[SavedRoute]
+
+
+@router.post("/saved/import")
+async def import_all_saved_routes(body: _RouteImportBody):
+    """Merge imported routes into saved. Imports get fresh ids so they never collide."""
+    imported = 0
+    for r in body.routes:
+        r.id = str(uuid.uuid4())
+        r.created_at = datetime.now(timezone.utc).isoformat()
+        _saved_routes[r.id] = r
+        imported += 1
+    if imported:
+        _persist_saved_routes()
+    return {"imported": imported}
+
+
 @router.post("/gpx/import")
 async def import_gpx(file: UploadFile = File(...)):
     content = await file.read()
