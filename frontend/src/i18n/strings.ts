@@ -232,6 +232,10 @@ export const STRINGS = {
 
   // ── Panel extras ────────────────────────────
   'panel.mode': { zh: '模式', en: 'Mode' },
+  'panel.straight_line': { zh: '使用直線路徑', en: 'Use straight-line path' },
+  'panel.straight_line_tooltip': { zh: '打開後不走 OSRM 路線,所有模式直接依直線移動', en: 'When on, skip OSRM and move along straight segments' },
+  'panel.click_waypoint': { zh: '左鍵設置路徑點', en: 'Left-click to add waypoints' },
+  'panel.click_waypoint_tooltip': { zh: '打開後在地圖上點左鍵即新增路徑點', en: 'When on, left-click the map to append a waypoint' },
   'panel.address_search': { zh: '地址搜尋', en: 'Address Search' },
   'panel.library': { zh: '收藏座標與路線', en: 'Bookmarks & Routes' },
   'panel.library_drag_hint': { zh: '收藏座標與路線 · 拖曳此處移動', en: 'Bookmarks & Routes · Drag to move' },

@@ -21,6 +21,7 @@ class Navigator:
         speed_kmh: float | None = None,
         speed_min_kmh: float | None = None,
         speed_max_kmh: float | None = None,
+        straight_line: bool = False,
     ) -> None:
         """Get an OSRM route from the current position to *dest*, then
         walk/run/drive along it using the engine's core movement loop.
@@ -54,6 +55,7 @@ class Navigator:
             start.lat, start.lng,
             dest.lat, dest.lng,
             profile=osrm_profile,
+            force_straight=straight_line,
         )
 
         # Convert [lat, lng] lists to Coordinate objects

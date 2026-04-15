@@ -29,6 +29,7 @@ class RouteLooper:
         pause_enabled: bool = True,
         pause_min: float = 5.0,
         pause_max: float = 20.0,
+        straight_line: bool = False,
     ) -> None:
         """Build a multi-waypoint route that forms a closed loop, then
         traverse it repeatedly until stopped.
@@ -56,6 +57,7 @@ class RouteLooper:
         wp_tuples = [(wp.lat, wp.lng) for wp in closed_waypoints]
         route_data = await engine.route_service.get_multi_route(
             wp_tuples, profile=osrm_profile,
+            force_straight=straight_line,
         )
 
         coords = [Coordinate(lat=pt[0], lng=pt[1]) for pt in route_data["coords"]]

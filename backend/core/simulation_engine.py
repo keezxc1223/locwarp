@@ -177,6 +177,7 @@ class SimulationEngine:
         speed_kmh: float | None = None,
         speed_min_kmh: float | None = None,
         speed_max_kmh: float | None = None,
+        straight_line: bool = False,
     ) -> None:
         """Navigate from current position to *dest*."""
         await self._ensure_stopped()
@@ -186,6 +187,7 @@ class SimulationEngine:
             self._navigator.navigate_to(
                 dest, mode, speed_kmh=speed_kmh,
                 speed_min_kmh=speed_min_kmh, speed_max_kmh=speed_max_kmh,
+                straight_line=straight_line,
             ),
             "Navigate",
         )
@@ -200,6 +202,7 @@ class SimulationEngine:
         pause_enabled: bool = True,
         pause_min: float = 5.0,
         pause_max: float = 20.0,
+        straight_line: bool = False,
     ) -> None:
         """Start looping through a closed route."""
         await self._ensure_stopped()
@@ -210,6 +213,7 @@ class SimulationEngine:
                 waypoints, mode, speed_kmh=speed_kmh,
                 speed_min_kmh=speed_min_kmh, speed_max_kmh=speed_max_kmh,
                 pause_enabled=pause_enabled, pause_min=pause_min, pause_max=pause_max,
+                straight_line=straight_line,
             ),
             "Loop",
         )
@@ -241,6 +245,7 @@ class SimulationEngine:
         pause_enabled: bool = True,
         pause_min: float = 5.0,
         pause_max: float = 20.0,
+        straight_line: bool = False,
     ) -> None:
         """Navigate through waypoints with optional stops."""
         await self._ensure_stopped()
@@ -251,6 +256,7 @@ class SimulationEngine:
                 waypoints, mode, stop_duration, loop, speed_kmh=speed_kmh,
                 speed_min_kmh=speed_min_kmh, speed_max_kmh=speed_max_kmh,
                 pause_enabled=pause_enabled, pause_min=pause_min, pause_max=pause_max,
+                straight_line=straight_line,
             ),
             "Multi-stop",
         )
@@ -267,6 +273,7 @@ class SimulationEngine:
         pause_min: float = 5.0,
         pause_max: float = 20.0,
         seed: int | None = None,
+        straight_line: bool = False,
     ) -> None:
         """Begin a random walk within a radius."""
         await self._ensure_stopped()
@@ -279,6 +286,7 @@ class SimulationEngine:
                 speed_min_kmh=speed_min_kmh, speed_max_kmh=speed_max_kmh,
                 pause_enabled=pause_enabled, pause_min=pause_min, pause_max=pause_max,
                 seed=seed,
+                straight_line=straight_line,
             ),
             "Random walk",
         )

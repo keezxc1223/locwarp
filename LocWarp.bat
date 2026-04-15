@@ -15,5 +15,5 @@ exit /b
 :RUN
 cd /d "%~dp0"
 :: Use the full path to avoid the Windows Store python stub
-"C:\Users\USER\AppData\Local\Programs\Python\Python312\python.exe" start.py
+"C:\Users\USER\AppData\Local\Programs\Python\Python313\python.exe" start.py
 pause

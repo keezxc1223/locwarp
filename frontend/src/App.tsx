@@ -61,6 +61,7 @@ const App: React.FC = () => {
   const [cooldown, setCooldown] = useState(0)
   const [cooldownEnabled, setCooldownEnabled] = useState(false)
   const [randomWalkRadius, setRandomWalkRadius] = useState(500)
+  const [clickToAddWaypoint, setClickToAddWaypoint] = useState(false)
   const [toastMsg, setToastMsg] = useState<string | null>(null)
 
   const showToast = useCallback((msg: string, ms = 2000) => {
@@ -190,8 +191,21 @@ const App: React.FC = () => {
 
   // -- Map handlers --
   const handleMapClick = useCallback((lat: number, lng: number) => {
-    // Just set as destination for now
-  }, [])
+    // When the "left-click to add waypoint" toggle is on AND we're in a
+    // waypoint-based mode, append to the waypoint list. Otherwise a map
+    // click is a no-op (teleport / navigate live on right-click menu).
+    if (!clickToAddWaypoint) return
+    if (sim.mode !== SimMode.Loop && sim.mode !== SimMode.MultiStop) return
+    sim.setWaypoints((prev: any[]) => {
+      if (prev.length === 0 && sim.currentPosition) {
+        return [
+          { lat: sim.currentPosition.lat, lng: sim.currentPosition.lng },
+          { lat, lng },
+        ]
+      }
+      return [...prev, { lat, lng }]
+    })
+  }, [clickToAddWaypoint, sim])
 
   const handleTeleport = useCallback(async (lat: number, lng: number) => {
     const udids = device.connectedDevices.map((d) => d.udid)
@@ -603,6 +617,10 @@ const App: React.FC = () => {
           onPauseRandomWalkChange={sim.setPauseRandomWalk}
           onRandomWalkRadiusChange={setRandomWalkRadius}
           currentWaypointsCount={sim.waypoints.length}
+          straightLine={sim.straightLine}
+          onStraightLineChange={sim.setStraightLine}
+          clickToAddWaypoint={clickToAddWaypoint}
+          onClickToAddWaypointChange={setClickToAddWaypoint}
           modeExtraSection={(sim.mode === SimMode.Loop || sim.mode === SimMode.MultiStop) ? (
           <div className="section" style={{ margin: '0 0 8px 0' }}>
             <div className="section-title" style={{ display: 'flex', alignItems: 'center', gap: 6 }}>

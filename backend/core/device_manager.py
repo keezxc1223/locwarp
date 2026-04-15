@@ -574,10 +574,9 @@ class DeviceManager:
     ) -> DeviceInfo:
         """Connect to a device via an existing WiFi tunnel.
 
-        Use this when a WiFi tunnel has already been established by
-        ``wifi_tunnel.py`` (or ``pymobiledevice3 remote start-tunnel``).
-        The caller provides the RSD address and port printed by the
-        tunnel process.
+        Use this when a WiFi tunnel has already been established (by the
+        in-process ``TunnelRunner`` or ``pymobiledevice3 remote start-tunnel``).
+        The caller provides the RSD address and port.
 
         Returns a ``DeviceInfo`` describing the connected device.
         """
@@ -610,7 +609,7 @@ class DeviceManager:
             logger.error("Failed to connect to RSD at %s:%d after retries", rsd_address, rsd_port)
             raise RuntimeError(
                 f"無法連線到 WiFi tunnel RSD ({rsd_address}:{rsd_port})。"
-                "請確認 wifi_tunnel.py 正在執行且 tunnel 仍然活躍。"
+                "請確認 WiFi tunnel 仍然活躍。"
             ) from last_exc
 
         peer = rsd.peer_info or {}

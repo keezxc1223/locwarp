@@ -50,7 +50,15 @@ export function useDevice(subscribe?: WsSubscribe) {
         listDevices().then((list) => { setDevices(list) }).catch(() => {})
       } else if (msg.type === 'device_connected') {
         // Re-fetch list so the newly-connected device appears with correct metadata.
-        listDevices().then((list) => { setDevices(list) }).catch(() => {})
+        listDevices().then((list) => {
+          setDevices(list)
+          // If nothing is currently set as the active device, promote the
+          // newly-connected one so the bottom panel switches off NODEVICE
+          // without the user having to press the USB button.
+          const udid = msg.data?.udid
+          const match = udid ? list.find((d) => d.udid === udid && d.is_connected) : null
+          setConnectedDevice((prev) => prev ?? match ?? list.find((d) => d.is_connected) ?? null)
+        }).catch(() => {})
       } else if (msg.type === 'device_reconnected') {
         listDevices().then((list) => {
           setDevices(list)

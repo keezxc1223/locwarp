@@ -68,9 +68,6 @@ class AppState:
                 if fmt:
                     from models.schemas import CoordinateFormat
                     self.coord_formatter.format = CoordinateFormat(fmt)
-                cd = data.get("cooldown_enabled")
-                if cd is not None:
-                    self.cooldown_timer.enabled = cd
                 imp = data.get("initial_map_position")
                 if isinstance(imp, dict) and "lat" in imp and "lng" in imp:
                     self._initial_map_position = {"lat": float(imp["lat"]), "lng": float(imp["lng"])}
@@ -81,7 +78,6 @@ class AppState:
         data = {
             "last_position": self._last_position,
             "coord_format": self.coord_formatter.format.value,
-            "cooldown_enabled": self.cooldown_timer.enabled,
             "initial_map_position": self._initial_map_position,
         }
         try:

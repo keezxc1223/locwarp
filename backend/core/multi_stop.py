@@ -31,6 +31,7 @@ class MultiStopNavigator:
         pause_enabled: bool = True,
         pause_min: float = 5.0,
         pause_max: float = 20.0,
+        straight_line: bool = False,
     ) -> None:
         """Navigate through *waypoints* one leg at a time.
 
@@ -79,6 +80,7 @@ class MultiStopNavigator:
         try:
             full_route = await engine.route_service.get_multi_route(
                 all_wp_tuples, profile=osrm_profile,
+                force_straight=straight_line,
             )
             await engine._emit("route_path", {
                 "coords": [{"lat": pt[0], "lng": pt[1]} for pt in full_route["coords"]],
@@ -108,6 +110,7 @@ class MultiStopNavigator:
                 start_pos.lat, start_pos.lng,
                 first.lat, first.lng,
                 profile=osrm_profile,
+                force_straight=straight_line,
             )
             coords = [Coordinate(lat=pt[0], lng=pt[1]) for pt in route_data["coords"]]
             if len(coords) >= 2:
@@ -145,6 +148,7 @@ class MultiStopNavigator:
                     wp_a.lat, wp_a.lng,
                     wp_b.lat, wp_b.lng,
                     profile=osrm_profile,
+                    force_straight=straight_line,
                 )
 
                 coords = [Coordinate(lat=pt[0], lng=pt[1]) for pt in route_data["coords"]]

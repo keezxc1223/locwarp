@@ -109,27 +109,27 @@ class RouteService:
         end_lat: float,
         end_lng: float,
         profile: str = "foot",
+        force_straight: bool = False,
     ) -> dict:
         """Plan a route between two points via OSRM.
 
-        Returns
-        -------
-        dict
-            coords:         list of [lat, lng] pairs (route geometry)
-            duration:        total duration in seconds
-            distance:        total distance in meters
-            leg_durations:   list of per-leg durations (seconds)
+        When *force_straight* is True, skip OSRM entirely and serve a
+        densified straight-line route (used by the global "straight-line"
+        toggle for users who want raw bearing-to-point travel).
         """
         waypoints = [
             (start_lat, start_lng),
             (end_lat, end_lng),
         ]
+        if force_straight:
+            return _straight_line_fallback(waypoints)
         return await self._fetch_route(waypoints, profile)
 
     async def get_multi_route(
         self,
         waypoints: list[tuple[float, float] | list[float] | dict],
         profile: str = "foot",
+        force_straight: bool = False,
     ) -> dict:
         """Plan a route through multiple waypoints.
 
@@ -146,6 +146,8 @@ class RouteService:
         if len(normalised) < 2:
             raise ValueError("At least two waypoints are required")
 
+        if force_straight:
+            return _straight_line_fallback(normalised)
         return await self._fetch_route(normalised, profile)
 
     # ------------------------------------------------------------------

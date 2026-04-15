@@ -17,6 +17,7 @@ frontend/.vite/
 dist-py/
 build-py/
 frontend/release/
+frontend/release-tmp/
 *.spec.bak
 
 # ── Runtime state ───────────────────────────────────

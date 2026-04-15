@@ -20,7 +20,7 @@
 >
 > **LocWarp 自 v0.1.49 起僅支援 iOS / iPadOS 17 以上的裝置。**
 >
-> iOS 16 及更早版本因 Developer Disk Image 機制差異與多位使用者實測無法正常運作,已停止支援;若連接 iOS <17 裝置,LocWarp 會直接拒絕並顯示提示。
+> iOS 17+ 為主要支援版本(開發者日常測試);**iOS 16.x 自 v0.2.5 起由 @bitifyChen (#9) 社群維護**,走 LegacyLocationService 路徑,最低門檻為 iOS 16.0。iOS 15 以下不受支援。
 
 > ### 相容性測試狀態
 >
@@ -35,7 +35,8 @@
 > | **18.5**(iPadOS) | 社群使用者回報 | ![Reported](https://img.shields.io/badge/回報可用-6c8cff?style=flat-square) |
 > | **18.1.1** | 社群使用者回報 | ![Reported](https://img.shields.io/badge/回報可用-6c8cff?style=flat-square) |
 > | **17.6.1** | 社群使用者回報 | ![Reported](https://img.shields.io/badge/回報可用-6c8cff?style=flat-square) |
-> | **16.x 及以下** | n/a | ![Unsupported](https://img.shields.io/badge/不支援-f44336?style=flat-square) |
+> | **16.x**(社群維護) | @bitifyChen · [#9](https://github.com/keezxc1223/locwarp/pull/9) | ![Community](https://img.shields.io/badge/社群維護-ffa726?style=flat-square) |
+> | **15.x 及以下** | n/a | ![Unsupported](https://img.shields.io/badge/不支援-f44336?style=flat-square) |
 >
 > **說明**:上表僅彙整開發者實測與少數社群回饋的結果,**並不保證於所有相同版本的裝置、網路環境或系統組合下皆能正常運作**。iOS 虛擬定位的穩定性高度依賴 iOS 修補版本、pymobiledevice3 對該版本的支援程度、Developer Disk Image 是否成功掛載,以及 Windows 端的驅動、VPN、防火牆、AV 配置。因此「回報可用」僅代表**至少一位使用者在其特定環境下成功運作**,不等同於通用相容性聲明。
 >
@@ -169,7 +170,7 @@
 
 | 技術 | 版本 | 用途 |
 | --- | --- | --- |
-| Python | 3.12 | 主 runtime |
+| Python | 3.13 | 主 runtime |
 | [FastAPI](https://fastapi.tiangolo.com/) | 0.110+ | REST API + WebSocket |
 | [uvicorn](https://www.uvicorn.org/) | 0.29+ | ASGI server(`:8777`) |
 | [websockets](https://websockets.readthedocs.io/) | 12+ | 即時位置/狀態推播給前端 |
@@ -178,13 +179,12 @@
 | [httpx](https://www.python-httpx.org/) | 0.27+ | OSRM / Nominatim HTTP 呼叫 |
 | [gpxpy](https://github.com/tkrajina/gpxpy) | 1.6+ | GPX 路線解析 |
 
-### WiFi Tunnel(獨立 helper)
+### WiFi Tunnel(整合於 backend,v0.2.3+)
 
-| 技術 | 版本 | 用途 |
-| --- | --- | --- |
-| Python | **3.13**(必需) | TLS-PSK 原生支援(3.12 不行) |
-| pymobiledevice3 | 9.9+ | `start_tcp_tunnel()` 建立 RSD tunnel |
-| pytun-pmd3 | n/a | Windows TUN 介面(wintun.dll) |
+| 技術 | 用途 |
+| --- | --- |
+| pymobiledevice3 `start_tcp_tunnel()` | 建立 RSD tunnel(in-process asyncio task) |
+| pytun-pmd3 | Windows TUN 介面(wintun.dll,已捆入 backend exe) |
 
 ### 外部服務(皆免費、無需 API key)
 
@@ -198,7 +198,7 @@
 
 | 工具 | 用途 |
 | --- | --- |
-| [PyInstaller](https://pyinstaller.org/) | Python → 單檔 exe(backend 用 3.12,tunnel 用 3.13) |
+| [PyInstaller](https://pyinstaller.org/) | Python → 單檔 exe(backend,含內建 tunnel) |
 | [electron-builder](https://www.electron.build/) | Electron 打包成 NSIS 安裝檔 |
 | NSIS | Windows 安裝器 |
 
@@ -219,7 +219,7 @@
 
 - **WebSocket 位置推播**:backend 每 tick(`update_interval` 由速度 profile 決定)發 `position_update` 事件,前端即時更新地圖游標 + ETA bar
 - **速度解析**:`config.resolve_speed_profile(mode, speed_kmh, speed_min_kmh, speed_max_kmh)` 統一處理「模式預設 / 固定自訂 / 隨機範圍」三種輸入,優先序 `range > 固定 > 預設`
-- **打包後路徑偵測**:backend 以 `sys.frozen` 判斷是否 PyInstaller bundle,從 `resources/backend/` 反推 `resources/wifi-tunnel/wifi-tunnel.exe`,避免硬編碼路徑
+- **In-process WiFi tunnel**:backend 自 v0.2.3 起直接在主 event loop 內執行 `start_tcp_tunnel()`,不再 spawn 獨立 helper exe
 - **Runtime 狀態目錄**:一律寫入 `~/.locwarp/`(bookmarks / settings / tunnel info),避免 PyInstaller 的 `_MEIPASS` 臨時目錄問題
 - **Tile referer / OSM 替換**:OSM 的 tile 服務封鎖散佈型應用,已改用 CartoDB(OSM 資料源、CARTO 代管 CDN、免 referer)
 
@@ -230,8 +230,7 @@
 ### 先決條件
 
 - Windows 10 / 11
-- Python **3.12**(backend)
-- Python **3.13**(WiFi tunnel,TLS-PSK 需求)
+- Python **3.13**(backend + WiFi tunnel 共用)
 - Node.js 18+
 - iPhone 已透過 iTunes / Apple Devices 配對過這台電腦
 - iOS 17+ 需開啟「開發人員模式」
@@ -239,13 +238,10 @@
 ### 首次設置
 
 ```bash
-# 1. 後端依賴
-py -3.12 -m pip install -r backend/requirements.txt
+# 1. 後端依賴(含 WiFi tunnel)
+py -3.13 -m pip install -r backend/requirements.txt
 
-# 2. WiFi tunnel 依賴(Python 3.13)
-py -3.13 -m pip install pymobiledevice3
-
-# 3. 前端依賴
+# 2. 前端依賴
 cd frontend
 npm install
 ```
@@ -261,7 +257,7 @@ npm install
 
 ```bash
 # 終端 1, backend
-cd backend && py -3.12 main.py
+cd backend && py -3.13 main.py
 
 # 終端 2, 前端 + Electron
 cd frontend && npm run start
@@ -274,8 +270,7 @@ cd frontend && npm run start
 ### 一次性安裝打包工具
 
 ```bash
-py -3.12 -m pip install pyinstaller
-py -3.13 -m pip install pyinstaller pymobiledevice3
+py -3.13 -m pip install pyinstaller
 cd frontend && npm install -D electron-builder
 ```
 
@@ -286,10 +281,9 @@ build-installer.bat
 ```
 
 依序執行:
-1. **PyInstaller(3.12)** 編譯 backend → `dist-py/locwarp-backend/`
-2. **PyInstaller(3.13)** 編譯 wifi-tunnel → `dist-py/wifi-tunnel/`
-3. **Vite** 建置前端 → `frontend/dist/`
-4. **electron-builder** 產出 NSIS 安裝檔 → `frontend/release/LocWarp Setup 0.1.0.exe`(~140 MB)
+1. **PyInstaller(3.13)** 編譯 backend(含 WiFi tunnel)→ `dist-py/locwarp-backend/`
+2. **Vite** 建置前端 → `frontend/dist/`
+3. **electron-builder** 產出 NSIS 安裝檔 → `frontend/release/LocWarp Setup X.Y.Z.exe`(~110 MB)
 
 產物為單一 exe,使用者無需安裝 Python / Node / 任何套件。
 
@@ -378,8 +372,6 @@ locwarp/
 │   ├── build/icon.ico       # App icon
 │   └── package.json         # electron-builder config
 │
-├── wifi_tunnel.py           # Python 3.13 standalone tunnel helper
-├── wifi-tunnel.spec         # PyInstaller spec
 ├── start.py                 # Dev launcher (used by LocWarp.bat)
 ├── stop.py
 ├── LocWarp.bat              # Dev entry (auto-elevates)

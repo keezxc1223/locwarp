@@ -57,6 +57,7 @@ class NavigateRequest(BaseModel):
     speed_kmh: float | None = None
     speed_min_kmh: float | None = None
     speed_max_kmh: float | None = None
+    straight_line: bool = False
     udid: str | None = None
 
 
@@ -69,6 +70,7 @@ class LoopRequest(BaseModel):
     pause_enabled: bool = True
     pause_min: float = 5.0
     pause_max: float = 20.0
+    straight_line: bool = False
     udid: str | None = None
 
 
@@ -83,6 +85,7 @@ class MultiStopRequest(BaseModel):
     pause_enabled: bool = True
     pause_min: float = 5.0
     pause_max: float = 20.0
+    straight_line: bool = False
     udid: str | None = None
 
 
@@ -96,6 +99,7 @@ class RandomWalkRequest(BaseModel):
     pause_enabled: bool = True
     pause_min: float = 5.0
     pause_max: float = 20.0
+    straight_line: bool = False
     udid: str | None = None
     # Dual-device group mode: both devices pass the same seed so they pick
     # identical sequences of random destinations, keeping their paths synced.

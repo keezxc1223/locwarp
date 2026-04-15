@@ -92,6 +92,10 @@ const MapView: React.FC<MapViewProps> = ({
   // first-render `t`. Language switches then don't reach the tooltip hint.
   // Route lookups through a ref that we keep in sync every render.
   const tRef = useRef(t);
+  // onMapClick closure gets captured by the once-per-mount click handler;
+  // route through a ref so toggling the prop mid-session takes effect.
+  const onMapClickRef = useRef(onMapClick);
+  useEffect(() => { onMapClickRef.current = onMapClick; }, [onMapClick]);
   tRef.current = t;
   const mapContainerRef = useRef<HTMLDivElement>(null);
   const mapRef = useRef<L.Map | null>(null);
@@ -157,11 +161,15 @@ const MapView: React.FC<MapViewProps> = ({
     });
     osmLayer.addTo(map);
 
-    // Left-click on the map now only dismisses any open context menu.
-    // The previous blue "click marker" was confusing users into thinking
-    // a left-click meant "teleport"; teleport lives on right-click.
-    map.on('click', () => {
+    // Left-click on the map dismisses any open context menu.
+    // If the parent wires `onMapClick` (currently used by the "left-click
+    // to add waypoint" toggle in Loop / MultiStop modes), forward the
+    // coordinates there too.
+    map.on('click', (e: L.LeafletMouseEvent) => {
       closeContextMenu();
+      try {
+        onMapClickRef.current?.(e.latlng.lat, e.latlng.lng);
+      } catch { /* ignore handler errors */ }
     });
 
     map.on('contextmenu', (e: L.LeafletMouseEvent) => {
