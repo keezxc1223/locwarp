@@ -16,6 +16,30 @@ import EtaBar from './components/EtaBar'
 import PauseControl from './components/PauseControl'
 import StatusBar from './components/StatusBar'
 import UpdateChecker from './components/UpdateChecker'
+import { DeviceChipRow } from './components/DeviceChipRow'
+import type { FanoutOutcome } from './hooks/useSimulation'
+
+// Summarise a group fan-out result into a single toast string.
+// Call from action handlers: showToast(toastForFanout(t, 'teleport', outcome, connectedDevices))
+export function toastForFanout<T>(
+  t: (k: any, v?: Record<string, string | number>) => string,
+  action: string,
+  outcome: FanoutOutcome<T>,
+  devices: { udid: string }[],
+): string {
+  const total = outcome.ok.length + outcome.failed.length
+  if (total === 0) return action
+  if (outcome.failed.length === 0) return t('group.action_all_success', { action })
+  if (outcome.ok.length === 0) return t('group.action_all_failed', { action })
+  const statusFor = (udid: string) =>
+    outcome.ok.some((o) => o.udid === udid) ? 'OK'
+      : outcome.failed.find((f) => f.udid === udid)?.reason ?? 'error'
+  return t('group.action_partial', {
+    action,
+    aStatus: devices[0] ? statusFor(devices[0].udid) : '-',
+    bStatus: devices[1] ? statusFor(devices[1].udid) : '-',
+  })
+}
 
 import { SimMode, MoveMode } from './hooks/useSimulation'
 
@@ -35,7 +59,7 @@ const App: React.FC = () => {
 
   const [savedRoutes, setSavedRoutes] = useState<any[]>([])
   const [cooldown, setCooldown] = useState(0)
-  const [cooldownEnabled, setCooldownEnabled] = useState(true)
+  const [cooldownEnabled, setCooldownEnabled] = useState(false)
   const [randomWalkRadius, setRandomWalkRadius] = useState(500)
   const [toastMsg, setToastMsg] = useState<string | null>(null)
 
@@ -51,7 +75,17 @@ const App: React.FC = () => {
     showToast(t('status.restore_in_progress'), 10000)
     const startedAt = Date.now()
     try {
-      await sim.restore()
+      // Group mode: fan out restore to every connected device; fall back to
+      // the legacy single-engine restore when no devices are tracked yet.
+      const udids = device.connectedDevices.map((d) => d.udid)
+      if (udids.length >= 2) {
+        const outcome = await sim.restoreAll(udids)
+        if (outcome.failed.length > 0 && outcome.ok.length === 0) {
+          throw new Error(outcome.failed[0]?.reason ?? 'restore failed')
+        }
+      } else {
+        await sim.restore()
+      }
       // Keep the in-progress toast visible for at least 1.2 s — otherwise a
       // fast restore (sub-second) would overwrite it before the user even
       // noticed it appeared.
@@ -63,7 +97,7 @@ const App: React.FC = () => {
     } catch {
       showToast(t('status.restore_failed'))
     }
-  }, [showToast, t, sim])
+  }, [showToast, t, sim, device])
   const [wpGenRadius, setWpGenRadius] = useState(300)
   const [wpGenCount, setWpGenCount] = useState(5)
 
@@ -159,13 +193,28 @@ const App: React.FC = () => {
     // Just set as destination for now
   }, [])
 
-  const handleTeleport = useCallback((lat: number, lng: number) => {
-    sim.teleport(lat, lng)
-  }, [sim])
+  const handleTeleport = useCallback(async (lat: number, lng: number) => {
+    const udids = device.connectedDevices.map((d) => d.udid)
+    if (udids.length >= 2) {
+      // Pre-set the map's tracked position so pan-to-current fires immediately,
+      // without waiting for the backend position_update event to arrive.
+      sim.setCurrentPosition({ lat, lng })
+      const outcome = await sim.teleportAll(udids, lat, lng)
+      showToast(toastForFanout(t, t('mode.teleport'), outcome, device.connectedDevices))
+    } else {
+      sim.teleport(lat, lng)
+    }
+  }, [sim, device, t, showToast])
 
-  const handleNavigate = useCallback((lat: number, lng: number) => {
-    sim.navigate(lat, lng)
-  }, [sim])
+  const handleNavigate = useCallback(async (lat: number, lng: number) => {
+    const udids = device.connectedDevices.map((d) => d.udid)
+    if (udids.length >= 2) {
+      const outcome = await sim.navigateAll(udids, lat, lng)
+      showToast(toastForFanout(t, t('mode.navigate'), outcome, device.connectedDevices))
+    } else {
+      sim.navigate(lat, lng)
+    }
+  }, [sim, device, t, showToast])
 
   const [addBmDialog, setAddBmDialog] = useState<{ lat: number; lng: number; name: string; category: string } | null>(null)
 
@@ -214,7 +263,7 @@ const App: React.FC = () => {
     sim.setWaypoints((prev: any[]) => prev.filter((_: any, i: number) => i !== index))
   }, [sim])
 
-  const handleStartWaypointRoute = useCallback(() => {
+  const handleStartWaypointRoute = useCallback(async () => {
     // UI waypoint list already includes the current position as index 0
     // (see handleAddWaypoint / generateWaypoints), so just hand it straight
     // to the backend. No more prepend-on-start, no more accidental re-inject
@@ -224,34 +273,67 @@ const App: React.FC = () => {
       showToast(t('toast.no_waypoints'))
       return
     }
+    const udids = device.connectedDevices.map((d) => d.udid)
     if (sim.mode === SimMode.Loop) {
-      sim.startLoop(route)
+      if (udids.length >= 2) {
+        const outcome = await sim.startLoopAll(udids, route)
+        showToast(toastForFanout(t, t('mode.loop'), outcome, device.connectedDevices))
+      } else {
+        sim.startLoop(route)
+      }
     } else if (sim.mode === SimMode.MultiStop) {
-      sim.multiStop(route, 0, false)
+      if (udids.length >= 2) {
+        const outcome = await sim.multiStopAll(udids, route, 0, false)
+        showToast(toastForFanout(t, t('mode.multi_stop'), outcome, device.connectedDevices))
+      } else {
+        sim.multiStop(route, 0, false)
+      }
     }
-  }, [sim, showToast, t])
+  }, [sim, device, showToast, t])
 
   // -- ControlPanel handlers --
-  const handleStart = useCallback(() => {
+  const handleStart = useCallback(async () => {
+    const udids = device.connectedDevices.map((d) => d.udid)
     if (sim.mode === SimMode.Joystick) {
-      sim.joystickStart()
+      if (udids.length >= 2) {
+        const outcome = await sim.joystickStartAll(udids)
+        showToast(toastForFanout(t, t('mode.joystick'), outcome, device.connectedDevices))
+      } else {
+        sim.joystickStart()
+      }
     } else if (sim.mode === SimMode.RandomWalk) {
       if (!sim.currentPosition) {
         showToast(t('toast.no_position_random'))
         return
       }
-      sim.randomWalk(sim.currentPosition, randomWalkRadius)
+      if (udids.length >= 2) {
+        const outcome = await sim.randomWalkAll(udids, sim.currentPosition, randomWalkRadius)
+        showToast(toastForFanout(t, t('mode.random_walk'), outcome, device.connectedDevices))
+      } else {
+        sim.randomWalk(sim.currentPosition, randomWalkRadius)
+      }
     } else if (sim.mode === SimMode.Loop || sim.mode === SimMode.MultiStop) {
       handleStartWaypointRoute()
     }
-  }, [sim, randomWalkRadius, handleStartWaypointRoute, showToast, t])
+  }, [sim, device, randomWalkRadius, handleStartWaypointRoute, showToast, t])
 
-  const handleStop = useCallback(() => {
+  const handleStop = useCallback(async () => {
     // Stop the active movement only — keep the simulated location in place
     // so the device stays where the user paused it. Use the 一鍵還原 button
     // separately to clear the simulated location and restore real GPS.
-    sim.stop()
-  }, [sim])
+    const udids = device.connectedDevices.map((d) => d.udid)
+    if (sim.mode === SimMode.Joystick && udids.length >= 2) {
+      const outcome = await sim.joystickStopAll(udids)
+      showToast(toastForFanout(t, t('mode.joystick'), outcome, device.connectedDevices))
+      return
+    }
+    if (udids.length >= 2) {
+      const outcome = await sim.stopAll(udids)
+      showToast(toastForFanout(t, 'stop', outcome, device.connectedDevices))
+    } else {
+      sim.stop()
+    }
+  }, [sim, device, t, showToast])
 
   const handleRouteLoad = useCallback((id: string) => {
     const route = savedRoutes.find((r) => r.id === id)
@@ -290,14 +372,56 @@ const App: React.FC = () => {
     window.open(url, '_blank')
   }, [])
 
-  const handleApplySpeed = useCallback(async () => {
+  const handleRoutesImportAll = useCallback(async (file: File) => {
     try {
-      await sim.applySpeed()
-      showToast(t('panel.apply_speed_success'))
+      const text = await file.text()
+      const data = JSON.parse(text)
+      if (!Array.isArray(data?.routes)) {
+        throw new Error('invalid file: missing routes array')
+      }
+      const res = await api.importAllRoutes({ routes: data.routes })
+      const routes = await api.getSavedRoutes()
+      setSavedRoutes(routes)
+      showToast(t('toast.routes_imported', { n: res.imported }))
+    } catch (err: any) {
+      showToast(t('toast.routes_import_failed', { msg: err.message || '' }))
+    }
+  }, [showToast])
+
+  const handleApplySpeed = useCallback(async () => {
+    const udids = device.connectedDevices.map((d) => d.udid)
+    try {
+      if (udids.length >= 2) {
+        const outcome = await sim.applySpeedAll(udids)
+        showToast(toastForFanout(t, t('panel.apply_speed_success'), outcome, device.connectedDevices))
+      } else {
+        await sim.applySpeed()
+        showToast(t('panel.apply_speed_success'))
+      }
     } catch (err: any) {
       showToast(t('panel.apply_speed_failed') + (err?.message ? `: ${err.message}` : ''))
     }
-  }, [sim, showToast, t])
+  }, [sim, device, showToast, t])
+
+  const handlePause = useCallback(async () => {
+    const udids = device.connectedDevices.map((d) => d.udid)
+    if (udids.length >= 2) {
+      const outcome = await sim.pauseAll(udids)
+      showToast(toastForFanout(t, 'pause', outcome, device.connectedDevices))
+    } else {
+      sim.pause()
+    }
+  }, [sim, device, t, showToast])
+
+  const handleResume = useCallback(async () => {
+    const udids = device.connectedDevices.map((d) => d.udid)
+    if (udids.length >= 2) {
+      const outcome = await sim.resumeAll(udids)
+      showToast(toastForFanout(t, 'resume', outcome, device.connectedDevices))
+    } else {
+      sim.resume()
+    }
+  }, [sim, device, t, showToast])
 
   const handleOpenLog = useCallback(async () => {
     try {
@@ -374,6 +498,26 @@ const App: React.FC = () => {
       <div className="noise-overlay" aria-hidden />
       <div className="sidebar">
         <div className="sidebar-content">
+        <DeviceChipRow
+          devices={device.connectedDevices}
+          runtimes={sim.runtimes}
+          onAdd={() => {
+            if (device.connectedDevices.length >= 2) {
+              setToastMsg(t('device.max_reached'))
+              return
+            }
+            device.scan()
+          }}
+          onDisconnect={(udid) => { device.disconnect(udid) }}
+          onRestoreOne={async (udid) => {
+            try {
+              await api.restoreSim(udid)
+              setToastMsg(t('status.restore_success'))
+            } catch (e: any) {
+              setToastMsg(e?.message ?? 'restore failed')
+            }
+          }}
+        />
         <DeviceStatus
           device={device.connectedDevice ? {
             id: device.connectedDevice.udid,
@@ -416,8 +560,8 @@ const App: React.FC = () => {
           onSpeedMaxChange={sim.setSpeedMaxKmh}
           onStart={handleStart}
           onStop={handleStop}
-          onPause={sim.pause}
-          onResume={sim.resume}
+          onPause={handlePause}
+          onResume={handleResume}
           onRestore={handleRestore}
           onApplySpeed={handleApplySpeed}
           waypointProgress={sim.waypointProgress}
@@ -448,6 +592,8 @@ const App: React.FC = () => {
           savedRoutes={savedRoutes.map(r => ({ id: r.id, name: r.name, waypoints: r.waypoints ?? [] }))}
           onRouteGpxImport={handleGpxImport}
           onRouteGpxExport={handleGpxExport}
+          onRoutesImportAll={handleRoutesImportAll}
+          routesExportAllUrl={api.exportAllRoutesUrl()}
           onRouteRename={handleRouteRename}
           onRouteDelete={handleRouteDelete}
           onRouteLoad={handleRouteLoad}
@@ -572,6 +718,7 @@ const App: React.FC = () => {
       </div>
       <div className="map-container">
         <EtaBar
+          runtimes={sim.runtimes}
           state={sim.status?.state ?? 'idle'}
           progress={sim.progress}
           remainingDistance={sim.status?.distance_remaining ?? 0}
@@ -647,6 +794,8 @@ const App: React.FC = () => {
           </div>
         )}
         <MapView
+          runtimes={sim.runtimes}
+          devices={device.connectedDevices}
           currentPosition={currentPos}
           destination={destPos}
           waypoints={sim.waypoints.map((w, i) => ({ ...w, index: i }))}
@@ -742,6 +891,8 @@ const App: React.FC = () => {
           </div>
         )}
         <StatusBar
+          runtimes={sim.runtimes}
+          devices={device.connectedDevices}
           isConnected={device.connectedDevice !== null}
           deviceName={device.connectedDevice?.name ?? ''}
           iosVersion={device.connectedDevice?.ios_version ?? ''}
@@ -753,6 +904,7 @@ const App: React.FC = () => {
           onToggleCooldown={handleToggleCooldown}
           onRestore={handleRestore}
           onOpenLog={handleOpenLog}
+          dualDevice={device.connectedDevices.length >= 2}
         />
 
         <UpdateChecker />

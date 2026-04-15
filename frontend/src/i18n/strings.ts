@@ -37,6 +37,34 @@ export const STRINGS = {
   'status.open_log_tooltip': { zh: '開啟 log 資料夾,方便將 backend.log 附到 Issue', en: 'Open the log folder so you can attach backend.log to an Issue' },
   'status.open_log_failed': { zh: '無法開啟 log', en: 'Failed to open log' },
   'status.copy_coord': { zh: '複製座標', en: 'Copy coordinates' },
+  'status.restore_all': { zh: '全部還原', en: 'Restore all' },
+  'status.set_initial': { zh: '初始位置', en: 'Initial pos' },
+  'status.set_initial_tooltip': { zh: '設定 LocWarp 開啟時地圖預設中心座標 (留空恢復預設)', en: 'Set the default map center on launch (blank to reset to default)' },
+  'status.set_initial_prompt': { zh: '輸入初始位置座標 (格式 lat, lng,例如 25.033, 121.564)。留空清除自訂值。', en: 'Enter initial position as "lat, lng" (e.g. 25.033, 121.564). Leave blank to clear.' },
+  'status.set_initial_invalid': { zh: '座標格式錯誤,請輸入「緯度, 經度」,範圍 lat ±90 / lng ±180', en: 'Invalid format. Use "lat, lng" with lat in ±90 and lng in ±180.' },
+  'status.set_initial_saved': { zh: '已儲存初始位置:{lat}, {lng} (下次開啟生效)', en: 'Initial position saved: {lat}, {lng} (effective next launch)' },
+  'status.set_initial_cleared': { zh: '已清除自訂初始位置,下次開啟回到預設', en: 'Custom initial position cleared. Next launch uses the default.' },
+  'status.cooldown_dual_disabled': { zh: '雙裝置模式不支援冷卻保護', en: 'Cooldown protection disabled in dual-device mode' },
+
+  // ── Group mode (dual device) ─────────────────
+  'group.action_all_success': { zh: '{action} 已啟動於全部裝置', en: '{action} started on all devices' },
+  'group.action_partial': { zh: '{action}:A {aStatus},B {bStatus}', en: '{action}: A {aStatus}, B {bStatus}' },
+  'group.action_all_failed': { zh: '{action} 失敗', en: '{action} failed on all devices' },
+
+  // ── Device chip ──────────────────────────────
+  'device.add_device': { zh: '新增裝置', en: 'Add device' },
+  'device.max_reached': { zh: '已連接最多 2 台', en: 'Maximum 2 devices connected' },
+  'device.chip_disconnect': { zh: '中斷此裝置', en: 'Disconnect this device' },
+  'device.chip_restore': { zh: '還原此裝置', en: 'Restore this device' },
+  'device.chip_enable_dev': { zh: '啟用開發者模式', en: 'Enable Developer Mode' },
+  'device.chip_state_idle': { zh: '已連線', en: 'Connected' },
+  'device.chip_state_running': { zh: '模擬中', en: 'Running' },
+  'device.chip_state_paused': { zh: '暫停', en: 'Paused' },
+  'device.chip_state_error': { zh: '錯誤', en: 'Error' },
+  'device.chip_state_disconnected': { zh: '已斷線', en: 'Disconnected' },
+
+  // ── ETA group ────────────────────────────────
+  'eta.group_progress': { zh: '平均進度', en: 'Average progress' },
 
   // ── Modes ────────────────────────────────────
   'mode.teleport': { zh: '瞬間移動', en: 'Teleport' },
@@ -86,6 +114,13 @@ export const STRINGS = {
   'panel.route_empty': { zh: '尚無儲存的路線', en: 'No saved routes' },
   'panel.route_gpx_import': { zh: '匯入 GPX', en: 'Import GPX' },
   'panel.route_gpx_export_tooltip': { zh: '匯出為 GPX', en: 'Export as GPX' },
+  'panel.routes_export_all': { zh: '全部匯出', en: 'Export all' },
+  'panel.routes_export_all_tooltip': { zh: '將所有已存路線匯出成單一 JSON 檔', en: 'Export every saved route as a single JSON file' },
+  'panel.routes_export_all_disabled': { zh: '尚無已存路線可匯出', en: 'No saved routes to export yet' },
+  'panel.routes_import_all': { zh: '全部匯入', en: 'Import all' },
+  'panel.routes_import_all_tooltip': { zh: '匯入先前「全部匯出」產生的 JSON 檔', en: 'Import a JSON file produced by "Export all"' },
+  'toast.routes_imported': { zh: '已匯入 {n} 條路線', en: 'Imported {n} routes' },
+  'toast.routes_import_failed': { zh: '匯入失敗:{msg}', en: 'Import failed: {msg}' },
   'panel.route_delete_confirm': { zh: '刪除路線「{name}」?', en: 'Delete route "{name}"?' },
   'panel.random_walk_radius': { zh: '隨機漫步半徑 (m)', en: 'Random walk radius (m)' },
 
@@ -93,7 +128,7 @@ export const STRINGS = {
   'device.no_device': { zh: '未偵測到裝置', en: 'No device detected' },
   'device.scan': { zh: 'USB', en: 'USB' },
   'device.scan_scanning': { zh: '掃描中', en: 'Scanning' },
-  'device.scan_found': { zh: '已找到裝置', en: 'Device found' },
+  'device.scan_found': { zh: '找到 {n} 台裝置', en: 'Found {n} device(s)' },
   'device.scan_none': { zh: '未偵測到', en: 'Not found' },
   'device.scan_tooltip': { zh: '掃描 USB 裝置', en: 'Scan USB devices' },
   'wifi.section_title': { zh: 'WiFi 無線連線', en: 'Wi-Fi Connection' },

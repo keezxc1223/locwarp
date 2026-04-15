@@ -41,12 +41,20 @@ class AppState:
 
     def __init__(self):
         self.device_manager = DeviceManager()
-        self.simulation_engine = None  # Created when a device connects
+        # Per-udid simulation engines (group mode, max 2). The legacy
+        # `simulation_engine` attribute still returns the most-recently-
+        # created engine for single-device call sites that have not yet
+        # been refactored.
+        self.simulation_engines: dict = {}
+        self._primary_udid: str | None = None
         self.cooldown_timer = CooldownTimer()
         self.bookmark_manager = BookmarkManager()
         self.coord_formatter = CoordinateFormatter()
         self.reconnect_manager = None
         self._last_position = None
+        # User-chosen initial map center (persisted between launches). When
+        # None, the frontend falls back to a hardcoded default.
+        self._initial_map_position: dict | None = None
         self._load_settings()
 
     def _load_settings(self):
@@ -63,6 +71,9 @@ class AppState:
                 cd = data.get("cooldown_enabled")
                 if cd is not None:
                     self.cooldown_timer.enabled = cd
+                imp = data.get("initial_map_position")
+                if isinstance(imp, dict) and "lat" in imp and "lng" in imp:
+                    self._initial_map_position = {"lat": float(imp["lat"]), "lng": float(imp["lng"])}
             except (json.JSONDecodeError, OSError, ValueError, KeyError):
                 logger.warning("Settings file malformed or unreadable; using defaults", exc_info=True)
 
@@ -71,6 +82,7 @@ class AppState:
             "last_position": self._last_position,
             "coord_format": self.coord_formatter.format.value,
             "cooldown_enabled": self.cooldown_timer.enabled,
+            "initial_map_position": self._initial_map_position,
         }
         try:
             SETTINGS_FILE.write_text(json.dumps(data, indent=2), encoding="utf-8")
@@ -86,6 +98,31 @@ class AppState:
     def update_last_position(self, lat: float, lng: float):
         self._last_position = {"lat": lat, "lng": lng}
 
+    @property
+    def simulation_engine(self):
+        """Legacy accessor: the most-recently-created engine.
+        Prefer get_engine(udid) in new code."""
+        if self._primary_udid and self._primary_udid in self.simulation_engines:
+            return self.simulation_engines[self._primary_udid]
+        return None
+
+    @simulation_engine.setter
+    def simulation_engine(self, value):
+        """Legacy setter. Only `= None` (clear all) is meaningful."""
+        if value is None:
+            self.simulation_engines.clear()
+            self._primary_udid = None
+        else:
+            # Best-effort: stash under a synthetic key if udid unknown
+            self.simulation_engines["__legacy__"] = value
+            self._primary_udid = "__legacy__"
+
+    def get_engine(self, udid: str | None):
+        """Return the engine for *udid*, or the primary engine if udid is None."""
+        if udid is None:
+            return self.simulation_engine
+        return self.simulation_engines.get(udid)
+
     async def create_engine_for_device(self, udid: str):
         """Create a SimulationEngine for the connected device."""
         from core.simulation_engine import SimulationEngine
@@ -94,16 +131,21 @@ class AppState:
         loc_service = await self.device_manager.get_location_service(udid)
 
         async def event_callback(event_type: str, data: dict):
+            # Always tag emissions with udid so the frontend can route per-device.
+            if isinstance(data, dict) and "udid" not in data:
+                data = {**data, "udid": udid}
             await broadcast(event_type, data)
             if event_type == "position_update" and "lat" in data:
                 self.update_last_position(data["lat"], data["lng"])
 
-        self.simulation_engine = SimulationEngine(loc_service, event_callback)
+        engine = SimulationEngine(loc_service, event_callback)
+        self.simulation_engines[udid] = engine
+        self._primary_udid = udid
 
         # Set initial position and push to device
         init = self.get_initial_position()
         from models.schemas import Coordinate
-        self.simulation_engine.current_position = Coordinate(
+        engine.current_position = Coordinate(
             lat=init["lat"], lng=init["lng"]
         )
 
@@ -117,7 +159,9 @@ class AppState:
             # lazy-rebuild on the next movement command instead of reusing
             # a dead service. Broadcast so the UI knows.
             logger.exception("Failed to push initial position to device; clearing engine")
-            self.simulation_engine = None
+            self.simulation_engines.pop(udid, None)
+            if self._primary_udid == udid:
+                self._primary_udid = next(iter(self.simulation_engines), None)
             try:
                 await broadcast("device_error", {
                     "udid": udid,
@@ -160,12 +204,12 @@ async def _usbmux_presence_watchdog():
     from api.websocket import broadcast
 
     miss_counts: dict[str, int] = {}
-    miss_threshold = 2
+    miss_threshold = 3
     last_reconnect_attempt: dict[str, float] = {}
     reconnect_cooldown = 5.0  # seconds between retry attempts per UDID
 
     while True:
-        await asyncio.sleep(2.0)
+        await asyncio.sleep(1.0)
         try:
             dm = app_state.device_manager
             connected = {
@@ -201,7 +245,13 @@ async def _usbmux_presence_watchdog():
                         await dm.disconnect(udid)
                     except Exception:
                         logger.exception("watchdog: disconnect failed for %s", udid)
-                app_state.simulation_engine = None
+                    # Only remove the lost device's engine. The legacy setter
+                    # `simulation_engine = None` wipes *all* engines, which
+                    # destroys the surviving device's engine in dual mode.
+                    app_state.simulation_engines.pop(udid, None)
+                    if app_state._primary_udid == udid:
+                        remaining = next(iter(app_state.simulation_engines.keys()), None)
+                        app_state._primary_udid = remaining
                 try:
                     await broadcast("device_disconnected", {
                         "udids": lost_now,
@@ -211,35 +261,44 @@ async def _usbmux_presence_watchdog():
                     logger.exception("watchdog: broadcast (disconnected) failed")
                 continue  # skip appearance logic this tick
 
-            # --- Appearance (auto-reconnect) ---
-            # If nothing is connected but a USB device shows up, connect it.
-            if connected or not present_usb:
+            # --- Appearance (auto-connect up to 2 devices, group mode) ---
+            # Auto-connect any USB device not yet connected, up to the dual-
+            # device cap. The user environment is assumed to only ever have
+            # their own iPhones plugged in.
+            MAX_DEVICES = 2
+            new_udids = present_usb - connected
+            if not new_udids or len(connected) >= MAX_DEVICES:
                 continue
-            if app_state.simulation_engine is not None:
-                continue  # already got one somehow
 
             now = time.monotonic()
-            for udid in present_usb:
+            for udid in new_udids:
+                if len(dm._connections) >= MAX_DEVICES:
+                    break
                 last = last_reconnect_attempt.get(udid, 0.0)
                 if now - last < reconnect_cooldown:
                     continue
                 last_reconnect_attempt[udid] = now
-                logger.info("usbmux watchdog: new USB device %s detected, auto-reconnecting", udid)
+                logger.info("usbmux watchdog: new USB device %s detected, auto-connecting", udid)
                 try:
                     await dm.connect(udid)
                     await app_state.create_engine_for_device(udid)
-                    # Only broadcast success when an engine was actually built
-                    if app_state.simulation_engine is not None:
-                        try:
-                            await broadcast("device_reconnected", {"udid": udid})
-                        except Exception:
-                            logger.exception("watchdog: broadcast (reconnected) failed")
-                        logger.info("Auto-reconnect succeeded for %s", udid)
-                        last_reconnect_attempt.pop(udid, None)
-                        break  # connected one device, done for this tick
+                    # Broadcast device_connected so the frontend chip row updates.
+                    try:
+                        devs = await dm.discover_devices()
+                        info = next((d for d in devs if d.udid == udid), None)
+                        await broadcast("device_connected", {
+                            "udid": udid,
+                            "name": info.name if info else "",
+                            "ios_version": info.ios_version if info else "",
+                            "connection_type": info.connection_type if info else "USB",
+                        })
+                    except Exception:
+                        logger.exception("watchdog: broadcast (connected) failed")
+                    logger.info("Auto-connect succeeded for %s", udid)
+                    last_reconnect_attempt.pop(udid, None)
                 except Exception:
                     logger.warning(
-                        "Auto-reconnect for %s failed (will retry in %.0fs): likely Trust pending",
+                        "Auto-connect for %s failed (will retry in %.0fs): likely Trust pending",
                         udid, reconnect_cooldown, exc_info=True,
                     )
         except asyncio.CancelledError:

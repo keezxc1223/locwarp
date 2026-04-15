@@ -33,6 +33,66 @@ export interface SimulationStatus {
 
 export type WsSubscribe = (fn: (m: WsMessage) => void) => () => void
 
+// ── Per-device runtime state (group mode) ──────────────────────────────
+export interface DeviceRuntime {
+  udid: string
+  state: string
+  currentPos: LatLng | null
+  destination: LatLng | null
+  routePath: LatLng[]
+  progress: number
+  eta: number
+  distanceRemaining: number
+  distanceTraveled: number
+  waypointIndex: number | null
+  currentSpeedKmh: number
+  error: string | null
+  lapCount: number
+  cooldown: number
+}
+
+export type RuntimesMap = Record<string, DeviceRuntime>
+
+function emptyRuntime(udid: string): DeviceRuntime {
+  return {
+    udid,
+    state: 'idle',
+    currentPos: null,
+    destination: null,
+    routePath: [],
+    progress: 0,
+    eta: 0,
+    distanceRemaining: 0,
+    distanceTraveled: 0,
+    waypointIndex: null,
+    currentSpeedKmh: 0,
+    error: null,
+    lapCount: 0,
+    cooldown: 0,
+  }
+}
+
+// ── Fan-out helper ─────────────────────────────────────────────────────
+export interface FanoutOutcome<T> {
+  ok: Array<{ udid: string; value: T }>
+  failed: Array<{ udid: string; reason: string }>
+}
+
+export function summarizeResults<T>(
+  results: PromiseSettledResult<T>[],
+  udids: string[],
+  _action: string,
+): FanoutOutcome<T> {
+  const ok: FanoutOutcome<T>['ok'] = []
+  const failed: FanoutOutcome<T>['failed'] = []
+  results.forEach((r, i) => {
+    const udid = udids[i]
+    if (r.status === 'fulfilled') ok.push({ udid, value: r.value })
+    else failed.push({ udid, reason: r.reason?.message ?? String(r.reason) })
+  })
+  return { ok, failed }
+}
+
 export function useSimulation(subscribe?: WsSubscribe) {
   const [mode, setMode] = useState<SimMode>(SimMode.Teleport)
   const [moveMode, setMoveMode] = useState<MoveMode>(MoveMode.Walking)
@@ -90,6 +150,15 @@ export function useSimulation(subscribe?: WsSubscribe) {
     { kmh: number | null; min: number | null; max: number | null } | null
   >(null)
 
+  // Per-device runtime map (group mode). Populated from WS events tagged with udid.
+  const [runtimes, setRuntimes] = useState<RuntimesMap>({})
+  const updateRuntime = useCallback((udid: string, patch: Partial<DeviceRuntime>) => {
+    setRuntimes((prev) => {
+      const cur = prev[udid] ?? emptyRuntime(udid)
+      return { ...prev, [udid]: { ...cur, ...patch } }
+    })
+  }, [])
+
   // Tick the pause countdown at 1 Hz
   useEffect(() => {
     if (pauseEndAt == null) {
@@ -112,6 +181,52 @@ export function useSimulation(subscribe?: WsSubscribe) {
   useEffect(() => {
     if (!subscribe) return
     return subscribe((wsMessage) => {
+    // ── Group mode: mirror per-device state into `runtimes` map ────────
+    const udid: string | undefined = wsMessage.data?.udid
+    if (udid) {
+      const d = wsMessage.data
+      switch (wsMessage.type) {
+        case 'position_update':
+          updateRuntime(udid, {
+            currentPos: (typeof d.lat === 'number' && typeof d.lng === 'number') ? { lat: d.lat, lng: d.lng } : undefined as any,
+            progress: d.progress ?? undefined as any,
+            eta: d.eta_seconds ?? d.eta ?? undefined as any,
+            distanceRemaining: d.distance_remaining ?? undefined as any,
+            distanceTraveled: d.distance_traveled ?? undefined as any,
+            currentSpeedKmh: d.speed_mps != null ? d.speed_mps * 3.6 : undefined as any,
+          })
+          break
+        case 'route_path':
+          if (Array.isArray(d.coords)) {
+            updateRuntime(udid, {
+              routePath: d.coords.map((p: any) => ({ lat: p.lat ?? p[0], lng: p.lng ?? p[1] })),
+            })
+          }
+          break
+        case 'state_change':
+          if (d.state) updateRuntime(udid, { state: d.state, ...(d.state === 'idle' || d.state === 'disconnected' ? { routePath: [] } : {}) })
+          break
+        case 'device_connected':
+          setRuntimes((prev) => prev[udid] ? prev : { ...prev, [udid]: emptyRuntime(udid) })
+          // A device reconnecting implicitly resolves any prior connection-
+          // loss banner (watchdog auto-connect now broadcasts `device_connected`
+          // rather than `device_reconnected`; the legacy case still handles
+          // the latter).
+          setError(null)
+          break
+        case 'device_disconnected':
+          updateRuntime(udid, { state: 'disconnected' })
+          break
+        case 'simulation_complete':
+          updateRuntime(udid, { progress: 1, state: 'idle' })
+          break
+        case 'waypoint_progress':
+          if (typeof d.current_index === 'number') {
+            updateRuntime(udid, { waypointIndex: d.current_index })
+          }
+          break
+      }
+    }
     switch (wsMessage.type) {
       case 'position_update': {
         const { lat, lng } = wsMessage.data
@@ -242,7 +357,7 @@ export function useSimulation(subscribe?: WsSubscribe) {
       }
     }
     })
-  }, [subscribe])
+  }, [subscribe, updateRuntime])
 
   const clearError = useCallback(() => setError(null), [])
 
@@ -471,13 +586,128 @@ export function useSimulation(subscribe?: WsSubscribe) {
     })
   }, [])
 
+  // ── Group-mode fan-out helpers ──────────────────────────────────────
+  // Each takes an explicit list of udids so the caller (App.tsx) decides
+  // which devices to target. Returns a FanoutOutcome for toast summarisation.
+  const fanout = useCallback(async <T,>(
+    udids: string[],
+    action: string,
+    fn: (udid: string) => Promise<T>,
+  ): Promise<FanoutOutcome<T>> => {
+    if (udids.length === 0) {
+      setError('No device connected')
+      return { ok: [], failed: [] }
+    }
+    const results = await Promise.allSettled(udids.map((u) => fn(u)))
+    return summarizeResults(results, udids, action)
+  }, [])
+
+  // Group-mode sync helper: before any action that depends on a common start
+  // (navigate / loop / multistop / randomwalk / joystick), teleport every
+  // target device to the primary's current position so both phones begin from
+  // the same coordinate and follow identical paths.
+  const preSyncStart = useCallback(async (udids: string[]) => {
+    if (udids.length < 2) return
+    const pos = currentPosition
+    if (!pos) return
+    try {
+      await Promise.allSettled(udids.map((u) => api.teleport(pos.lat, pos.lng, u)))
+      // Tiny settle delay so devices finalise the teleport before the next
+      // command arrives.
+      await new Promise((r) => setTimeout(r, 150))
+    } catch {
+      // Non-fatal: fall through to the primary action.
+    }
+  }, [currentPosition])
+
+  const teleportAll = useCallback((udids: string[], lat: number, lng: number) =>
+    fanout(udids, 'teleport', (u) => api.teleport(lat, lng, u)), [fanout])
+  const navigateAll = useCallback(async (udids: string[], lat: number, lng: number) => {
+    await preSyncStart(udids)
+    return fanout(udids, 'navigate', (u) => api.navigate(lat, lng, moveMode, { speed_kmh: customSpeedKmh, speed_min_kmh: speedMinKmh, speed_max_kmh: speedMaxKmh }, u))
+  }, [fanout, preSyncStart, moveMode, customSpeedKmh, speedMinKmh, speedMaxKmh])
+  const startLoopAll = useCallback(async (udids: string[], wps: LatLng[]) => {
+    await preSyncStart(udids)
+    return fanout(udids, 'loop', (u) => api.startLoop(wps, moveMode, { speed_kmh: customSpeedKmh, speed_min_kmh: speedMinKmh, speed_max_kmh: speedMaxKmh }, { pause_enabled: pauseLoop.enabled, pause_min: pauseLoop.min, pause_max: pauseLoop.max }, u))
+  }, [fanout, preSyncStart, moveMode, customSpeedKmh, speedMinKmh, speedMaxKmh, pauseLoop])
+  const multiStopAll = useCallback(async (udids: string[], wps: LatLng[], dur: number, loop: boolean) => {
+    await preSyncStart(udids)
+    return fanout(udids, 'multistop', (u) => api.multiStop(wps, moveMode, dur, loop, { speed_kmh: customSpeedKmh, speed_min_kmh: speedMinKmh, speed_max_kmh: speedMaxKmh }, { pause_enabled: pauseMultiStop.enabled, pause_min: pauseMultiStop.min, pause_max: pauseMultiStop.max }, u))
+  }, [fanout, preSyncStart, moveMode, customSpeedKmh, speedMinKmh, speedMaxKmh, pauseMultiStop])
+  const randomWalkAll = useCallback(async (udids: string[], center: LatLng, r: number) => {
+    await preSyncStart(udids)
+    // Shared seed → both engines produce identical destination sequences.
+    const seed = udids.length >= 2 ? Date.now() : null
+    return fanout(udids, 'randomwalk', (u) => api.randomWalk(center, r, moveMode, { speed_kmh: customSpeedKmh, speed_min_kmh: speedMinKmh, speed_max_kmh: speedMaxKmh }, { pause_enabled: pauseRandomWalk.enabled, pause_min: pauseRandomWalk.min, pause_max: pauseRandomWalk.max }, u, seed))
+  }, [fanout, preSyncStart, moveMode, customSpeedKmh, speedMinKmh, speedMaxKmh, pauseRandomWalk])
+  const applySpeedAll = useCallback((udids: string[]) =>
+    fanout(udids, 'apply-speed', (u) => api.applySpeed(moveMode, { speed_kmh: customSpeedKmh, speed_min_kmh: speedMinKmh, speed_max_kmh: speedMaxKmh }, u)),
+    [fanout, moveMode, customSpeedKmh, speedMinKmh, speedMaxKmh])
+  const pauseAll = useCallback((udids: string[]) => fanout(udids, 'pause', (u) => api.pauseSim(u)), [fanout])
+  const resumeAll = useCallback((udids: string[]) => fanout(udids, 'resume', (u) => api.resumeSim(u)), [fanout])
+  const stopAll = useCallback((udids: string[]) => fanout(udids, 'stop', (u) => api.stopSim(u)), [fanout])
+  const restoreAll = useCallback(async (udids: string[]) => {
+    const outcome = await fanout(udids, 'restore', (u) => api.restoreSim(u))
+    // Clear per-device runtime state (markers, routes) and legacy state so
+    // the map immediately reflects the wipe without waiting for events.
+    setRuntimes((prev) => {
+      const next: RuntimesMap = { ...prev }
+      for (const u of udids) {
+        if (next[u]) {
+          next[u] = { ...next[u], currentPos: null, destination: null, routePath: [], progress: 0, eta: 0, distanceRemaining: 0, distanceTraveled: 0, waypointIndex: null, state: 'idle' }
+        }
+      }
+      return next
+    })
+    setCurrentPosition(null)
+    setDestination(null)
+    setProgress(0)
+    setEta(null)
+    setWaypoints([])
+    setRoutePath([])
+    setWaypointProgress(null)
+    setEffectiveSpeed(null)
+    return outcome
+  }, [fanout])
+  const joystickStartAll = useCallback(async (udids: string[]) => {
+    await preSyncStart(udids)
+    return fanout(udids, 'joystick-start', (u) => api.joystickStart(moveMode, u))
+  }, [fanout, preSyncStart, moveMode])
+  const joystickStopAll = useCallback((udids: string[]) =>
+    fanout(udids, 'joystick-stop', (u) => api.joystickStop(u)), [fanout])
+
+  // Derived: primary runtime for legacy single-device components.
+  const primaryRuntime: DeviceRuntime | null = (() => {
+    const keys = Object.keys(runtimes)
+    return keys.length ? runtimes[keys[0]] : null
+  })()
+  const anyRunning = Object.values(runtimes).some((r) =>
+    r.state && r.state !== 'idle' && r.state !== 'disconnected',
+  )
+
   return {
+    runtimes,
+    primaryRuntime,
+    anyRunning,
+    teleportAll,
+    navigateAll,
+    startLoopAll,
+    multiStopAll,
+    randomWalkAll,
+    applySpeedAll,
+    pauseAll,
+    resumeAll,
+    stopAll,
+    restoreAll,
+    joystickStartAll,
+    joystickStopAll,
     mode,
     setMode,
     moveMode,
     setMoveMode,
     status,
     currentPosition,
+    setCurrentPosition,
     destination,
     progress,
     eta,

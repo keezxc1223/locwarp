@@ -1,5 +1,6 @@
 import React from 'react';
 import { useT } from '../i18n';
+import type { RuntimesMap } from '../hooks/useSimulation';
 
 interface EtaBarProps {
   state: string;
@@ -7,6 +8,7 @@ interface EtaBarProps {
   remainingDistance: number; // meters
   traveledDistance: number; // meters
   eta: number; // seconds remaining
+  runtimes?: RuntimesMap;
 }
 
 const ACTIVE_STATES = ['navigating', 'looping', 'multi_stop', 'random_walk'];
@@ -34,11 +36,34 @@ const EtaBar: React.FC<EtaBarProps> = ({
   remainingDistance,
   traveledDistance,
   eta,
+  runtimes,
 }) => {
   const t = useT();
-  if (!ACTIVE_STATES.includes(state)) return null;
 
-  const percent = Math.min(Math.max(progress * 100, 0), 100);
+  // Group-mode aggregation: if 2+ device runtimes report an active state, use
+  // the fleet's average progress / max ETA instead of the single-device props.
+  const activeRuntimes = runtimes
+    ? Object.values(runtimes).filter((r) => ACTIVE_STATES.includes(r.state))
+    : [];
+  const isGroup = activeRuntimes.length >= 2;
+
+  if (!isGroup && !ACTIVE_STATES.includes(state)) return null;
+  if (isGroup && activeRuntimes.length === 0) return null;
+
+  const aggProgress = isGroup
+    ? activeRuntimes.reduce((s, r) => s + (r.progress || 0), 0) / activeRuntimes.length
+    : progress;
+  const aggEta = isGroup
+    ? Math.max(...activeRuntimes.map((r) => r.eta || 0))
+    : eta;
+  const aggRemaining = isGroup
+    ? Math.max(...activeRuntimes.map((r) => r.distanceRemaining || 0))
+    : remainingDistance;
+  const aggTraveled = isGroup
+    ? activeRuntimes.reduce((s, r) => s + (r.distanceTraveled || 0), 0)
+    : traveledDistance;
+
+  const percent = Math.min(Math.max(aggProgress * 100, 0), 100);
 
   return (
     <div
@@ -103,7 +128,7 @@ const EtaBar: React.FC<EtaBarProps> = ({
           <circle cx="12" cy="12" r="10" />
           <polyline points="12,6 12,12 16,14" />
         </svg>
-        <span>{t('eta.remaining')} {formatDistance(remainingDistance)}</span>
+        <span>{t('eta.remaining')} {formatDistance(aggRemaining)}</span>
       </div>
 
       {/* Separator */}
@@ -115,7 +140,7 @@ const EtaBar: React.FC<EtaBarProps> = ({
           <path d="M5 12h14" />
           <path d="M12 5l7 7-7 7" />
         </svg>
-        <span>{t('eta.eta')} {formatTime(eta)}</span>
+        <span>{t('eta.eta')} {formatTime(aggEta)}</span>
       </div>
 
       {/* Separator */}
@@ -126,8 +151,22 @@ const EtaBar: React.FC<EtaBarProps> = ({
         <svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" style={{ opacity: 0.6 }}>
           <polyline points="22,12 18,12 15,21 9,3 6,12 2,12" />
         </svg>
-        <span>{t('eta.traveled')} {formatDistance(traveledDistance)}</span>
+        <span>{t('eta.traveled')} {formatDistance(aggTraveled)}</span>
       </div>
+
+      {isGroup && (
+        <>
+          <div style={{ width: 1, height: 14, background: 'rgba(255,255,255,0.15)' }} />
+          <div style={{ display: 'flex', alignItems: 'center', gap: 6, fontSize: 11, opacity: 0.85 }}>
+            <span style={{ opacity: 0.6 }}>{t('eta.group_progress')}</span>
+            {activeRuntimes.slice(0, 2).map((r, i) => (
+              <span key={r.udid} style={{ color: i === 0 ? '#4285f4' : '#ff9800', fontWeight: 600 }}>
+                {i === 0 ? 'A' : 'B'} {formatTime(r.eta || 0)}
+              </span>
+            ))}
+          </div>
+        </>
+      )}
     </div>
   );
 };

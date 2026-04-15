@@ -1,8 +1,14 @@
 import React, { useEffect, useState } from 'react';
+import { createPortal } from 'react-dom';
 import { SimMode } from '../hooks/useSimulation';
+import type { RuntimesMap } from '../hooks/useSimulation';
+import type { DeviceInfo } from '../hooks/useDevice';
 import { useT } from '../i18n';
 import LangToggle from './LangToggle';
 import pkg from '../../package.json';
+
+const DEVICE_COLORS = ['#4285f4', '#ff9800'];
+const DEVICE_LETTERS = ['A', 'B'];
 
 const APP_VERSION = (pkg as { version: string }).version;
 
@@ -23,6 +29,24 @@ interface StatusBarProps {
   onToggleCooldown: (enabled: boolean) => void;
   onRestore?: () => void;
   onOpenLog?: () => void;
+  // Group mode: when two devices are connected, cooldown toggle is force-off
+  // and displays a different tooltip. Does not modify the saved setting.
+  dualDevice?: boolean;
+  runtimes?: RuntimesMap;
+  devices?: DeviceInfo[];
+}
+
+function stateToMode(state: string): SimMode | null {
+  switch (state) {
+    case 'navigating': return SimMode.Navigate;
+    case 'looping': return SimMode.Loop;
+    case 'multi_stop': return SimMode.MultiStop;
+    case 'random_walk': return SimMode.RandomWalk;
+    case 'joystick': return SimMode.Joystick;
+    case 'teleport':
+    case 'idle':
+    default: return null;
+  }
 }
 
 import type { StringKey } from '../i18n';
@@ -53,10 +77,53 @@ const StatusBar: React.FC<StatusBarProps> = ({
   onToggleCooldown,
   onRestore,
   onOpenLog,
+  dualDevice = false,
+  runtimes,
+  devices,
 }) => {
   const t = useT();
   const [cooldownDisplay, setCooldownDisplay] = useState(cooldown);
   const [copied, setCopied] = useState(false);
+  // Initial-position dialog state (React modal replaces unavailable
+  // native window.prompt which Electron does not support).
+  const [initialDialogOpen, setInitialDialogOpen] = useState(false);
+  const [initialDialogValue, setInitialDialogValue] = useState('');
+  const [initialDialogError, setInitialDialogError] = useState<string | null>(null);
+  const [initialDialogBusy, setInitialDialogBusy] = useState(false);
+
+  const handleInitialDialogSave = async () => {
+    const { setInitialPosition } = await import('../services/api');
+    const trimmed = initialDialogValue.trim();
+    setInitialDialogError(null);
+    if (trimmed === '') {
+      setInitialDialogBusy(true);
+      try {
+        await setInitialPosition(null, null);
+        setInitialDialogOpen(false);
+      } catch (e: any) {
+        setInitialDialogError(e?.message || 'error');
+      } finally { setInitialDialogBusy(false); }
+      return;
+    }
+    const m = trimmed.match(/^(-?\d+(?:\.\d+)?)\s*,\s*(-?\d+(?:\.\d+)?)$/);
+    if (!m) {
+      setInitialDialogError(t('status.set_initial_invalid'));
+      return;
+    }
+    const lat = parseFloat(m[1]);
+    const lng = parseFloat(m[2]);
+    if (!isFinite(lat) || !isFinite(lng) || lat < -90 || lat > 90 || lng < -180 || lng > 180) {
+      setInitialDialogError(t('status.set_initial_invalid'));
+      return;
+    }
+    setInitialDialogBusy(true);
+    try {
+      await setInitialPosition(lat, lng);
+      setInitialDialogOpen(false);
+    } catch (e: any) {
+      setInitialDialogError(e?.message || 'error');
+    } finally { setInitialDialogBusy(false); }
+  };
 
   useEffect(() => {
     setCooldownDisplay(cooldown);
@@ -106,8 +173,42 @@ const StatusBar: React.FC<StatusBarProps> = ({
           the left-side DeviceStatus panel already shows all of this, so
           repeating it here only ate horizontal space. */}
 
-      {/* Current coordinates */}
-      {currentPosition && (
+      {/* Dual-device pills */}
+      {dualDevice && devices && runtimes && devices.slice(0, 2).map((dev, i) => {
+        const rt = runtimes[dev.udid];
+        const color = DEVICE_COLORS[i];
+        const letter = DEVICE_LETTERS[i];
+        const coord = rt?.currentPos
+          ? `${rt.currentPos.lat.toFixed(4)},${rt.currentPos.lng.toFixed(4)}`
+          : '—';
+        const spd = rt?.currentSpeedKmh ? rt.currentSpeedKmh.toFixed(0) : String(speed);
+        const dMode = rt ? stateToMode(rt.state) : null;
+        const modeLabel = dMode ? t(modeLabelKeys[dMode]) : t(modeLabelKeys[mode]);
+        return (
+          <div
+            key={dev.udid}
+            style={{
+              display: 'flex', alignItems: 'center', gap: 6,
+              padding: '2px 8px',
+              borderRadius: 4,
+              background: 'rgba(255,255,255,0.04)',
+              fontFamily: 'monospace', fontSize: 11,
+            }}
+            title={dev.name}
+          >
+            <span style={{ color, fontWeight: 700 }}>{letter}</span>
+            <span>{coord}</span>
+            <span style={{ opacity: 0.4 }}>·</span>
+            <span>{spd}km/h</span>
+            <span style={{ opacity: 0.4 }}>·</span>
+            <span style={{ opacity: 0.75 }}>{modeLabel}</span>
+          </div>
+        );
+      })}
+      {dualDevice && <div style={{ width: 1, height: 14, background: 'rgba(255,255,255,0.12)' }} />}
+
+      {/* Current coordinates (single-device mode only) */}
+      {!dualDevice && currentPosition && (
         <>
           <div style={{ display: 'flex', alignItems: 'center', gap: 4, fontFamily: 'monospace', fontSize: 11 }}>
             <svg width="11" height="11" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" style={{ opacity: 0.5 }}>
@@ -148,8 +249,8 @@ const StatusBar: React.FC<StatusBarProps> = ({
         </>
       )}
 
-      {/* Speed + Mode */}
-      <div style={{ display: 'flex', alignItems: 'center', gap: 4 }}>
+      {/* Speed + Mode (single-device mode only) */}
+      {!dualDevice && <div style={{ display: 'flex', alignItems: 'center', gap: 4 }}>
         <svg width="11" height="11" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" style={{ opacity: 0.5 }}>
           <path d="M12 2L2 7l10 5 10-5-10-5z" />
           <path d="M2 17l10 5 10-5" />
@@ -158,23 +259,24 @@ const StatusBar: React.FC<StatusBarProps> = ({
         <span>{speed} km/h</span>
         <span style={{ opacity: 0.4 }}>|</span>
         <span style={{ opacity: 0.7 }}>{t(modeLabelKeys[mode])}</span>
-      </div>
+      </div>}
 
       {/* Force wrap to a second row here */}
       <div style={{ flexBasis: '100%', height: 0 }} />
 
       {/* Cooldown enable toggle */}
       <label
-        title={t('status.cooldown_tooltip')}
-        style={{ display: 'flex', alignItems: 'center', gap: 6, cursor: 'pointer', userSelect: 'none' }}
+        title={dualDevice ? t('status.cooldown_dual_disabled') : t('status.cooldown_tooltip')}
+        style={{ display: 'flex', alignItems: 'center', gap: 6, cursor: dualDevice ? 'not-allowed' : 'pointer', userSelect: 'none', opacity: dualDevice ? 0.55 : 1 }}
       >
         <input
           type="checkbox"
-          checked={cooldownEnabled}
-          onChange={(e) => onToggleCooldown(e.target.checked)}
-          style={{ cursor: 'pointer', margin: 0 }}
+          checked={dualDevice ? false : cooldownEnabled}
+          disabled={dualDevice}
+          onChange={(e) => { if (!dualDevice) onToggleCooldown(e.target.checked) }}
+          style={{ cursor: dualDevice ? 'not-allowed' : 'pointer', margin: 0 }}
         />
-        <span style={{ opacity: cooldownEnabled ? 1 : 0.5 }}>{cooldownEnabled ? t('status.cooldown_enabled') : t('status.cooldown_disabled')}</span>
+        <span style={{ opacity: (dualDevice || !cooldownEnabled) ? 0.5 : 1 }}>{(dualDevice || !cooldownEnabled) ? t('status.cooldown_disabled') : t('status.cooldown_enabled')}</span>
       </label>
 
       {/* Restore button */}
@@ -201,7 +303,7 @@ const StatusBar: React.FC<StatusBarProps> = ({
               <path d="M3 12a9 9 0 109-9" />
               <polyline points="3,3 3,9 9,9" />
             </svg>
-            {t('status.restore')}
+            {dualDevice ? t('status.restore_all') : t('status.restore')}
           </button>
           {onOpenLog && (
             <button
@@ -229,6 +331,37 @@ const StatusBar: React.FC<StatusBarProps> = ({
               {t('status.open_log')}
             </button>
           )}
+          {/* Set initial map position (persisted in backend settings.json) */}
+          <button
+            onClick={async () => {
+              const { getInitialPosition } = await import('../services/api');
+              try {
+                const res = await getInitialPosition();
+                setInitialDialogValue(res.position ? `${res.position.lat}, ${res.position.lng}` : '');
+              } catch { setInitialDialogValue(''); }
+              setInitialDialogError(null);
+              setInitialDialogOpen(true);
+            }}
+            title={t('status.set_initial_tooltip')}
+            style={{
+              display: 'flex',
+              alignItems: 'center',
+              gap: 4,
+              padding: '2px 8px',
+              fontSize: 12,
+              background: 'rgba(78, 205, 196, 0.12)',
+              border: '1px solid rgba(78, 205, 196, 0.4)',
+              color: '#4ecdc4',
+              borderRadius: 4,
+              cursor: 'pointer',
+            }}
+          >
+            <svg width="11" height="11" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2">
+              <circle cx="12" cy="12" r="10" />
+              <circle cx="12" cy="12" r="3" />
+            </svg>
+            {t('status.set_initial')}
+          </button>
         </>
       )}
 
@@ -269,6 +402,78 @@ const StatusBar: React.FC<StatusBarProps> = ({
           v{APP_VERSION}
         </span>
       </div>
+
+      {initialDialogOpen && createPortal((
+        <div
+          onClick={() => { if (!initialDialogBusy) setInitialDialogOpen(false); }}
+          style={{
+            position: 'fixed', inset: 0, zIndex: 2000,
+            background: 'rgba(8, 10, 20, 0.55)', backdropFilter: 'blur(4px)',
+            display: 'flex', alignItems: 'center', justifyContent: 'center',
+          }}
+        >
+          <div
+            onClick={(e) => e.stopPropagation()}
+            style={{
+              width: 360, background: 'rgba(26, 29, 39, 0.96)',
+              border: '1px solid rgba(108, 140, 255, 0.25)', borderRadius: 12,
+              padding: 22, color: '#e8eaf0',
+              boxShadow: '0 20px 60px rgba(12, 18, 40, 0.65)',
+              fontSize: 13,
+            }}
+          >
+            <div style={{ fontSize: 15, fontWeight: 600, marginBottom: 10 }}>
+              {t('status.set_initial')}
+            </div>
+            <div style={{ fontSize: 12, opacity: 0.75, marginBottom: 12, lineHeight: 1.5 }}>
+              {t('status.set_initial_prompt')}
+            </div>
+            <input
+              type="text"
+              value={initialDialogValue}
+              onChange={(e) => { setInitialDialogValue(e.target.value); setInitialDialogError(null); }}
+              onKeyDown={(e) => {
+                if (e.key === 'Enter' && !initialDialogBusy) handleInitialDialogSave();
+                if (e.key === 'Escape' && !initialDialogBusy) setInitialDialogOpen(false);
+              }}
+              autoFocus
+              placeholder="25.033, 121.564"
+              style={{
+                width: '100%', boxSizing: 'border-box',
+                background: 'rgba(10, 12, 18, 0.7)',
+                border: '1px solid rgba(108, 140, 255, 0.3)',
+                borderRadius: 6, color: '#e8eaf0',
+                padding: '8px 10px', fontFamily: 'monospace', fontSize: 13,
+                outline: 'none',
+              }}
+            />
+            {initialDialogError && (
+              <div style={{ color: '#ff4757', fontSize: 11, marginTop: 8 }}>{initialDialogError}</div>
+            )}
+            <div style={{ display: 'flex', gap: 8, marginTop: 16, justifyContent: 'flex-end' }}>
+              <button
+                onClick={() => setInitialDialogOpen(false)}
+                disabled={initialDialogBusy}
+                style={{
+                  padding: '6px 14px', fontSize: 12, cursor: 'pointer',
+                  background: 'transparent', color: '#9499ac',
+                  border: '1px solid rgba(255,255,255,0.12)', borderRadius: 6,
+                }}
+              >{t('generic.cancel')}</button>
+              <button
+                onClick={handleInitialDialogSave}
+                disabled={initialDialogBusy}
+                style={{
+                  padding: '6px 14px', fontSize: 12, fontWeight: 600, cursor: 'pointer',
+                  background: '#6c8cff', color: '#fff',
+                  border: 'none', borderRadius: 6,
+                  opacity: initialDialogBusy ? 0.6 : 1,
+                }}
+              >{t('generic.save')}</button>
+            </div>
+          </div>
+        </div>
+      ), document.body)}
     </div>
   );
 };

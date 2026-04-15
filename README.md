@@ -1,6 +1,6 @@
 # LocWarp
 
-**iOS 虛擬定位模擬器** — 在 Windows 上控制 iPhone 的 GPS 定位,支援直接跳點、導航、路線循環、多點停留、隨機漫步、搖桿操作等模擬模式,可經由 USB 或 WiFi 連線。
+**iOS 虛擬定位模擬器**, 在 Windows 上控制 iPhone 的 GPS 定位,支援直接跳點、導航、路線循環、多點停留、隨機漫步、搖桿操作等模擬模式,可經由 USB 或 WiFi 連線。
 
 <p align="right">
   <a href="README.md"><img alt="繁體中文" src="https://img.shields.io/badge/繁體中文-active-2d3748?style=flat-square"></a>
@@ -27,12 +27,15 @@
 > | iOS 版本 | 驗證來源 | 狀態 |
 > | --- | --- | --- |
 > | **26.4.1** | 開發者實測 | ![Tested](https://img.shields.io/badge/測試可用-4caf50?style=flat-square) |
+> | **26.4.1**(iPadOS) | 社群使用者回報 | ![Reported](https://img.shields.io/badge/回報可用-6c8cff?style=flat-square) |
 > | **26.4** | 社群使用者回報 | ![Reported](https://img.shields.io/badge/回報可用-6c8cff?style=flat-square) |
+> | **26.2** | 社群使用者回報 | ![Reported](https://img.shields.io/badge/回報可用-6c8cff?style=flat-square) |
 > | **26.2.1**(iPadOS,M1 iPad) | 社群使用者回報 | ![Reported](https://img.shields.io/badge/回報可用-6c8cff?style=flat-square) |
 > | **18.7.7** | 社群使用者回報 | ![Reported](https://img.shields.io/badge/回報可用-6c8cff?style=flat-square) |
 > | **18.5**(iPadOS) | 社群使用者回報 | ![Reported](https://img.shields.io/badge/回報可用-6c8cff?style=flat-square) |
 > | **18.1.1** | 社群使用者回報 | ![Reported](https://img.shields.io/badge/回報可用-6c8cff?style=flat-square) |
-> | **16.x 及以下** | — | ![Unsupported](https://img.shields.io/badge/不支援-f44336?style=flat-square) |
+> | **17.6.1** | 社群使用者回報 | ![Reported](https://img.shields.io/badge/回報可用-6c8cff?style=flat-square) |
+> | **16.x 及以下** | n/a | ![Unsupported](https://img.shields.io/badge/不支援-f44336?style=flat-square) |
 >
 > **說明**:上表僅彙整開發者實測與少數社群回饋的結果,**並不保證於所有相同版本的裝置、網路環境或系統組合下皆能正常運作**。iOS 虛擬定位的穩定性高度依賴 iOS 修補版本、pymobiledevice3 對該版本的支援程度、Developer Disk Image 是否成功掛載,以及 Windows 端的驅動、VPN、防火牆、AV 配置。因此「回報可用」僅代表**至少一位使用者在其特定環境下成功運作**,不等同於通用相容性聲明。
 >
@@ -69,6 +72,23 @@
 | **Multi-stop** | 依序經過多個停靠點,**每點隨機 5~20 秒停頓**(可自訂) |
 | **Random Walk** | 在指定半徑內隨機漫遊,每段停頓時間可調 |
 | **Joystick** | 以方向 + 力度即時操控,支援 **WASD / 方向鍵** 鍵盤操作 |
+
+
+### 雙裝置群組模式 (v0.2.0+)
+
+可同時連接 **兩台 iPhone**,所有操作 (瞬移、導航、巡迴、多點導航、隨機漫步、搖桿、暫停、繼續、停止、套用速度、全部還原) 會**同步發送**到兩台。
+
+- 側邊欄頂端兩個裝置 chip 顯示連線狀態與目前模式;右鍵選單可單獨還原 / 開發者模式 / 中斷該台
+- 底部狀態列雙 pill 並陳兩台座標、速度、模式;「全部還原」一鍵清除兩台虛擬定位
+- **自動同步起點**:啟動任何群組動作前先把兩台瞬移到同座標,確保兩台路徑一致
+- **隨機漫步共用亂數種子**:兩台目的地序列完全相同,跑幾小時也不會脫鉤
+- **冷卻 toggle 自動鎖定為關閉**:避免兩台同步動作互相阻擋
+- **自動連線**:USB 偵測到新裝置 1 秒內自動配對,直到 2 台上限,**第三台插上完全不理**
+- 地圖維持單一視覺 (兩台已永遠重疊,雙 marker 反而是雜訊),裝置狀態靠 chip 與 StatusBar pill 呈現
+
+### OSRM 區域智慧 fallback (v0.2.0+)
+
+把世界切成 1° × 1° 網格快取 OSRM 覆蓋狀態:首次到新區域用 2.5 秒 short-timeout 試打 OSRM,通了標 ok、不通標 down。下次同區直接看快取,**沒覆蓋的區域 (例如部分南美 / 非洲偏遠地帶) 不再每段都白等 8 秒 timeout**,直接走密化直線。10 分鐘 TTL 過期會重 probe 一次。
 
 ### 速度控制
 
@@ -143,7 +163,7 @@
 | [TypeScript](https://www.typescriptlang.org/) | 5.5 | Type-safe JS |
 | [Vite](https://vitejs.dev/) | 5.4 | Dev server + 生產環境打包(`base: './'` 供 `file://` 載入) |
 | [Leaflet](https://leafletjs.com/) | 1.9 | 互動地圖 |
-| CSS | — | 手寫,單一 `styles.css` |
+| CSS | n/a | 手寫,單一 `styles.css` |
 
 ### Backend
 
@@ -164,7 +184,7 @@
 | --- | --- | --- |
 | Python | **3.13**(必需) | TLS-PSK 原生支援(3.12 不行) |
 | pymobiledevice3 | 9.9+ | `start_tcp_tunnel()` 建立 RSD tunnel |
-| pytun-pmd3 | — | Windows TUN 介面(wintun.dll) |
+| pytun-pmd3 | n/a | Windows TUN 介面(wintun.dll) |
 
 ### 外部服務(皆免費、無需 API key)
 
@@ -232,7 +252,7 @@ npm install
 
 ### 啟動(開發模式)
 
-雙擊 `LocWarp.bat` — 會自動提權並呼叫 `start.py`,同時啟動:
+雙擊 `LocWarp.bat`, 會自動提權並呼叫 `start.py`,同時啟動:
 - backend(`:8777`)
 - Vite dev server(`:5173`)
 - Electron(載入 dev server)
@@ -240,10 +260,10 @@ npm install
 或手動:
 
 ```bash
-# 終端 1 — backend
+# 終端 1, backend
 cd backend && py -3.12 main.py
 
-# 終端 2 — 前端 + Electron
+# 終端 2, 前端 + Electron
 cd frontend && npm run start
 ```
 
@@ -287,7 +307,7 @@ Windows 需要 Apple 的 USB driver 才能與 iPhone 溝通。
 
 - **下載(必裝)**:[iTunes for Windows (64-bit)](https://secure-appldnld.apple.com/itunes12/047-76416-20260302-fefe4356-211d-4da1-8bc4-058eb36ea803/iTunes64Setup.exe)
 
-> **注意:** 請勿使用 Microsoft Store 的「Apple Devices」— 該版本**不相容**,LocWarp 會抓不到裝置。必須裝上面連結的傳統版 iTunes。
+> **注意:** 請勿使用 Microsoft Store 的「Apple Devices」, 該版本**不相容**,LocWarp 會抓不到裝置。必須裝上面連結的傳統版 iTunes。
 
 ### 2. USB 連接並信任此電腦
 
@@ -310,7 +330,7 @@ iPhone 上:**設定 → 隱私權與安全性 → 開發者模式 → 開啟**
 
 | 連線方式 | 鎖屏影響 | 建議設定 |
 | --- | --- | --- |
-| **USB 有線** | ![Yes](https://img.shields.io/badge/可鎖屏-4caf50?style=flat-square) 可自由鎖定螢幕 | — |
+| **USB 有線** | ![Yes](https://img.shields.io/badge/可鎖屏-4caf50?style=flat-square) 可自由鎖定螢幕 | n/a |
 | **WiFi Tunnel** | ![No](https://img.shields.io/badge/不可鎖屏-f44336?style=flat-square) 鎖屏會導致網路介面休眠,Tunnel 中斷 | 建議關閉自動鎖定以維持連線 |
 
 > **注意:** **WiFi Tunnel 模式下 iPhone 螢幕熄滅會造成網路介面進入休眠狀態,導致 RSD Tunnel 中斷連線。**
@@ -349,7 +369,7 @@ locwarp/
 │   └── locwarp-backend.spec # PyInstaller spec
 │
 ├── frontend/                # Electron + React
-│   ├── electron/main.js     # Electron entry — spawns backend in packaged mode
+│   ├── electron/main.js     # Electron entry, spawns backend in packaged mode
 │   ├── src/
 │   │   ├── App.tsx
 │   │   ├── components/      # MapView, ControlPanel, EtaBar, etc.
@@ -384,7 +404,7 @@ locwarp/
 iOS 17+ 的「設定 → 隱私權與安全性 → 開發者模式」預設**不顯示**。Apple 要求裝置必須曾經被開發者簽署之 App 部署過,該選項才會出現。使用者可依下列流程側載任一自簽 IPA 完成觸發:
 
 1. 安裝 [**Sideloadly**](https://sideloadly.io/)。
-2. 於 [**Decrypt IPA Store**](https://decrypt.day/) 等解密 IPA 網站取得任意 IPA 檔案。建議挑選體積較小的檔案管理類 App 以縮短側載時間。
+2. 於 [**Decrypt IPA Store**](https://decrypt.day/) 或 [**ARM Converter Decrypted App Store**](https://armconverter.com/decryptedappstore/us) 等解密 IPA 網站取得任意 IPA 檔案。建議挑選體積較小的檔案管理類 App 以縮短側載時間。
 3. 將 IPA 拖入 Sideloadly 視窗。
 4. USB 連接 iPhone,於 Sideloadly 輸入個人 Apple ID。
 5. 按下 **Start** 執行側載,等待完成。
@@ -399,7 +419,7 @@ iOS 17+ 的「設定 → 隱私權與安全性 → 開發者模式」預設**不
 
 ## License
 
-本專案採用 **MIT License** 授權釋出 — 詳見 [LICENSE](LICENSE)。
+本專案採用 **MIT License** 授權釋出, 詳見 [LICENSE](LICENSE)。
 
 允許自由使用、修改、再散佈與商業利用,惟須保留原始著作權與授權聲明。
 

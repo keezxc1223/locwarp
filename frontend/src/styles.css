@@ -2537,3 +2537,8 @@ input:focus-visible {
 .font-mono {
   font-family: 'SF Mono', 'Fira Code', monospace;
 }
+
+@keyframes chip-pulse {
+  0%, 100% { opacity: 1; transform: scale(1); }
+  50% { opacity: 0.65; transform: scale(1.15); }
+}

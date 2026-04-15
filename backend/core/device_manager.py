@@ -95,6 +95,10 @@ class DeviceManager:
     def __init__(self) -> None:
         self._connections: Dict[str, _ActiveConnection] = {}
         self._lock = asyncio.Lock()
+        # Serialise DDI downloads/mounts across devices. Without this, two
+        # parallel connects on a fresh machine race to write the same DDI
+        # cache path and corrupt each other.
+        self._ddi_mount_lock = asyncio.Lock()
 
     # ------------------------------------------------------------------
     # Discovery
@@ -402,7 +406,10 @@ class DeviceManager:
             # auto_mount_personalized internally uses requests.get for the
             # GitHub DDI download. Hard-cap the whole operation so a slow or
             # blocked network can't freeze us indefinitely.
-            await asyncio.wait_for(auto_mount_personalized(conn.lockdown), timeout=120.0)
+            # Serialise across devices so parallel connects don't corrupt
+            # the shared DDI cache.
+            async with self._ddi_mount_lock:
+                await asyncio.wait_for(auto_mount_personalized(conn.lockdown), timeout=120.0)
             logger.info("Personalized DDI mounted successfully for %s", conn.udid)
             mount_succeeded = True
         except AlreadyMountedError:

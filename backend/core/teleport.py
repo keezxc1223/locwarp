@@ -35,6 +35,10 @@ class TeleportHandler:
             await engine._set_position(lat, lng)
             logger.info("Teleported to (%.6f, %.6f)", lat, lng)
             await engine._emit("teleport", {"lat": lat, "lng": lng})
+            # Also emit position_update so the per-device map marker
+            # (group-mode dual rendering reads runtimes[udid].currentPos)
+            # refreshes after a teleport.
+            await engine._emit("position_update", {"lat": lat, "lng": lng})
         finally:
             engine.state = SimulationState.IDLE
             await engine._emit("state_change", {"state": engine.state.value})

@@ -33,8 +33,24 @@ export function useDevice(subscribe?: WsSubscribe) {
     if (!subscribe) return
     return subscribe((msg) => {
       if (msg.type === 'device_disconnected') {
-        setConnectedDevice(null)
-        setDevices((prev) => prev.map((d) => ({ ...d, is_connected: false })))
+        // Group mode: only mark the specific udid disconnected when provided;
+        // fall back to clearing all for legacy single-device disconnect events.
+        const udid = msg.data?.udid
+        const udids: string[] = Array.isArray(msg.data?.udids) ? msg.data.udids : (udid ? [udid] : [])
+        if (udids.length === 0) {
+          setConnectedDevice(null)
+          setDevices((prev) => prev.map((d) => ({ ...d, is_connected: false })))
+        } else {
+          setDevices((prev) => prev.map((d) => udids.includes(d.udid) ? { ...d, is_connected: false } : d))
+          setConnectedDevice((prev) => (prev && udids.includes(prev.udid)) ? null : prev)
+        }
+        // Re-fetch so the sidebar list and metadata stay in sync with the
+        // backend (otherwise the left device panel can show a stale empty
+        // state while a remaining device is still connected).
+        listDevices().then((list) => { setDevices(list) }).catch(() => {})
+      } else if (msg.type === 'device_connected') {
+        // Re-fetch list so the newly-connected device appears with correct metadata.
+        listDevices().then((list) => { setDevices(list) }).catch(() => {})
       } else if (msg.type === 'device_reconnected') {
         listDevices().then((list) => {
           setDevices(list)
@@ -203,9 +219,18 @@ export function useDevice(subscribe?: WsSubscribe) {
     }
   }, [])
 
+  // Group-mode derived state: every device in `devices` marked is_connected.
+  // `primaryDevice` is the first one (ordering = connection order preserved
+  // because scan() preserves backend list order). Existing single-device
+  // call sites can keep reading `connectedDevice`; new call sites should
+  // prefer `connectedDevices` / `primaryDevice`.
+  const connectedDevices: DeviceInfo[] = devices.filter((d) => d.is_connected)
+  const primaryDevice: DeviceInfo | null = connectedDevices[0] ?? connectedDevice ?? null
+
   return {
     devices, connectedDevice, scanning, scan, connect, disconnect,
     connectWifi, scanWifi, wifiScanning, wifiDevices,
     startWifiTunnel, checkTunnelStatus, stopTunnel, tunnelStatus,
+    connectedDevices, primaryDevice,
   }
 }

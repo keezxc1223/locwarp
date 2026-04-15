@@ -266,6 +266,7 @@ class SimulationEngine:
         pause_enabled: bool = True,
         pause_min: float = 5.0,
         pause_max: float = 20.0,
+        seed: int | None = None,
     ) -> None:
         """Begin a random walk within a radius."""
         await self._ensure_stopped()
@@ -277,6 +278,7 @@ class SimulationEngine:
                 speed_kmh=speed_kmh,
                 speed_min_kmh=speed_min_kmh, speed_max_kmh=speed_max_kmh,
                 pause_enabled=pause_enabled, pause_min=pause_min, pause_max=pause_max,
+                seed=seed,
             ),
             "Random walk",
         )
