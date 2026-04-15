@@ -16,6 +16,7 @@ import HistoryPanel from './components/HistoryPanel'
 import GamePresetsPanel from './components/GamePresetsPanel'
 import GeofencePanel from './components/GeofencePanel'
 import SchedulePanel from './components/SchedulePanel'
+import MultiDevicePanel from './components/MultiDevicePanel'
 import JoystickPad from './components/JoystickPad'
 import EtaBar from './components/EtaBar'
 import PauseControl from './components/PauseControl'
@@ -348,6 +349,7 @@ const App: React.FC = () => {
           tunnelStatus={device.tunnelStatus}
         />
         <BlueStacksPanel />
+        <MultiDevicePanel wsMessage={ws.lastMessage} />
         <TimerPanel wsMessage={ws.lastMessage} />
         <GamePresetsPanel onApplyPreset={handleApplyPreset} />
         <GeofencePanel

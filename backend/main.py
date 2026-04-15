@@ -26,6 +26,7 @@ from services.scheduler import ScheduledReturn
 from services.location_history import LocationHistory
 from services.geofence import GeofenceService
 from services.schedule_service import ScheduleService
+from services.multi_location_service import MultiLocationService
 
 # Configure logging — console + rotating file in ~/.locwarp/logs/
 _log_fmt = "%(asctime)s [%(name)s] %(levelname)s: %(message)s"
@@ -65,6 +66,9 @@ class AppState:
         self.geofence = GeofenceService()           # 地理圍欄
         self.schedule_service = ScheduleService()   # 排程跳點
         self.jitter_enabled = True                  # GPS 抖動偽裝
+        # Multi-device GPS sync
+        self._multi_loc = MultiLocationService()                 # fan-out service (reused across engine rebuilds)
+        self._sync_device_names: dict[str, str] = {}            # udid → display name
         self._load_settings()
 
     def _load_settings(self):
@@ -166,11 +170,28 @@ class AppState:
             self.save_settings()
 
     async def create_engine_for_device(self, udid: str):
-        """Create a SimulationEngine for the connected device."""
+        """Create a SimulationEngine for the connected device.
+
+        Uses the persistent MultiLocationService (_multi_loc) so that any
+        previously registered sync devices remain active across engine rebuilds.
+        """
         from core.simulation_engine import SimulationEngine
         from api.websocket import broadcast
 
         loc_service = await self.device_manager.get_location_service(udid)
+
+        # Register as primary in the fan-out service (keeps existing sync devices)
+        self._multi_loc.set_primary(udid, loc_service)
+
+        # Store device name for the sync list
+        try:
+            devices = await self.device_manager.discover_devices()
+            for d in devices:
+                if d.udid == udid:
+                    self._sync_device_names[udid] = d.name
+                    break
+        except Exception:
+            self._sync_device_names[udid] = udid
 
         async def event_callback(event_type: str, data: dict):
             await broadcast(event_type, data)
@@ -191,7 +212,8 @@ class AppState:
                         except Exception:
                             logger.exception("Geofence auto-return failed")
 
-        self.simulation_engine = SimulationEngine(loc_service, event_callback)
+        # Engine always uses the multi-location service
+        self.simulation_engine = SimulationEngine(self._multi_loc, event_callback)
 
         # 決定起始位置（優先順序：home > last > IP > 預設）
         init = await self.get_initial_position_async()
@@ -200,7 +222,7 @@ class AppState:
             lat=init["lat"], lng=init["lng"]
         )
 
-        # 將起始位置注入手機 GPS，最多重試 3 次（冷啟動時 DVT 可能需要時間初始化）
+        # 將起始位置注入手機 GPS（只推送給主要裝置，避免 fan-out 到尚未就緒的同步裝置）
         _set_ok = False
         for _attempt in range(3):
             try:
@@ -250,6 +272,65 @@ class AppState:
         self.reconnect_manager = ReconnectManager(self.device_manager)
 
         logger.info("Simulation engine created for device %s", udid)
+
+    async def add_sync_device(self, udid: str) -> None:
+        """Connect a secondary iOS device and add it to the GPS fan-out group.
+
+        Immediately pushes the current position so the new device is in sync.
+        """
+        from api.websocket import broadcast
+
+        dm = self.device_manager
+        if udid not in dm._connections:
+            await dm.connect(udid)
+
+        loc_service = await dm.get_location_service(udid)
+        self._multi_loc.add_sync(udid, loc_service)
+
+        # Cache device name
+        try:
+            devices = await dm.discover_devices()
+            for d in devices:
+                if d.udid == udid:
+                    self._sync_device_names[udid] = d.name
+                    break
+            else:
+                self._sync_device_names[udid] = udid
+        except Exception:
+            self._sync_device_names[udid] = udid
+
+        # Immediately sync current position to the new device
+        if self.simulation_engine and self.simulation_engine.current_position:
+            pos = self.simulation_engine.current_position
+            try:
+                await loc_service.set(pos.lat, pos.lng)
+                logger.info("Sync device %s received current position (%.6f, %.6f)", udid, pos.lat, pos.lng)
+            except Exception:
+                logger.warning("Could not push initial position to sync device %s", udid, exc_info=True)
+
+        name = self._sync_device_names.get(udid, udid)
+        logger.info("Sync device added: %s (%s) — total in group: %d", name, udid, self._multi_loc.count)
+        try:
+            await broadcast("sync_device_added", {"udid": udid, "name": name, "total": self._multi_loc.count})
+        except Exception:
+            pass
+
+    def remove_sync_device(self, udid: str) -> None:
+        """Remove a secondary device from the GPS fan-out group."""
+        from api.websocket import broadcast as _broadcast
+        import asyncio as _asyncio
+
+        self._multi_loc.remove_sync(udid)
+        name = self._sync_device_names.pop(udid, udid)
+        logger.info("Sync device removed: %s (%s) — total in group: %d", name, udid, self._multi_loc.count)
+        try:
+            _asyncio.get_event_loop().call_soon_threadsafe(
+                lambda: _asyncio.ensure_future(
+                    _broadcast("sync_device_removed", {"udid": udid, "name": name, "total": self._multi_loc.count})
+                )
+            )
+        except Exception:
+            pass
 
     async def create_engine_for_adb(self, serial: str, name: str, loc_service):
         """Create a SimulationEngine for a BlueStacks / Android device via ADB."""
@@ -473,6 +554,7 @@ from api.bluestacks import router as bluestacks_router
 from api.history import router as history_router
 from api.geofence import router as geofence_router
 from api.schedule import router as schedule_router
+from api.sync_device import router as sync_router
 
 app.include_router(device_router)
 app.include_router(location_router)
@@ -484,6 +566,7 @@ app.include_router(bluestacks_router)
 app.include_router(history_router)
 app.include_router(geofence_router)
 app.include_router(schedule_router)
+app.include_router(sync_router)
 
 
 @app.get("/")

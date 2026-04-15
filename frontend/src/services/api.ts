@@ -172,6 +172,12 @@ export const connectAdb = (serial: string) => request<any>('POST', '/api/bluesta
 export const disconnectAdb = () => request<any>('DELETE', '/api/bluestacks/connect')
 export const getAdbStatus = () => request<any>('GET', '/api/bluestacks/status')
 
+// Multi-device GPS sync
+export const getSyncDevices = () =>
+  request<{ devices: { udid: string; name: string; is_primary: boolean }[]; total: number }>('GET', '/api/device/sync')
+export const addSyncDevice = (udid: string) => request<any>('POST', '/api/device/sync', { udid })
+export const removeSyncDevice = (udid: string) => request<any>('DELETE', `/api/device/sync/${udid}`)
+
 // Geocoding
 export const searchAddress = (q: string) => request<any[]>('GET', `/api/geocode/search?q=${encodeURIComponent(q)}`)
 export const reverseGeocode = (lat: number, lng: number) =>
