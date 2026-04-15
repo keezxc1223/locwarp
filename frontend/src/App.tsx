@@ -45,6 +45,7 @@ const App: React.FC = () => {
   const [toastMsg, setToastMsg] = useState<string | null>(null)
   const [drawingMode, setDrawingMode] = useState(false)
   const [geofence, setGeofence] = useState<{ lat: number; lng: number; radius_m: number } | null>(null)
+  const [sidebarTab, setSidebarTab] = useState<'control' | 'device' | 'tools'>('control')
 
   const toastTimerRef = React.useRef<ReturnType<typeof setTimeout> | null>(null)
   const showToast = useCallback((msg: string, ms = 2000) => {
@@ -323,45 +324,50 @@ const App: React.FC = () => {
   const isRunning = sim.status.running
   const isPaused = sim.status.paused
 
+  const isConnected = device.connectedDevice !== null
+
   return (
     <div className="app-layout">
       <div className="sidebar">
+
+        {/* ── Brand header ── */}
+        <div className="sidebar-header">
+          <div className="sidebar-logo">📍</div>
+          <span className="sidebar-brand">LocWarp</span>
+          <div className={`sidebar-conn-dot ${isConnected ? 'connected' : 'disconnected'}`} title={isConnected ? `已連線：${device.connectedDevice?.name}` : '未連線'} />
+        </div>
+
+        {/* ── Tab navigation ── */}
+        <div className="sidebar-tabs">
+          <button
+            className={`sidebar-tab ${sidebarTab === 'control' ? 'active' : ''}`}
+            onClick={() => setSidebarTab('control')}
+          >
+            <span className="sidebar-tab-icon">🕹️</span>
+            <span>控制</span>
+          </button>
+          <button
+            className={`sidebar-tab ${sidebarTab === 'device' ? 'active' : ''}`}
+            onClick={() => setSidebarTab('device')}
+          >
+            <span className="sidebar-tab-icon">📱</span>
+            <span>裝置</span>
+            {isConnected && <span className="sidebar-tab-dot sidebar-tab-dot--green" />}
+          </button>
+          <button
+            className={`sidebar-tab ${sidebarTab === 'tools' ? 'active' : ''}`}
+            onClick={() => setSidebarTab('tools')}
+          >
+            <span className="sidebar-tab-icon">🛠️</span>
+            <span>工具</span>
+          </button>
+        </div>
+
+        {/* ── Tab content ── */}
         <div className="sidebar-content">
-        <DeviceStatus
-          device={device.connectedDevice ? {
-            id: device.connectedDevice.udid,
-            name: device.connectedDevice.name,
-            iosVersion: device.connectedDevice.ios_version,
-            connectionType: device.connectedDevice.connection_type,
-          } : null}
-          devices={device.devices.map(d => ({
-            id: d.udid,
-            name: d.name,
-            iosVersion: d.ios_version,
-            connectionType: d.connection_type,
-          }))}
-          isConnected={device.connectedDevice !== null}
-          onScan={() => { device.scan() }}
-          onSelect={(id: string) => { device.connect(id) }}
-          onStartWifiTunnel={device.startWifiTunnel}
-          onWifiConnect={device.connectWifi}
-          onStopTunnel={device.stopTunnel}
-          tunnelStatus={device.tunnelStatus}
-        />
-        <BlueStacksPanel />
-        <MultiDevicePanel wsMessage={ws.lastMessage} />
-        <TimerPanel wsMessage={ws.lastMessage} />
-        <GamePresetsPanel onApplyPreset={handleApplyPreset} />
-        <GeofencePanel
-          currentPosition={currentPos}
-          wsMessage={ws.lastMessage}
-          onGeofenceChange={setGeofence}
-        />
-        <SchedulePanel
-          currentPosition={currentPos}
-          wsMessage={ws.lastMessage}
-        />
-        <HistoryPanel onJump={handleTeleport} />
+
+          {/* ── 控制 tab ── */}
+          {sidebarTab === 'control' && (
         <ControlPanel
           simMode={sim.mode}
           moveMode={sim.moveMode}
@@ -422,7 +428,7 @@ const App: React.FC = () => {
           onRandomWalkRadiusChange={setRandomWalkRadius}
           currentWaypointsCount={sim.waypoints.length}
           modeExtraSection={(sim.mode === SimMode.Loop || sim.mode === SimMode.MultiStop) ? (
-          <div className="section" style={{ margin: '0 0 8px 0' }}>
+          <div className="section" style={{ margin: '0 0 8px 0', padding: '0 0 2px 0' }}>
             <div className="section-title" style={{ display: 'flex', alignItems: 'center', gap: 6 }}>
               <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2">
                 <circle cx="12" cy="12" r="3" />
@@ -512,6 +518,55 @@ const App: React.FC = () => {
           ) : null}
         />
 
+          )}
+
+          {/* ── 裝置 tab ── */}
+          {sidebarTab === 'device' && (
+            <>
+              <DeviceStatus
+                device={device.connectedDevice ? {
+                  id: device.connectedDevice.udid,
+                  name: device.connectedDevice.name,
+                  iosVersion: device.connectedDevice.ios_version,
+                  connectionType: device.connectedDevice.connection_type,
+                } : null}
+                devices={device.devices.map(d => ({
+                  id: d.udid,
+                  name: d.name,
+                  iosVersion: d.ios_version,
+                  connectionType: d.connection_type,
+                }))}
+                isConnected={isConnected}
+                onScan={() => { device.scan() }}
+                onSelect={(id: string) => { device.connect(id) }}
+                onStartWifiTunnel={device.startWifiTunnel}
+                onWifiConnect={device.connectWifi}
+                onStopTunnel={device.stopTunnel}
+                tunnelStatus={device.tunnelStatus}
+              />
+              <BlueStacksPanel />
+              <MultiDevicePanel wsMessage={ws.lastMessage} />
+            </>
+          )}
+
+          {/* ── 工具 tab ── */}
+          {sidebarTab === 'tools' && (
+            <>
+              <TimerPanel wsMessage={ws.lastMessage} />
+              <GamePresetsPanel onApplyPreset={handleApplyPreset} />
+              <GeofencePanel
+                currentPosition={currentPos}
+                wsMessage={ws.lastMessage}
+                onGeofenceChange={setGeofence}
+              />
+              <SchedulePanel
+                currentPosition={currentPos}
+                wsMessage={ws.lastMessage}
+              />
+              <HistoryPanel onJump={handleTeleport} />
+            </>
+          )}
+
         </div>
       </div>
       <div className="map-container">
@@ -525,92 +580,35 @@ const App: React.FC = () => {
         {/* Drawing mode toggle — only visible in loop/multistop modes */}
         {(sim.mode === SimMode.Loop || sim.mode === SimMode.MultiStop) && (
           <button
+            className={`map-btn map-btn--draw${drawingMode ? ' map-btn--active' : ''}`}
             onClick={handleDrawingToggle}
             title={drawingMode ? '關閉繪圖模式' : '開啟繪圖模式（點地圖新增航點）'}
-            style={{
-              position: 'absolute',
-              right: 16,
-              bottom: 70,
-              zIndex: 800,
-              width: 40,
-              height: 40,
-              borderRadius: '50%',
-              border: `1px solid ${drawingMode ? 'rgba(255,152,0,0.6)' : 'rgba(255,255,255,0.15)'}`,
-              background: drawingMode ? 'rgba(255,152,0,0.85)' : 'rgba(40, 44, 60, 0.95)',
-              color: drawingMode ? '#1a1a1a' : '#94a3b8',
-              cursor: 'pointer',
-              boxShadow: '0 2px 8px rgba(0,0,0,0.35)',
-              display: 'flex',
-              alignItems: 'center',
-              justifyContent: 'center',
-              fontSize: 18,
-              padding: 0,
-            }}
           >
             ✏️
           </button>
         )}
+
+        {/* DDI mounting overlay */}
         {sim.ddiMounting && (
-          <div
-            style={{
-              position: 'absolute',
-              inset: 0,
-              zIndex: 10000,
-              background: 'rgba(20, 22, 32, 0.85)',
-              backdropFilter: 'blur(3px)',
-              display: 'flex',
-              alignItems: 'center',
-              justifyContent: 'center',
-              pointerEvents: 'auto',
-            }}
-          >
-            <div
-              style={{
-                background: '#23232a',
-                border: '1px solid #3a3a42',
-                borderRadius: 8,
-                padding: '20px 28px',
-                maxWidth: 420,
-                textAlign: 'center',
-                boxShadow: '0 8px 24px rgba(0,0,0,0.5)',
-              }}
-            >
+          <div className="ddi-overlay">
+            <div className="ddi-modal">
               <svg
                 width="32" height="32" viewBox="0 0 24 24" fill="none"
-                stroke="#6c8cff" strokeWidth="2"
-                style={{ animation: 'spin 1s linear infinite', margin: '0 auto 10px' }}
+                stroke="var(--accent-blue)" strokeWidth="2"
+                className="spin"
+                style={{ display: 'block', margin: '0 auto 10px' }}
               >
                 <circle cx="12" cy="12" r="10" strokeDasharray="32" strokeDashoffset="16" />
               </svg>
-              <div style={{ fontSize: 14, fontWeight: 600, marginBottom: 6 }}>
-                {t('ddi.mounting_title')}
-              </div>
-              <div style={{ fontSize: 12, opacity: 0.75, lineHeight: 1.6 }}>
-                {t('ddi.mounting_hint')}
-              </div>
+              <div className="ddi-modal-title">{t('ddi.mounting_title')}</div>
+              <div className="ddi-modal-hint">{t('ddi.mounting_hint')}</div>
             </div>
           </div>
         )}
+
+        {/* Pause countdown */}
         {sim.pauseRemaining != null && sim.pauseRemaining > 0 && (
-          <div
-            style={{
-              position: 'absolute',
-              top: 38,
-              left: '50%',
-              transform: 'translateX(-50%)',
-              zIndex: 901,
-              background: 'rgba(255, 152, 0, 0.95)',
-              color: '#1a1a1a',
-              padding: '6px 14px',
-              borderRadius: 18,
-              fontSize: 12,
-              fontWeight: 600,
-              boxShadow: '0 2px 8px rgba(0,0,0,0.35)',
-              display: 'flex',
-              alignItems: 'center',
-              gap: 8,
-            }}
-          >
+          <div className="pause-countdown-banner">
             <svg width="14" height="14" viewBox="0 0 24 24" fill="currentColor">
               <rect x="6" y="4" width="4" height="16" rx="1" />
               <rect x="14" y="4" width="4" height="16" rx="1" />
@@ -647,16 +645,9 @@ const App: React.FC = () => {
           />
         )}
         {addBmDialog && (
-          <div
-            style={{
-              position: 'absolute', top: 60, left: '50%', transform: 'translateX(-50%)',
-              zIndex: 2500, background: '#23232a', border: '1px solid #3a3a42',
-              borderRadius: 8, padding: 14, width: 300,
-              boxShadow: '0 8px 24px rgba(0,0,0,0.5)',
-            }}
-          >
-            <div style={{ fontSize: 13, fontWeight: 600, marginBottom: 8 }}>{t('bm.add')}</div>
-            <div style={{ fontSize: 11, opacity: 0.6, marginBottom: 8 }}>
+          <div className="bm-add-dialog">
+            <div className="bm-add-dialog-title">{t('bm.add')}</div>
+            <div className="bm-add-dialog-coords">
               {addBmDialog.lat.toFixed(5)}, {addBmDialog.lng.toFixed(5)}
             </div>
             <input
@@ -677,8 +668,9 @@ const App: React.FC = () => {
               onChange={(e) => setAddBmDialog({ ...addBmDialog, category: e.target.value })}
               style={{
                 width: '100%', marginBottom: 10, padding: '6px 8px',
-                background: '#1e1e22', color: '#e0e0e0', border: '1px solid #444',
-                borderRadius: 4, fontSize: 12,
+                background: 'var(--bg-primary)', color: 'var(--text-primary)',
+                border: '1px solid var(--border-color)',
+                borderRadius: 'var(--radius-sm)', fontSize: 12,
               }}
             >
               {bm.categories.map((c) => (
@@ -697,20 +689,12 @@ const App: React.FC = () => {
           </div>
         )}
         {sim.error && (
-          <div
-            style={{
-              position: 'absolute', top: 12, left: '50%', transform: 'translateX(-50%)',
-              zIndex: 2000, background: '#e53935', color: '#fff', padding: '8px 20px',
-              borderRadius: 6, fontSize: 13, boxShadow: '0 4px 12px rgba(0,0,0,0.4)',
-              cursor: 'pointer', maxWidth: '80%', textAlign: 'center',
-            }}
-            onClick={sim.clearError}
-          >
+          <div className="map-error-toast" onClick={sim.clearError}>
             {sim.error}
           </div>
         )}
         <StatusBar
-          isConnected={device.connectedDevice !== null}
+          isConnected={isConnected}
           deviceName={device.connectedDevice?.name ?? ''}
           iosVersion={device.connectedDevice?.ios_version ?? ''}
           currentPosition={currentPos}
@@ -723,27 +707,8 @@ const App: React.FC = () => {
         />
 
         {toastMsg && (
-          <div
-            style={{
-              position: 'fixed',
-              top: 70,
-              left: '50%',
-              transform: 'translateX(-50%)',
-              zIndex: 10001,
-              background: 'rgba(40, 44, 60, 0.95)',
-              color: '#fff',
-              padding: '10px 20px',
-              borderRadius: 6,
-              fontSize: 13,
-              fontWeight: 500,
-              boxShadow: '0 4px 16px rgba(0,0,0,0.4)',
-              border: '1px solid rgba(108, 140, 255, 0.4)',
-              display: 'flex',
-              alignItems: 'center',
-              gap: 8,
-            }}
-          >
-            <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="#4caf50" strokeWidth="2.5">
+          <div className="global-toast">
+            <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="var(--accent-green)" strokeWidth="2.5">
               <polyline points="20 6 9 17 4 12" />
             </svg>
             {toastMsg}

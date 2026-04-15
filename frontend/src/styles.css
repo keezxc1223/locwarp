@@ -2308,3 +2308,382 @@ input:focus-visible {
 .font-mono {
   font-family: 'SF Mono', 'Fira Code', monospace;
 }
+
+/* =====================================================
+   LocWarp UI Redesign — v2 additions
+   ===================================================== */
+
+/* ---------- Extra CSS variables ---------- */
+:root {
+  --accent-orange: #ff9800;
+  --accent-orange-dim: rgba(255, 152, 0, 0.15);
+
+  /* Z-index scale */
+  --z-map-controls: 800;
+  --z-map-overlay: 900;
+  --z-modal-backdrop: 8999;
+  --z-modal: 9000;
+  --z-context-menu: 10000;
+  --z-toast: 10001;
+
+  /* Tab nav height */
+  --sidebar-tab-height: 50px;
+}
+
+/* ---------- Sidebar header (app brand) ---------- */
+.sidebar-header {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  padding: 10px 14px;
+  border-bottom: 1px solid var(--border-color);
+  flex-shrink: 0;
+}
+
+.sidebar-logo {
+  width: 28px;
+  height: 28px;
+  border-radius: var(--radius-md);
+  background: var(--accent-blue-dim);
+  border: 1px solid rgba(108, 140, 255, 0.35);
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  color: var(--accent-blue);
+  font-size: 15px;
+  flex-shrink: 0;
+}
+
+.sidebar-brand {
+  font-size: 15px;
+  font-weight: 700;
+  letter-spacing: -0.02em;
+  color: var(--text-primary);
+  flex: 1;
+}
+
+.sidebar-conn-dot {
+  width: 8px;
+  height: 8px;
+  border-radius: 50%;
+  flex-shrink: 0;
+  transition: background var(--transition-fast), box-shadow var(--transition-fast);
+}
+.sidebar-conn-dot.connected {
+  background: var(--accent-green);
+  box-shadow: 0 0 6px var(--accent-green);
+}
+.sidebar-conn-dot.disconnected {
+  background: var(--text-muted);
+}
+
+/* ---------- Sidebar tab navigation ---------- */
+.sidebar-tabs {
+  display: flex;
+  border-bottom: 1px solid var(--border-color);
+  flex-shrink: 0;
+  background: var(--bg-surface);
+}
+
+.sidebar-tab {
+  flex: 1;
+  padding: 9px 4px 8px;
+  background: transparent;
+  border: none;
+  border-bottom: 2px solid transparent;
+  color: var(--text-secondary);
+  font-size: 11px;
+  font-weight: 500;
+  cursor: pointer;
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  gap: 3px;
+  transition: all var(--transition-fast);
+  position: relative;
+  user-select: none;
+}
+
+.sidebar-tab:hover {
+  color: var(--text-primary);
+  background: var(--bg-surface-hover);
+}
+
+.sidebar-tab.active {
+  color: var(--accent-blue);
+  border-bottom-color: var(--accent-blue);
+  background: var(--bg-surface);
+}
+
+.sidebar-tab-icon {
+  font-size: 16px;
+  line-height: 1;
+}
+
+/* Small indicator dot on tab (e.g. device connected) */
+.sidebar-tab-dot {
+  position: absolute;
+  top: 7px;
+  right: 10px;
+  width: 6px;
+  height: 6px;
+  border-radius: 50%;
+  border: 1.5px solid var(--bg-surface);
+}
+.sidebar-tab-dot--green {
+  background: var(--accent-green);
+  box-shadow: 0 0 4px var(--accent-green);
+}
+.sidebar-tab-dot--yellow {
+  background: var(--accent-yellow);
+}
+
+/* ---------- Panel card (.device-status) ----------
+   All collapsible feature panels share this base style.
+   Applies immediately to: BlueStacksPanel, MultiDevicePanel,
+   TimerPanel, GamePresetsPanel, GeofencePanel, SchedulePanel,
+   HistoryPanel — they all use className="device-status".
+   -------------------------------------------------- */
+.device-status {
+  background: var(--bg-elevated);
+  border: 1px solid var(--border-color);
+  border-radius: var(--radius-md);
+  padding: 10px 12px;
+  /* Horizontal margin aligns with .sidebar-section (padding: 8px 12px) */
+  margin: 0 12px 8px;
+  transition: border-color var(--transition-fast);
+}
+
+.device-status:hover {
+  border-color: var(--border-light);
+}
+
+/* First panel in a tab gets a small top gap */
+.sidebar-content > .device-status:first-child,
+.sidebar-content > :first-child > .device-status:first-child {
+  margin-top: 4px;
+}
+
+/* ---------- Panel badges ---------- */
+.panel-badge {
+  display: inline-flex;
+  align-items: center;
+  font-size: 10px;
+  font-weight: 500;
+  padding: 1px 7px;
+  border-radius: var(--radius-full);
+  line-height: 1.4;
+}
+.panel-badge--green  { color: var(--accent-green); background: var(--accent-green-dim); }
+.panel-badge--blue   { color: var(--accent-blue);  background: var(--accent-blue-dim); }
+.panel-badge--yellow { color: var(--accent-yellow); background: var(--accent-yellow-dim); }
+.panel-badge--orange { color: var(--accent-orange); background: var(--accent-orange-dim); }
+.panel-badge--red    { color: var(--accent-red); background: rgba(255,71,87,0.15); }
+.panel-badge--cyan   { color: #67e8f9; background: rgba(6,182,212,0.15); }
+
+/* ---------- Panel in-line toast ---------- */
+.panel-toast {
+  margin-top: 8px;
+  font-size: 12px;
+  padding: 5px 9px;
+  border-radius: var(--radius-sm);
+  line-height: 1.4;
+}
+.panel-toast--success { color: #86efac; background: rgba(34,197,94,0.08); }
+.panel-toast--error   { color: var(--accent-red); background: rgba(255,71,87,0.08); }
+.panel-toast--warning { color: var(--accent-yellow); background: var(--accent-yellow-dim); }
+.panel-toast--info    { color: #67e8f9; background: rgba(6,182,212,0.08); }
+
+/* ---------- Map overlay elements ---------- */
+
+/* Floating round button on map (recenter, drawing toggle, etc.) */
+.map-btn {
+  width: 40px;
+  height: 40px;
+  border-radius: 50%;
+  border: 1px solid rgba(255,255,255,0.15);
+  background: rgba(40, 44, 60, 0.95);
+  color: var(--text-secondary);
+  cursor: pointer;
+  box-shadow: var(--shadow-sm);
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  padding: 0;
+  transition: all var(--transition-fast);
+  position: absolute;
+  z-index: var(--z-map-controls);
+}
+.map-btn:hover {
+  background: rgba(50,55,75,0.98);
+  color: var(--text-primary);
+  border-color: rgba(255,255,255,0.25);
+}
+.map-btn:disabled { opacity: 0.4; cursor: not-allowed; }
+.map-btn--active {
+  background: rgba(255,152,0,0.88) !important;
+  border-color: rgba(255,152,0,0.6) !important;
+  color: #1a1a1a !important;
+}
+.map-btn--recenter { left: 16px; bottom: 38px; }
+.map-btn--draw     { right: 16px; bottom: 78px; }
+
+/* Drawing mode banner at top of map */
+.drawing-mode-banner {
+  position: absolute;
+  top: 8px;
+  left: 50%;
+  transform: translateX(-50%);
+  z-index: var(--z-map-overlay);
+  background: rgba(255,152,0,0.92);
+  color: #1a1a1a;
+  padding: 5px 16px;
+  border-radius: var(--radius-full);
+  font-size: 12px;
+  font-weight: 600;
+  pointer-events: none;
+  box-shadow: var(--shadow-sm);
+  white-space: nowrap;
+}
+
+/* Pause countdown pill */
+.pause-countdown-banner {
+  position: absolute;
+  top: 38px;
+  left: 50%;
+  transform: translateX(-50%);
+  z-index: calc(var(--z-map-overlay) + 1);
+  background: rgba(255,152,0,0.95);
+  color: #1a1a1a;
+  padding: 6px 14px;
+  border-radius: 18px;
+  font-size: 12px;
+  font-weight: 600;
+  box-shadow: var(--shadow-sm);
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  white-space: nowrap;
+}
+
+/* DDI mounting full-screen overlay */
+.ddi-overlay {
+  position: absolute;
+  inset: 0;
+  z-index: var(--z-modal-backdrop);
+  background: rgba(20,22,32,0.85);
+  backdrop-filter: blur(3px);
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  pointer-events: auto;
+}
+
+.ddi-modal {
+  background: var(--bg-elevated);
+  border: 1px solid var(--border-color);
+  border-radius: var(--radius-md);
+  padding: 20px 28px;
+  max-width: 420px;
+  text-align: center;
+  box-shadow: var(--shadow-lg);
+}
+
+.ddi-modal-title {
+  font-size: 14px;
+  font-weight: 600;
+  margin-bottom: 6px;
+}
+
+.ddi-modal-hint {
+  font-size: 12px;
+  opacity: 0.75;
+  line-height: 1.6;
+}
+
+/* Add-bookmark dialog */
+.bm-add-dialog {
+  position: absolute;
+  top: 60px;
+  left: 50%;
+  transform: translateX(-50%);
+  z-index: var(--z-modal);
+  background: var(--bg-elevated);
+  border: 1px solid var(--border-color);
+  border-radius: var(--radius-md);
+  padding: 14px;
+  width: 300px;
+  box-shadow: var(--shadow-lg);
+}
+
+.bm-add-dialog-title {
+  font-size: 13px;
+  font-weight: 600;
+  margin-bottom: 8px;
+}
+
+.bm-add-dialog-coords {
+  font-size: 11px;
+  color: var(--text-muted);
+  margin-bottom: 8px;
+  font-family: 'SF Mono', 'Fira Code', monospace;
+}
+
+/* Error / sim error toast on map */
+.map-error-toast {
+  position: absolute;
+  top: 12px;
+  left: 50%;
+  transform: translateX(-50%);
+  z-index: var(--z-modal);
+  background: #e53935;
+  color: #fff;
+  padding: 8px 20px;
+  border-radius: var(--radius-sm);
+  font-size: 13px;
+  box-shadow: var(--shadow-md);
+  cursor: pointer;
+  max-width: 80%;
+  text-align: center;
+}
+
+/* Global toast (top-center, slide-in) */
+.global-toast {
+  position: fixed;
+  top: 70px;
+  left: 50%;
+  transform: translateX(-50%);
+  z-index: var(--z-toast);
+  background: rgba(40,44,60,0.97);
+  color: var(--text-primary);
+  padding: 10px 20px;
+  border-radius: var(--radius-sm);
+  font-size: 13px;
+  font-weight: 500;
+  box-shadow: var(--shadow-md);
+  border: 1px solid rgba(108,140,255,0.35);
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  animation: toast-in 0.25s ease;
+  white-space: nowrap;
+}
+
+/* Prevent layout shift from scrollbar appearing/disappearing */
+.sidebar-content {
+  scrollbar-gutter: stable;
+}
+
+/* ---------- Utility additions ---------- */
+.truncate {
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
+}
+
+/* Spinner */
+@keyframes _spin {
+  from { transform: rotate(0deg); }
+  to   { transform: rotate(360deg); }
+}
+.spin { animation: _spin 0.7s linear infinite; }

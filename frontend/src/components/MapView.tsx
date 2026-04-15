@@ -457,27 +457,11 @@ const MapView: React.FC<MapViewProps> = ({
 
       {/* Recenter on user position */}
       <button
+        className={`map-btn map-btn--recenter${currentPosition ? '' : ' map-btn--disabled'}`}
         onClick={recenter}
         disabled={!currentPosition}
         title={t('map.recenter')}
-        style={{
-          position: 'absolute',
-          left: 16,
-          bottom: 24,
-          zIndex: 800,
-          width: 40,
-          height: 40,
-          borderRadius: '50%',
-          border: '1px solid rgba(255,255,255,0.15)',
-          background: currentPosition ? 'rgba(40, 44, 60, 0.95)' : 'rgba(40, 44, 60, 0.5)',
-          color: currentPosition ? '#6c8cff' : '#666',
-          cursor: currentPosition ? 'pointer' : 'not-allowed',
-          boxShadow: '0 2px 8px rgba(0,0,0,0.35)',
-          display: 'flex',
-          alignItems: 'center',
-          justifyContent: 'center',
-          padding: 0,
-        }}
+        style={{ color: currentPosition ? 'var(--accent-blue)' : undefined }}
       >
         <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
           <circle cx="12" cy="12" r="3" />
