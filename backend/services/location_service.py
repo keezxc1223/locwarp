@@ -8,6 +8,7 @@ iOS versions, wrapping pymobiledevice3's location simulation capabilities.
 from __future__ import annotations
 
 import logging
+import inspect
 from abc import ABC, abstractmethod
 
 import asyncio
@@ -195,6 +196,11 @@ class LegacyLocationService(LocationService):
             logger.debug("Legacy DtSimulateLocation service initialised")
         return self._service
 
+    async def _maybe_await(self, result) -> None:
+        """Support both sync and async DtSimulateLocation methods."""
+        if inspect.isawaitable(result):
+            await result
+
     def _reset_service(self) -> None:
         """Drop the cached DtSimulateLocation so the next call reconstructs it."""
         try:
@@ -208,7 +214,7 @@ class LegacyLocationService(LocationService):
         """Simulate the device location using the legacy service."""
         try:
             svc = self._ensure_service()
-            svc.set(lat, lng)
+            await self._maybe_await(svc.set(lat, lng))
             self._active = True
             logger.info("Legacy location set to (%.6f, %.6f)", lat, lng)
         except (OSError, EOFError, BrokenPipeError, ConnectionResetError) as exc:
@@ -217,7 +223,7 @@ class LegacyLocationService(LocationService):
             self._reset_service()
             try:
                 svc = self._ensure_service()
-                svc.set(lat, lng)
+                await self._maybe_await(svc.set(lat, lng))
                 self._active = True
                 logger.info("Legacy location set to (%.6f, %.6f) after reconnect", lat, lng)
             except Exception as retry_exc:
@@ -234,7 +240,7 @@ class LegacyLocationService(LocationService):
             return
         try:
             svc = self._ensure_service()
-            svc.clear()
+            await self._maybe_await(svc.clear())
             self._active = False
             logger.info("Legacy simulated location cleared")
         except (OSError, EOFError, BrokenPipeError, ConnectionResetError) as exc:
@@ -243,7 +249,7 @@ class LegacyLocationService(LocationService):
             self._reset_service()
             try:
                 svc = self._ensure_service()
-                svc.clear()
+                await self._maybe_await(svc.clear())
                 self._active = False
             except Exception:
                 logger.exception("Legacy clear failed after reconnect")

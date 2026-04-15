@@ -38,8 +38,8 @@ const ERROR_I18N: Record<string, { zh: string; en: string }> = {
     en: 'Maximum 2 devices connected',
   },
   ios_unsupported: {
-    zh: '裝置 iOS 版本過舊,LocWarp 僅支援 iOS 17 以上。請升級 iOS 後再試。',
-    en: 'This device runs an unsupported iOS version. LocWarp requires iOS 17 or later. Please update and try again.',
+    zh: '裝置 iOS 版本過舊,LocWarp 僅支援 iOS 16 以上。請升級 iOS 後再試。',
+    en: 'This device runs an unsupported iOS version. LocWarp requires iOS 16 or later. Please update and try again.',
   },
 }
 

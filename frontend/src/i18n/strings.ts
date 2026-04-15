@@ -133,7 +133,7 @@ export const STRINGS = {
   'device.scan_tooltip': { zh: '掃描 USB 裝置', en: 'Scan USB devices' },
   'wifi.section_title': { zh: 'WiFi 無線連線', en: 'Wi-Fi Connection' },
   'wifi.section_hint': { zh: '(USB 模式不用連線)', en: '(USB mode: no connection needed)' },
-  'device.ios_unsupported_label': { zh: 'iOS {version} 不支援(需 iOS 17+)', en: 'iOS {version} not supported (requires iOS 17+)' },
+  'device.ios_unsupported_label': { zh: 'iOS {version} 不支援(需 iOS 16+)', en: 'iOS {version} not supported (requires iOS 16+)' },
   'wifi.warning_label': { zh: '注意事項', en: 'Notice' },
   'wifi.warning_title': { zh: '慎用:USB 拔除模式相容性說明', en: 'Caution: USB-free mode compatibility' },
   'wifi.warning_body': {

@@ -89,7 +89,7 @@ const DeviceStatus: React.FC<DeviceStatusProps> = ({
   React.useEffect(() => () => {
     if (scanResultTimer.current) clearTimeout(scanResultTimer.current);
   }, []);
-  // iOS 16-and-below WiFi state removed in v0.1.49 (LocWarp now requires iOS 17+).
+  // WiFi tunnel remains iOS 17+ only; iOS 16 devices are supported over USB.
 
   const handleDiscover = async () => {
     setDiscovering(true);
@@ -254,11 +254,11 @@ const DeviceStatus: React.FC<DeviceStatusProps> = ({
               }}
             >
               {devices.map((d) => {
-                // LocWarp v0.1.49+ requires iOS 17. Mark older devices as
-                // unsupported so users don't waste a click waiting for the
+                // iOS 16 is supported again. Keep only truly older devices
+                // disabled so users don't waste a click waiting for the
                 // backend to reject the connect.
                 const major = parseInt((d.iosVersion || '0').split('.')[0], 10) || 0;
-                const unsupported = major > 0 && major < 17;
+                const unsupported = major > 0 && major < 16;
                 return (
                 <div
                   key={d.id}

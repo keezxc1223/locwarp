@@ -1,6 +1,6 @@
 # -*- mode: python ; coding: utf-8 -*-
-# PyInstaller spec for LocWarp backend (Python 3.12).
-# Build: py -3.12 -m PyInstaller backend/locwarp-backend.spec --noconfirm
+# PyInstaller spec for LocWarp backend (Python 3.13).
+# Build: py -3.13 -m PyInstaller backend/locwarp-backend.spec --noconfirm
 
 from PyInstaller.utils.hooks import collect_all, collect_submodules
 
