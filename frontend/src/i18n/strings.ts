@@ -291,9 +291,17 @@ export const STRINGS = {
   'update.title': { zh: '有新版本可更新', en: 'Update available' },
   'update.current': { zh: '目前版本', en: 'Current version' },
   'update.latest': { zh: '最新版本', en: 'Latest version' },
+  'update.install_now': { zh: '立即更新', en: 'Install now' },
+  'update.goto_github': { zh: '前往 GitHub', en: 'Open GitHub' },
+  'update.skip': { zh: '暫不更新', en: 'Skip' },
+  'update.downloading': { zh: '下載中', en: 'Downloading' },
+  'update.downloaded_hint': { zh: '下載完成,按「重啟安裝」後 LocWarp 將關閉並執行安裝程式。', en: 'Download complete. Click "Restart & install" to close LocWarp and run the installer.' },
+  'update.restart_install': { zh: '重啟安裝', en: 'Restart & install' },
+  'update.retry': { zh: '重試', en: 'Retry' },
+  // legacy keys kept for any cached strings still in play
   'update.go_to_github': { zh: '請前往 GitHub 下載更新。', en: 'Please visit GitHub to download the update.' },
   'update.download': { zh: '前往下載', en: 'Download' },
-  'update.later': { zh: '稍後提醒', en: 'Later' },
+  'update.later': { zh: '暫不更新', en: 'Skip' },
   'bm.edit': { zh: '編輯', en: 'Edit' },
   'bm.move_to': { zh: '移動到:', en: 'Move to:' },
 

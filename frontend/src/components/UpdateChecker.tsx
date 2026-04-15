@@ -7,9 +7,6 @@ const CURRENT = (pkg as { version: string }).version;
 const REPO = 'keezxc1223/locwarp';
 const RELEASES_URL = `https://github.com/${REPO}/releases`;
 const API_URL = `https://api.github.com/repos/${REPO}/releases/latest`;
-// Don't nag more than once per 6 h per unique newer version.
-const COOLDOWN_MS = 6 * 60 * 60 * 1000;
-const DISMISS_KEY = 'locwarp.update_check.dismissed';
 
 function parseVer(s: string): number[] {
   return s.replace(/^v/i, '').split('.').map((p) => parseInt(p, 10) || 0);
@@ -28,54 +25,59 @@ function isNewer(a: string, b: string): boolean {
   return false;
 }
 
+type Phase = 'idle' | 'downloading' | 'downloaded' | 'error';
+
+interface UpdaterEvent {
+  type: 'checking' | 'available' | 'not-available' | 'progress' | 'downloaded' | 'error';
+  version?: string;
+  percent?: number;
+  bytesPerSecond?: number;
+  message?: string;
+}
+
+interface UpdaterBridge {
+  check: () => Promise<{ ok: boolean; version?: string | null; reason?: string }>;
+  download: () => Promise<{ ok: boolean; reason?: string }>;
+  quitAndInstall: () => Promise<{ ok: boolean }>;
+  onEvent: (cb: (e: UpdaterEvent) => void) => () => void;
+}
+
+function getUpdater(): UpdaterBridge | null {
+  try {
+    return (window as any).locwarpUpdater ?? null;
+  } catch {
+    return null;
+  }
+}
+
 /**
- * Checks GitHub on mount for a newer release; shows a dismissible dialog
- * when one is found. Silent when already on the latest version or when
- * the network / API is unreachable. User-dismissed versions are cached
- * in localStorage for 6 hours to avoid nagging.
+ * Shows a dismissible update dialog when the GitHub API reports a newer
+ * release. The user picks one of:
+ *   - Install now: renderer asks the main process to download via
+ *     electron-updater and then quit-and-install on completion
+ *   - Open GitHub: external browser to the releases page (for users who
+ *     prefer the manual route / want to read the changelog first)
+ *   - Skip: closes the dialog; it will reappear on the next launch if a
+ *     newer version is still available (no 6h cooldown).
  */
 const UpdateChecker: React.FC = () => {
   const t = useT();
   const [latest, setLatest] = useState<string | null>(null);
+  const [phase, setPhase] = useState<Phase>('idle');
+  const [percent, setPercent] = useState(0);
+  const [errMsg, setErrMsg] = useState<string | null>(null);
 
+  // Fetch GitHub API on mount for quick "is there a new version?" signal.
   useEffect(() => {
     let cancelled = false;
     (async () => {
       try {
-        // Previously dismissed the same version recently?
-        try {
-          const raw = localStorage.getItem(DISMISS_KEY);
-          if (raw) {
-            const { version, at } = JSON.parse(raw);
-            if (typeof version === 'string' && typeof at === 'number' &&
-                Date.now() - at < COOLDOWN_MS) {
-              // Only suppress if the dismissed version is still the latest
-              // we know of; if a *newer* version than that appears, show again.
-              // We don't know yet — fetch and compare below.
-              var dismissedVersion: string | null = version;
-              var dismissedAt: number = at;
-            }
-          }
-        } catch { /* ignore malformed cache */ }
-
-        const r = await fetch(API_URL, {
-          headers: { Accept: 'application/vnd.github+json' },
-        });
+        const r = await fetch(API_URL, { headers: { Accept: 'application/vnd.github+json' } });
         if (!r.ok) return;
         const data = await r.json();
         const tag: string | undefined = data?.tag_name;
         if (!tag || cancelled) return;
         if (!isNewer(tag, CURRENT)) return;
-
-        // If user already dismissed THIS version within cooldown, stay quiet.
-        // (But a brand-new tag beyond the dismissed one will show.)
-        // @ts-ignore — defined conditionally above
-        if (typeof dismissedVersion !== 'undefined' && dismissedVersion !== null) {
-          // @ts-ignore
-          if (parseVer(tag).join('.') === parseVer(dismissedVersion).join('.')) {
-            return;
-          }
-        }
         setLatest(tag);
       } catch {
         // Offline / rate-limited / DNS — silent.
@@ -84,21 +86,81 @@ const UpdateChecker: React.FC = () => {
     return () => { cancelled = true; };
   }, []);
 
+  // Subscribe to electron-updater progress / error / downloaded events.
+  useEffect(() => {
+    const updater = getUpdater();
+    if (!updater) return;
+    const off = updater.onEvent((e) => {
+      if (e.type === 'progress') {
+        setPhase('downloading');
+        setPercent(Math.max(0, Math.min(100, Math.round(e.percent ?? 0))));
+      } else if (e.type === 'downloaded') {
+        setPhase('downloaded');
+        setPercent(100);
+      } else if (e.type === 'error') {
+        setPhase('error');
+        setErrMsg(e.message ?? 'update error');
+      }
+    });
+    return off;
+  }, []);
+
   if (!latest) return null;
 
-  const dismiss = () => {
+  const dismiss = () => setLatest(null);
+
+  const openGithub = () => {
     try {
-      localStorage.setItem(DISMISS_KEY, JSON.stringify({
-        version: latest, at: Date.now(),
-      }));
-    } catch { /* storage disabled */ }
-    setLatest(null);
+      const anyWin: any = window;
+      if (anyWin.locwarp?.openExternal) {
+        anyWin.locwarp.openExternal(RELEASES_URL);
+      } else {
+        window.open(RELEASES_URL, '_blank');
+      }
+    } catch {
+      window.open(RELEASES_URL, '_blank');
+    }
   };
+
+  const startUpdate = async () => {
+    const updater = getUpdater();
+    if (!updater) {
+      // Dev build or old packaged build without the bridge — fall back to
+      // opening the releases page so the user can still grab the installer.
+      openGithub();
+      return;
+    }
+    setPhase('downloading');
+    setPercent(0);
+    setErrMsg(null);
+    const res = await updater.download();
+    if (!res.ok) {
+      setPhase('error');
+      setErrMsg(res.reason ?? 'download failed');
+    }
+  };
+
+  const restartAndInstall = async () => {
+    const updater = getUpdater();
+    if (!updater) return;
+    await updater.quitAndInstall();
+  };
+
+  const primaryLabel =
+    phase === 'downloading' ? t('update.downloading') :
+    phase === 'downloaded' ? t('update.restart_install') :
+    phase === 'error' ? t('update.retry') :
+    t('update.install_now');
+
+  const primaryAction =
+    phase === 'downloaded' ? restartAndInstall : startUpdate;
+
+  const primaryDisabled = phase === 'downloading';
 
   return createPortal(
     <div
       className="anim-fade-in"
-      onClick={dismiss}
+      onClick={phase === 'downloading' ? undefined : dismiss}
       style={{
         position: 'fixed', top: 0, left: 0, right: 0, bottom: 0,
         background: 'rgba(8, 10, 20, 0.55)',
@@ -114,7 +176,7 @@ const UpdateChecker: React.FC = () => {
           background: 'rgba(26, 29, 39, 0.96)',
           backdropFilter: 'blur(14px)', WebkitBackdropFilter: 'blur(14px)',
           border: '1px solid rgba(108, 140, 255, 0.25)',
-          borderRadius: 12, padding: 22, width: 360, color: '#e0e0e0',
+          borderRadius: 12, padding: 22, width: 380, color: '#e0e0e0',
           boxShadow: '0 20px 60px rgba(12, 18, 40, 0.65), 0 0 0 1px rgba(255,255,255,0.05) inset',
         }}
       >
@@ -144,58 +206,53 @@ const UpdateChecker: React.FC = () => {
           </div>
           <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
             <span style={{ opacity: 0.65 }}>{t('update.latest')}</span>
-            <a
-              href={RELEASES_URL}
-              target="_blank"
-              rel="noreferrer"
-              style={{
-                fontFamily: 'monospace', color: '#6c8cff',
-                textDecoration: 'none', fontWeight: 600,
-              }}
-              onClick={(e) => {
-                // Electron webview: intercept and open externally if possible.
-                try {
-                  const anyWin: any = window;
-                  if (anyWin.locwarp?.openExternal) {
-                    e.preventDefault();
-                    anyWin.locwarp.openExternal(RELEASES_URL);
-                  }
-                } catch { /* default browser nav */ }
-              }}
-            >
-              {latest} ↗
-            </a>
+            <span style={{ fontFamily: 'monospace', color: '#6c8cff', fontWeight: 600 }}>
+              {latest}
+            </span>
           </div>
         </div>
 
-        <div style={{ fontSize: 12, opacity: 0.75, marginBottom: 16, lineHeight: 1.6 }}>
-          {t('update.go_to_github')}
-        </div>
+        {phase === 'downloading' && (
+          <div style={{ marginBottom: 14 }}>
+            <div style={{ fontSize: 11, opacity: 0.7, marginBottom: 6 }}>
+              {t('update.downloading')} · {percent}%
+            </div>
+            <div style={{ height: 4, borderRadius: 2, background: 'rgba(255,255,255,0.08)', overflow: 'hidden' }}>
+              <div style={{
+                height: '100%', width: `${percent}%`,
+                background: 'linear-gradient(90deg, #6c8cff, #4285f4)',
+                transition: 'width 0.2s ease',
+              }} />
+            </div>
+          </div>
+        )}
+
+        {phase === 'downloaded' && (
+          <div style={{ fontSize: 12, opacity: 0.8, marginBottom: 14, color: '#5dd4a0' }}>
+            {t('update.downloaded_hint')}
+          </div>
+        )}
+
+        {phase === 'error' && errMsg && (
+          <div style={{ fontSize: 11, opacity: 0.85, marginBottom: 14, color: '#ff8a80', wordBreak: 'break-word' }}>
+            {errMsg}
+          </div>
+        )}
 
         <div style={{ display: 'flex', gap: 8 }}>
-          <a
-            href={RELEASES_URL}
-            target="_blank"
-            rel="noreferrer"
+          <button
             className="action-btn primary"
-            style={{
-              flex: 1, textAlign: 'center', textDecoration: 'none',
-              display: 'inline-flex', alignItems: 'center', justifyContent: 'center', gap: 6,
-            }}
-            onClick={(e) => {
-              try {
-                const anyWin: any = window;
-                if (anyWin.locwarp?.openExternal) {
-                  e.preventDefault();
-                  anyWin.locwarp.openExternal(RELEASES_URL);
-                }
-              } catch { /* default */ }
-            }}
+            onClick={primaryAction}
+            disabled={primaryDisabled}
+            style={{ flex: 1 }}
           >
-            {t('update.download')}
-          </a>
-          <button className="action-btn" onClick={dismiss}>
-            {t('update.later')}
+            {primaryLabel}
+          </button>
+          <button className="action-btn" onClick={openGithub} disabled={phase === 'downloading'}>
+            {t('update.goto_github')}
+          </button>
+          <button className="action-btn" onClick={dismiss} disabled={phase === 'downloading'}>
+            {t('update.skip')}
           </button>
         </div>
       </div>

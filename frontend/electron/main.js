@@ -1,7 +1,8 @@
-const { app, BrowserWindow, Menu, shell } = require('electron')
+const { app, BrowserWindow, Menu, shell, ipcMain } = require('electron')
 const path = require('path')
 const { spawn } = require('child_process')
 const http = require('http')
+const { autoUpdater } = require('electron-updater')
 
 // Strip the default "File Edit View Window Help" menubar — LocWarp has its
 // own in-window controls and the native menu only adds noise on Windows.
@@ -103,6 +104,7 @@ async function createWindow() {
     webPreferences: {
       nodeIntegration: false,
       contextIsolation: true,
+      preload: path.join(__dirname, 'preload.js'),
     },
   })
   // Show the window once the first frame is painted. Combined with
@@ -130,6 +132,52 @@ async function createWindow() {
     mainWindow.loadFile(path.join(__dirname, '../dist/index.html'))
   }
 }
+
+// ── Auto-updater ──────────────────────────────────────────────
+// Renderer drives the flow: it calls check, optionally download, then
+// quit-and-install. All lifecycle events are forwarded as 'updater:event'
+// so the UI can show progress without polling.
+autoUpdater.autoDownload = false
+autoUpdater.autoInstallOnAppQuit = false
+
+function forwardUpdaterEvent(type, data) {
+  if (!mainWindow || mainWindow.isDestroyed()) return
+  try { mainWindow.webContents.send('updater:event', { type, ...data }) } catch {}
+}
+
+autoUpdater.on('checking-for-update', () => forwardUpdaterEvent('checking'))
+autoUpdater.on('update-available', (info) => forwardUpdaterEvent('available', { version: info.version }))
+autoUpdater.on('update-not-available', () => forwardUpdaterEvent('not-available'))
+autoUpdater.on('download-progress', (p) => forwardUpdaterEvent('progress', {
+  percent: p.percent, transferred: p.transferred, total: p.total, bytesPerSecond: p.bytesPerSecond,
+}))
+autoUpdater.on('update-downloaded', (info) => forwardUpdaterEvent('downloaded', { version: info.version }))
+autoUpdater.on('error', (err) => forwardUpdaterEvent('error', { message: String(err?.message || err) }))
+
+ipcMain.handle('updater:check', async () => {
+  if (!app.isPackaged) return { ok: false, reason: 'dev-build' }
+  try {
+    const result = await autoUpdater.checkForUpdates()
+    return { ok: true, version: result?.updateInfo?.version ?? null }
+  } catch (e) {
+    return { ok: false, reason: String(e?.message || e) }
+  }
+})
+ipcMain.handle('updater:download', async () => {
+  try {
+    await autoUpdater.downloadUpdate()
+    return { ok: true }
+  } catch (e) {
+    return { ok: false, reason: String(e?.message || e) }
+  }
+})
+ipcMain.handle('updater:install', () => {
+  // Closes the app and runs the NSIS installer. Silent=false so the user
+  // sees the install UI (requireAdministrator triggers UAC). isForceRunAfter
+  // true so LocWarp relaunches once the install completes.
+  setImmediate(() => autoUpdater.quitAndInstall(false, true))
+  return { ok: true }
+})
 
 app.whenReady().then(createWindow)
 app.on('window-all-closed', () => {
