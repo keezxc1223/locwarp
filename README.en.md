@@ -27,7 +27,9 @@
 > | iOS Version | Source | Status |
 > | --- | --- | --- |
 > | **26.4.1** | Developer-tested | ![Verified](https://img.shields.io/badge/Verified-4caf50?style=flat-square) |
+> | **26.4.1** (iPadOS) | Community-reported | ![Reported](https://img.shields.io/badge/Reported-6c8cff?style=flat-square) |
 > | **26.4** | Community-reported | ![Reported](https://img.shields.io/badge/Reported-6c8cff?style=flat-square) |
+> | **26.2** | Community-reported | ![Reported](https://img.shields.io/badge/Reported-6c8cff?style=flat-square) |
 > | **26.2.1** (iPadOS, M1 iPad) | Community-reported | ![Reported](https://img.shields.io/badge/Reported-6c8cff?style=flat-square) |
 > | **18.7.7** | Community-reported | ![Reported](https://img.shields.io/badge/Reported-6c8cff?style=flat-square) |
 > | **18.5** (iPadOS) | Community-reported | ![Reported](https://img.shields.io/badge/Reported-6c8cff?style=flat-square) |
