@@ -196,18 +196,35 @@ const App: React.FC = () => {
     // click is a no-op (teleport / navigate live on right-click menu).
     if (!clickToAddWaypoint) return
     if (sim.mode !== SimMode.Loop && sim.mode !== SimMode.MultiStop) return
+    const nlat = clampLat(lat)
+    const nlng = normalizeLng(lng)
     sim.setWaypoints((prev: any[]) => {
       if (prev.length === 0 && sim.currentPosition) {
         return [
           { lat: sim.currentPosition.lat, lng: sim.currentPosition.lng },
-          { lat, lng },
+          { lat: nlat, lng: nlng },
         ]
       }
-      return [...prev, { lat, lng }]
+      return [...prev, { lat: nlat, lng: nlng }]
     })
   }, [clickToAddWaypoint, sim])
 
-  const handleTeleport = useCallback(async (lat: number, lng: number) => {
+  // Leaflet wraps the world horizontally at very low zoom levels; clicking on
+  // a "second copy" of a country yields lng outside [-180, 180]. Backend's
+  // pydantic TeleportRequest bounds lng to [-180, 180] so the raw click
+  // would 422. Normalize at the handler entry so every downstream call sees
+  // a single canonical coordinate.
+  const normalizeLng = (lng: number): number => {
+    const n = ((lng + 180) % 360 + 360) % 360 - 180
+    // ((180 + 180) % 360 + 360) % 360 - 180 == -180, but 180 is also valid.
+    // Keep +180 if the input was exactly +180.
+    return lng === 180 ? 180 : n
+  }
+  const clampLat = (lat: number): number => Math.max(-90, Math.min(90, lat))
+
+  const handleTeleport = useCallback(async (latIn: number, lngIn: number) => {
+    const lat = clampLat(latIn)
+    const lng = normalizeLng(lngIn)
     const udids = device.connectedDevices.map((d) => d.udid)
     if (udids.length >= 2) {
       // Pre-set the map's tracked position so pan-to-current fires immediately,
@@ -220,7 +237,9 @@ const App: React.FC = () => {
     }
   }, [sim, device, t, showToast])
 
-  const handleNavigate = useCallback(async (lat: number, lng: number) => {
+  const handleNavigate = useCallback(async (latIn: number, lngIn: number) => {
+    const lat = clampLat(latIn)
+    const lng = normalizeLng(lngIn)
     const udids = device.connectedDevices.map((d) => d.udid)
     if (udids.length >= 2) {
       const outcome = await sim.navigateAll(udids, lat, lng)
@@ -258,14 +277,16 @@ const App: React.FC = () => {
     // point on the first add. This keeps backend route and UI list aligned
     // so waypoint-progress highlighting indexes correctly, and removes the
     // "start button injects current pos every click" footgun.
+    const nlat = clampLat(lat)
+    const nlng = normalizeLng(lng)
     sim.setWaypoints((prev: any[]) => {
       if (prev.length === 0 && sim.currentPosition) {
         return [
           { lat: sim.currentPosition.lat, lng: sim.currentPosition.lng },
-          { lat, lng },
+          { lat: nlat, lng: nlng },
         ]
       }
-      return [...prev, { lat, lng }]
+      return [...prev, { lat: nlat, lng: nlng }]
     })
   }, [sim])
 
