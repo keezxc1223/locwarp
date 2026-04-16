@@ -54,7 +54,7 @@
       <span class="idx-num">01 /</span>
       <span class="idx-body">
         <span class="idx-title">怎麼安裝 LocWarp?</span>
-        <span class="idx-sub">3 steps · 前置安裝</span>
+        <span class="idx-sub">4 steps · 下載 + 前置</span>
       </span>
       <svg class="idx-arrow" width="22" height="14" viewBox="0 0 22 14" fill="none" stroke="currentColor" stroke-width="1.5" aria-hidden="true">
         <path d="M1 7h19M14 1l6 6-6 6"/>
@@ -80,7 +80,7 @@
       </div>
       <div class="chapter-body">
         <h2>怎麼安裝 LocWarp?</h2>
-        <p class="lede">Windows 版需要三個前置步驟,缺一項都會抓不到裝置。先安裝 iTunes 取得驅動、USB 信任配對、最後啟用開發者模式。</p>
+        <p class="lede">先從 GitHub Releases 下載 LocWarp 安裝檔,接著做三個前置(iTunes 驅動、USB 信任、開發者模式),缺一項都會抓不到裝置。</p>
       </div>
     </header>
 
@@ -89,7 +89,50 @@
       <!-- Step 1 -->
       <article id="install-1" class="step reveal">
         <header class="step-aside">
-          <div class="step-num">Step <b>01</b> of 03</div>
+          <div class="step-num">Step <b>01</b> of 04</div>
+          <h3 class="step-heading">下載並安裝 LocWarp</h3>
+          <div class="step-kicker">GitHub Releases · NSIS 安裝檔</div>
+        </header>
+        <div class="step-body">
+          <p>到 GitHub 專案的 Releases 頁抓最新版的 Windows 安裝檔,檔名類似 <code>LocWarp Setup 0.2.XX.exe</code>。</p>
+
+          <div class="btn-row">
+            <a class="btn btn-primary" href="https://github.com/keezxc1223/locwarp/releases/latest">
+              <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" aria-hidden="true">
+                <path d="M21 15v4a2 2 0 01-2 2H5a2 2 0 01-2-2v-4"/><polyline points="7 10 12 15 17 10"/><line x1="12" y1="15" x2="12" y2="3"/>
+              </svg>
+              前往 GitHub Releases
+            </a>
+            <a class="btn" href="https://github.com/keezxc1223/locwarp">
+              <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" aria-hidden="true">
+                <path d="M9 19c-5 1.5-5-2.5-7-3m14 6v-3.87a3.37 3.37 0 0 0-.94-2.61c3.14-.35 6.44-1.54 6.44-7A5.44 5.44 0 0 0 20 4.77 5.07 5.07 0 0 0 19.91 1S18.73.65 16 2.48a13.38 13.38 0 0 0-7 0C6.27.65 5.09 1 5.09 1A5.07 5.07 0 0 0 5 4.77a5.44 5.44 0 0 0-1.5 3.78c0 5.42 3.3 6.61 6.44 7A3.37 3.37 0 0 0 9 18.13V22"/>
+              </svg>
+              專案首頁
+            </a>
+          </div>
+
+          <div class="note note--warn">
+            <div class="note-label">Note <b>· Windows SmartScreen</b></div>
+            <div class="note-body">
+              <span class="note-title">出現「Windows 已保護您的電腦」?</span>
+              因為 LocWarp 未做 code-signing,第一次執行會被 SmartScreen 擋。點<strong>其他資訊</strong> &rsaquo; <strong>仍要執行</strong>即可繼續安裝。
+            </div>
+          </div>
+
+          <div class="note">
+            <div class="note-label">Note <b>· 需系統管理員</b></div>
+            <div class="note-body">
+              <span class="note-title">安裝 + 執行都需要 Admin 權限</span>
+              LocWarp 的 WiFi Tunnel 功能需要建立 TUN 網路介面,因此安裝時會要求系統管理員,執行時也會跳 UAC。
+            </div>
+          </div>
+        </div>
+      </article>
+
+      <!-- Step 2 -->
+      <article id="install-2" class="step reveal">
+        <header class="step-aside">
+          <div class="step-num">Step <b>02</b> of 04</div>
           <h3 class="step-heading">安裝 iTunes for Windows</h3>
           <div class="step-kicker">取得 Apple USB driver</div>
         </header>
@@ -115,10 +158,10 @@
         </div>
       </article>
 
-      <!-- Step 2 -->
-      <article id="install-2" class="step reveal">
+      <!-- Step 3 -->
+      <article id="install-3" class="step reveal">
         <header class="step-aside">
-          <div class="step-num">Step <b>02</b> of 03</div>
+          <div class="step-num">Step <b>03</b> of 04</div>
           <h3 class="step-heading">USB 連接並信任電腦</h3>
           <div class="step-kicker">建立 pair record</div>
         </header>
@@ -143,12 +186,12 @@
         </div>
       </article>
 
-      <!-- Step 3 -->
-      <article id="install-3" class="step reveal">
+      <!-- Step 4 -->
+      <article id="install-4" class="step reveal">
         <header class="step-aside">
-          <div class="step-num">Step <b>03</b> of 03</div>
+          <div class="step-num">Step <b>04</b> of 04</div>
           <h3 class="step-heading">開啟開發者模式</h3>
-          <div class="step-kicker">iOS 17+ · 解鎖 DVT 協議</div>
+          <div class="step-kicker">iOS 16+ · 解鎖 DVT 協議</div>
         </header>
         <div class="step-body">
           <p>iPhone 上前往:</p>
@@ -307,8 +350,24 @@
           <div class="note note--ok">
             <div class="note-label">End <b>· 大功告成</b></div>
             <div class="note-body">
-              回到 LocWarp 重新連線,首次連線時系統會自動下載並掛載 Developer Disk Image (約 20 MB),之後即可開始使用模擬定位功能。
+              <span class="note-title">回到 LocWarp</span>
+              首次連線時系統會自動下載並掛載 Developer Disk Image (約 20 MB),之後即可開始使用模擬定位功能。還沒下載 LocWarp 的請到下方 GitHub Releases 抓最新版。
             </div>
+          </div>
+
+          <div class="btn-row">
+            <a class="btn btn-primary" href="https://github.com/keezxc1223/locwarp/releases/latest">
+              <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" aria-hidden="true">
+                <path d="M21 15v4a2 2 0 01-2 2H5a2 2 0 01-2-2v-4"/><polyline points="7 10 12 15 17 10"/><line x1="12" y1="15" x2="12" y2="3"/>
+              </svg>
+              下載 LocWarp
+            </a>
+            <a class="btn" href="https://github.com/keezxc1223/locwarp">
+              <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" aria-hidden="true">
+                <path d="M9 19c-5 1.5-5-2.5-7-3m14 6v-3.87a3.37 3.37 0 0 0-.94-2.61c3.14-.35 6.44-1.54 6.44-7A5.44 5.44 0 0 0 20 4.77 5.07 5.07 0 0 0 19.91 1S18.73.65 16 2.48a13.38 13.38 0 0 0-7 0C6.27.65 5.09 1 5.09 1A5.07 5.07 0 0 0 5 4.77a5.44 5.44 0 0 0-1.5 3.78c0 5.42 3.3 6.61 6.44 7A3.37 3.37 0 0 0 9 18.13V22"/>
+              </svg>
+              專案首頁
+            </a>
           </div>
         </div>
       </article>
