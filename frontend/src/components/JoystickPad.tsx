@@ -11,6 +11,7 @@ interface JoystickPadProps {
 const PAD_RADIUS = 70;
 const HANDLE_RADIUS = 22;
 const MAX_DISTANCE = PAD_RADIUS - HANDLE_RADIUS;
+const SMOOTH_TAU_MS = 40;
 
 const JoystickPad: React.FC<JoystickPadProps> = ({
   direction,
@@ -21,7 +22,47 @@ const JoystickPad: React.FC<JoystickPadProps> = ({
   const t = useT();
   const padRef = useRef<HTMLDivElement>(null);
   const [dragging, setDragging] = useState(false);
-  const [handlePos, setHandlePos] = useState({ x: 0, y: 0 });
+  const [visualPos, setVisualPos] = useState({ x: 0, y: 0 });
+  const targetPosRef = useRef({ x: 0, y: 0 });
+  const visualPosRef = useRef({ x: 0, y: 0 });
+  const rafRef = useRef<number | null>(null);
+  const lastFrameRef = useRef(0);
+
+  const tick = useCallback((now: number) => {
+    const dt = lastFrameRef.current ? now - lastFrameRef.current : 16;
+    lastFrameRef.current = now;
+    const target = targetPosRef.current;
+    const current = visualPosRef.current;
+    const dx = target.x - current.x;
+    const dy = target.y - current.y;
+    const dist = Math.hypot(dx, dy);
+    if (dist < 0.3) {
+      visualPosRef.current = { x: target.x, y: target.y };
+      setVisualPos({ x: target.x, y: target.y });
+      rafRef.current = null;
+      lastFrameRef.current = 0;
+      return;
+    }
+    const alpha = 1 - Math.exp(-dt / SMOOTH_TAU_MS);
+    const next = { x: current.x + dx * alpha, y: current.y + dy * alpha };
+    visualPosRef.current = next;
+    setVisualPos(next);
+    rafRef.current = requestAnimationFrame(tick);
+  }, []);
+
+  const setTarget = useCallback((x: number, y: number) => {
+    targetPosRef.current = { x, y };
+    if (rafRef.current == null) {
+      lastFrameRef.current = 0;
+      rafRef.current = requestAnimationFrame(tick);
+    }
+  }, [tick]);
+
+  useEffect(() => {
+    return () => {
+      if (rafRef.current != null) cancelAnimationFrame(rafRef.current);
+    };
+  }, []);
 
   const getDirectionLabel = (deg: number): string => {
     // deg is compass degrees: 0=N, 90=E, 180=S, 270=W
@@ -61,16 +102,19 @@ const JoystickPad: React.FC<JoystickPadProps> = ({
       const visualX = dx * scale;
       const visualY = -(dy * scale); // Back to screen coords
 
-      setHandlePos({ x: visualX, y: visualY });
+      setTarget(visualX, visualY);
       onMove(Math.round(compassDeg), normIntensity);
     },
-    [onMove]
+    [onMove, setTarget]
   );
 
   const handlePointerDown = useCallback(
     (e: React.PointerEvent) => {
       setDragging(true);
-      (e.target as HTMLElement).setPointerCapture(e.pointerId);
+      // Capture on currentTarget (the pad div with the handlers), not e.target
+      // which can resolve to an inner child and break capture semantics,
+      // causing the pointer to escape when dragged outside the pad.
+      (e.currentTarget as HTMLElement).setPointerCapture(e.pointerId);
       calcFromEvent(e.clientX, e.clientY);
     },
     [calcFromEvent]
@@ -86,9 +130,9 @@ const JoystickPad: React.FC<JoystickPadProps> = ({
 
   const handlePointerUp = useCallback(() => {
     setDragging(false);
-    setHandlePos({ x: 0, y: 0 });
+    setTarget(0, 0);
     onRelease();
-  }, [onRelease]);
+  }, [onRelease, setTarget]);
 
   // ── WASD / arrow keyboard control ───────────────────
   useEffect(() => {
@@ -125,19 +169,17 @@ const JoystickPad: React.FC<JoystickPadProps> = ({
       const r = compute();
       if (!r) {
         setDragging(false);
-        setHandlePos({ x: 0, y: 0 });
+        setTarget(0, 0);
         onRelease();
         return;
       }
-      const intensity = 1;
       setDragging(true);
-      onMove(r.deg, intensity);
-      // Move handle visually to reflect keyboard input
+      onMove(r.deg, 1);
       const len = Math.sqrt(r.dx * r.dx + r.dy * r.dy);
-      setHandlePos({
-        x: (r.dx / len) * MAX_DISTANCE,
-        y: -(r.dy / len) * MAX_DISTANCE,
-      });
+      setTarget(
+        (r.dx / len) * MAX_DISTANCE,
+        -(r.dy / len) * MAX_DISTANCE,
+      );
     };
 
     const onKeyDown = (e: KeyboardEvent) => {
@@ -163,7 +205,7 @@ const JoystickPad: React.FC<JoystickPadProps> = ({
       if (pressed.size > 0) {
         pressed.clear();
         setDragging(false);
-        setHandlePos({ x: 0, y: 0 });
+        setTarget(0, 0);
         onRelease();
       }
     };
@@ -176,7 +218,7 @@ const JoystickPad: React.FC<JoystickPadProps> = ({
       window.removeEventListener('keyup', onKeyUp);
       window.removeEventListener('blur', onBlur);
     };
-  }, [onMove, onRelease]);
+  }, [onMove, onRelease, setTarget]);
 
   // Direction arrows around the pad
   const arrows = [
@@ -273,11 +315,11 @@ const JoystickPad: React.FC<JoystickPadProps> = ({
                 : 'radial-gradient(circle, #888 0%, #555 100%)',
               border: '2px solid rgba(255,255,255,0.3)',
               position: 'absolute',
-              left: PAD_RADIUS - HANDLE_RADIUS + handlePos.x,
-              top: PAD_RADIUS - HANDLE_RADIUS + handlePos.y,
-              transition: dragging ? 'none' : 'left 0.2s ease-out, top 0.2s ease-out',
+              left: PAD_RADIUS - HANDLE_RADIUS + visualPos.x,
+              top: PAD_RADIUS - HANDLE_RADIUS + visualPos.y,
               pointerEvents: 'none',
               boxShadow: dragging ? '0 0 12px rgba(74,108,247,0.5)' : '0 2px 6px rgba(0,0,0,0.3)',
+              willChange: 'left, top',
             }}
           />
         </div>
