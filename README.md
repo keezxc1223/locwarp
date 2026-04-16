@@ -7,6 +7,14 @@
   <a href="README.en.md"><img alt="English" src="https://img.shields.io/badge/English-gray?style=flat-square"></a>
 </p>
 
+<p align="center">
+  <a href="https://ko-fi.com/haoooooo" target="_blank">
+    <img src="https://img.shields.io/badge/%E8%AB%8B%E6%88%91%E5%96%9D%E6%9D%AF%E5%92%96%E5%95%A1-Ko--fi-FF5E5B?style=for-the-badge&logo=ko-fi&logoColor=white&labelColor=F59E0B" alt="請我喝杯咖啡">
+  </a>
+</p>
+
+> 如果 LocWarp 有幫到你, 歡迎[請我喝杯咖啡](https://ko-fi.com/haoooooo)支持持續更新 ☕
+
 > ### 專案性質聲明
 >
 > LocWarp 為個人獨立維護之開源專案(hobby project),非商業產品,亦無專職團隊。開發者將盡力於合理時間內新增功能、回應 Issue、修復 Bug 並隨 iOS / pymobiledevice3 版本演進持續更新,然:
