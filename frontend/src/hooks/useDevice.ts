@@ -242,12 +242,32 @@ export function useDevice(subscribe?: WsSubscribe) {
   }, [])
 
   // Group-mode derived state: every device in `devices` marked is_connected.
-  // `primaryDevice` is the first one (ordering = connection order preserved
-  // because scan() preserves backend list order). Existing single-device
-  // call sites can keep reading `connectedDevice`; new call sites should
-  // prefer `connectedDevices` / `primaryDevice`.
+  // `primaryDevice` sticks to whichever device we picked first; we only
+  // promote a new one when the current sticky primary is no longer in the
+  // connected slice. Without stickiness, listDevices()'s order on a
+  // mid-session reconnect can swap primary back to the just-rejoined
+  // device, which then receives the auto-sync replay (a fresh sim from
+  // its current position) and the frontend lets that REPLAY's events
+  // through the udid filter, overwriting the surviving device's polyline
+  // and "瞬移回起點 / 慢慢走回起點" on screen. Sticky primary keeps the
+  // surviving device in charge so the rejoining one's replay stays
+  // filtered out and invisible until the user explicitly chooses to
+  // switch.
   const connectedDevices: DeviceInfo[] = devices.filter((d) => d.is_connected)
-  const primaryDevice: DeviceInfo | null = connectedDevices[0] ?? connectedDevice ?? null
+  const [stickyPrimaryUdid, setStickyPrimaryUdid] = useState<string | null>(null)
+  useEffect(() => {
+    if (connectedDevices.length === 0) {
+      if (stickyPrimaryUdid !== null) setStickyPrimaryUdid(null)
+      return
+    }
+    if (stickyPrimaryUdid && connectedDevices.some((d) => d.udid === stickyPrimaryUdid)) {
+      return
+    }
+    setStickyPrimaryUdid(connectedDevices[0].udid)
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [devices])
+  const primaryDevice: DeviceInfo | null =
+    devices.find((d) => d.udid === stickyPrimaryUdid && d.is_connected) ?? null
 
   return {
     devices, connectedDevice, scanning, scan, connect, disconnect,
