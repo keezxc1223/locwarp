@@ -155,8 +155,8 @@ The world is bucketed into 1° x 1° grid cells with a per-region OSRM-coverage 
 
 ### Developer Disk Image
 
-- iOS 17+ first-time connect auto-mounts the **Personalized DDI** (downloaded from GitHub, ~20 MB); already-mounted is a no-op
-- Mount progress shown in the UI; failures surface the real error message instead of being swallowed into the log
+- iOS 17+ requires the **Personalized DDI** to be mounted on the iPhone for DVT (instruments → dtservicehub) to work
+- Since v0.2.58 LocWarp **no longer auto-downloads or auto-mounts the DDI** (iOS 26.4.1's RSD tunnel kept getting reset during the 20 MB upload, leaving the device in an InvalidService loop). LocWarp now only checks whether the DDI is already mounted; if not, it shows a hint asking the user to mount it once via Xcode / 愛思助手 / 3uTools / pymobiledevice3 CLI and reconnect
 
 ### Map & Utilities
 
@@ -188,7 +188,7 @@ The world is bucketed into 1° x 1° grid cells with a per-region OSRM-coverage 
 ### UX
 
 - Auto-retry on startup races (up to ~20 s window), no manual relaunch required
-- Real-time WebSocket push for position, progress, ETA, remaining distance, device connection state, DDI mount progress
+- Real-time WebSocket push for position, progress, ETA, remaining distance, device connection state
 - Auto-reconnect on disconnect + banner auto-dismiss
 - **Update check**: at startup, compares against the latest GitHub Release and shows a dialog if a newer version exists (prompt only, never auto-downloads)
 - **Open Log Folder** button (status bar): opens `~/.locwarp/logs/` so you can attach `backend.log` to bug reports
@@ -404,8 +404,7 @@ The installer is self-contained, end users need no Python or Node installed.
 | Symptom | Likely cause / fix |
 | --- | --- |
 | Backend unreachable after tunnel started | Make sure LocWarp was launched as Administrator |
-| `No such service: com.apple.instruments.dtservicehub` (iOS 17+/26) | LocWarp auto-mounts the Developer Disk Image. If it still fails: (1) Settings → Privacy & Security → **Developer Mode** off, reboot, turn it back on; (2) make sure github.com is reachable (DDI is downloaded from there, ~20 MB); (3) unplug and reconnect the device. Since v0.1.34 LocWarp also falls back to the legacy `com.apple.dt.simulatelocation` service automatically. |
-| DDI download hangs / times out | Check that github.com / raw.githubusercontent.com is reachable, some corporate or campus networks block it. |
+| `No such service: com.apple.instruments.dtservicehub` (iOS 17+/26) / LocWarp shows "DDI not mounted" | Since v0.2.58 LocWarp no longer auto-mounts the DDI. Mount it once via Xcode / 愛思助手 / 3uTools / pymobiledevice3 CLI, then reconnect. If mount still fails, toggle Settings → Privacy & Security → **Developer Mode** off, reboot, re-enable, and try mounting again. |
 | **Developer Mode option missing** (iOS 16+) | The device must have had a signed app deployed to it before the option appears in Settings. See [Appendix: Enabling Developer Mode on iPhone (Windows)](#appendix-enabling-developer-mode-on-iphone-windows) below. |
 
 ---
@@ -422,7 +421,7 @@ On iOS 16+, **Settings → Privacy & Security → Developer Mode** is hidden by 
 6. On the iPhone: Settings → Privacy & Security → scroll to the bottom → the **Developer Mode** toggle will now appear. Turn it on.
 7. The device will prompt to restart. After the reboot, verify Developer Mode is still on.
 
-Once done, return to LocWarp and connect. On first connection LocWarp will download and mount the Developer Disk Image automatically if needed.
+Once done, return to LocWarp and connect. For iOS 17+ you also need to mount the Developer Disk Image once via Xcode / 愛思助手 / 3uTools / pymobiledevice3 CLI; LocWarp itself no longer auto-mounts (since v0.2.58).
 
 > Procedure adapted from community feedback, thanks for sharing.
 

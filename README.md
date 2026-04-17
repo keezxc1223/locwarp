@@ -154,8 +154,8 @@ TB1i7pEcifAeh8oDLLZFqiRVrpUaZmmDAn
 
 ### Developer Disk Image
 
-- iOS 17+ 首次連線會自動偵測 + 下載並掛載 **Personalized DDI**(從 GitHub 約 20 MB),已掛載則直接 no-op
-- DDI 掛載中前端顯示 overlay,失敗時把真實錯誤訊息顯示到 UI(不再吃進 log)
+- iOS 17+ 需要 **Personalized DDI** 掛在 iPhone 上才能走 DVT(instruments → dtservicehub)
+- v0.2.58 起 LocWarp **不自動下載、不自動掛載 DDI**(iOS 26.4.1 的 RSD tunnel 撐不住 20MB 上傳導致不穩);改為只檢查 iPhone 上是否已有 DDI,沒有就跳提示請用 Xcode / 愛思助手 / 3uTools / pymobiledevice3 CLI 幫 iPhone 掛過一次後再回來使用
 
 ### 地圖與輔助
 
@@ -187,7 +187,7 @@ TB1i7pEcifAeh8oDLLZFqiRVrpUaZmmDAn
 ### 使用者體驗
 
 - 啟動時 backend race condition 自動重試(最多 ~20 秒緩衝),無需手動重開
-- WebSocket 即時推播位置、進度、ETA、剩餘距離、裝置連線狀態、DDI 掛載進度
+- WebSocket 即時推播位置、進度、ETA、剩餘距離、裝置連線狀態
 - 斷線自動重連 + banner 自動清除
 - **更新檢查**:啟動時從 GitHub Releases 比對版本,有新版跳對話框(僅提示,不自動下載)
 - **Log 資料夾**按鈕(狀態列):一鍵開啟 `~/.locwarp/logs/` 資料夾,方便將 backend.log 附到 Issue
@@ -456,8 +456,7 @@ locwarp/
 | 症狀 | 可能原因 / 解法 |
 | --- | --- |
 | Tunnel 啟動後 backend 連不上 | 確認以系統管理員身份啟動 |
-| `No such service: com.apple.instruments.dtservicehub` (iOS 17+/26) | LocWarp 會自動嘗試掛載 Developer Disk Image;若仍失敗,請:(1) 設定 → 隱私權與安全性 → **開發者模式** 關閉,重開機,再次開啟;(2) 確認可連線至 github.com(DDI 由此下載,約 20MB);(3) 拔除重插裝置再試。v0.1.34 起會自動回退到 legacy `com.apple.dt.simulatelocation` 服務。 |
-| DDI 下載卡住 / 逾時 | 檢查網路是否可到達 github.com;公司或校園網路可能封鎖 raw.githubusercontent.com。 |
+| `No such service: com.apple.instruments.dtservicehub` (iOS 17+/26) / LocWarp 跳「iPhone 上未偵測到 DDI」 | v0.2.58 起 LocWarp 不再自動掛 DDI,請用下列任一工具幫 iPhone 掛一次 DDI 後再回來使用:Xcode、愛思助手、3uTools、pymobiledevice3 CLI。也可先「設定 → 隱私權與安全性 → **開發者模式** 關閉,重開機,再次開啟」,然後用上述工具重新掛一次。 |
 | **開發者模式未顯示**(iOS 16+) | 需先讓裝置被任一自簽 IPA 部署過,設定中方會出現該選項。請見下方 [附錄:iPhone 開啟開發者模式(Windows 流程)](#附錄iphone-開啟開發者模式windows-流程)。 |
 
 ---
@@ -474,7 +473,7 @@ iOS 16+ 的「設定 → 隱私權與安全性 → 開發者模式」預設**不
 6. iPhone 上 設定 → 隱私權與安全性 → 滑至底部 → 會出現「**開發者模式**」。開啟該開關。
 7. 系統提示重新啟動,重啟後再次確認開發者模式為開啟狀態。
 
-完成後即可回到 LocWarp 建立連線。首次連線時,LocWarp 會視需要自動下載並掛載 Developer Disk Image。
+完成後即可回到 LocWarp 建立連線。iOS 17+ 還需額外用 Xcode / 愛思助手 / 3uTools / pymobiledevice3 CLI 幫 iPhone 掛過一次 Developer Disk Image,LocWarp 本身不會自動掛(v0.2.58 起)。
 
 > 本流程參考自社群使用者回饋,感謝分享。
 
