@@ -599,6 +599,14 @@ const StatusBar: React.FC<StatusBarProps> = ({
                     <button
                       onClick={() => {
                         if (!locatePcResult) return;
+                        // Pan the map first (synchronous, <1 frame) so the
+                        // user sees the view snap to PC location
+                        // immediately. Then fire teleport in parallel:
+                        // the backend round-trip + websocket
+                        // position_update would otherwise leave the
+                        // map frozen for ~1s, and even after that the
+                        // map-view recenter only kicks in on jumps > 500m.
+                        onLocatePcPanOnly?.(locatePcResult.lat, locatePcResult.lng);
                         onLocatePcFly(locatePcResult.lat, locatePcResult.lng);
                         setLocatePcOpen(false);
                         setLocatePcResult(null);
