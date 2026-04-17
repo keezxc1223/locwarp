@@ -214,6 +214,9 @@ export const STRINGS = {
 
   // ── Map ──────────────────────────────────────
   'map.recenter': { zh: '定位到目前位置', en: 'Recenter on current position' },
+  'map.follow_on': { zh: '跟隨模式 (開啟中, 點擊關閉)', en: 'Follow mode (on, click to disable)' },
+  'map.follow_off': { zh: '跟隨模式 (關閉中, 點擊開啟)', en: 'Follow mode (off, click to enable)' },
+  'map.follow_disabled_toast': { zh: '跟隨已關閉, 點按鈕可恢復', en: 'Follow disabled. Tap the button to resume.' },
   'map.click_not_locate': { zh: '此功能非定位', en: 'This is NOT teleport' },
   'map.click_use_right': { zh: '請用右鍵「瞬移到這裡」', en: 'Right-click to "Teleport here"' },
   'map.device_disconnected': { zh: 'USB 已斷開,請重新插入', en: 'USB disconnected, please reconnect' },

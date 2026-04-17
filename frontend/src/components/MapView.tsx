@@ -134,8 +134,23 @@ const MapView: React.FC<MapViewProps> = ({
   // standard 10px gap. Any other approach leaves it a few px off.
   const recenterBtnRef = useRef<HTMLButtonElement | null>(null);
   const recenterHandlerRef = useRef<() => void>(() => {});
+  // Follow-mode toggle button (sits below recenter as a third leaflet-bar).
+  // When enabled, the map auto-pans to the current position on every update.
+  // Manual map drag disables follow so the user can pan/look around freely.
+  const followBtnRef = useRef<HTMLButtonElement | null>(null);
+  const followHandlerRef = useRef<() => void>(() => {});
+  // followStateRef mirrors followMode so the dragstart handler (wired once
+  // at map init) sees the latest value without a stale closure.
+  const followStateRef = useRef(false);
+  // onShowToast captured by once-mount handlers. Routed through a ref so
+  // prop changes mid-session take effect.
+  const onShowToastRef = useRef(onShowToast);
+  useEffect(() => { onShowToastRef.current = onShowToast; }, [onShowToast]);
   // clickMarkerRef removed — left-click no longer drops a pin.
   const radiusCircleRef = useRef<L.Circle | null>(null);
+
+  const [followMode, setFollowMode] = useState(false);
+  useEffect(() => { followStateRef.current = followMode; }, [followMode]);
 
   const [contextMenu, setContextMenu] = useState<ContextMenuState>({
     visible: false,
@@ -250,6 +265,47 @@ const MapView: React.FC<MapViewProps> = ({
       topLeftEl.appendChild(wrapper);
       recenterBtnRef.current = btn;
     }
+
+    // Follow-mode toggle, mounted as a third leaflet-bar so it lines up
+    // exactly under the recenter button with Leaflet's standard 10px gap.
+    if (topLeftEl) {
+      const wrapper = L.DomUtil.create('div', 'leaflet-bar leaflet-control');
+      const btn = L.DomUtil.create('button', '', wrapper) as HTMLButtonElement;
+      btn.type = 'button';
+      btn.title = tRef.current('map.follow_off');
+      btn.setAttribute('role', 'button');
+      btn.setAttribute('aria-pressed', 'false');
+      btn.style.cssText = [
+        'width: 30px', 'height: 30px', 'display: flex',
+        'align-items: center', 'justify-content: center',
+        'padding: 0', 'margin: 0', 'cursor: pointer',
+        'background: var(--bg-surface, #2a2f3a)',
+        'color: #fff', 'border: none', 'border-radius: 0',
+      ].join(';');
+      btn.innerHTML = `<svg width="16" height="16" viewBox="0 0 24 24" fill="currentColor" stroke="currentColor" stroke-width="1.5" stroke-linejoin="round">
+        <polygon points="3 11 22 2 13 21 11 13 3 11"/>
+      </svg>`;
+      L.DomEvent.disableClickPropagation(wrapper);
+      L.DomEvent.on(btn, 'click', (e: Event) => {
+        e.preventDefault();
+        followHandlerRef.current();
+      });
+      topLeftEl.appendChild(wrapper);
+      followBtnRef.current = btn;
+    }
+
+    // User-initiated drag disables follow mode so they can pan freely. We
+    // only react when follow is currently on (read via ref so the handler
+    // wired once at mount sees the latest state). dragstart fires only on
+    // pointer drag — programmatic panTo / setView do not trigger it, so
+    // the auto-pan loop won't accidentally turn itself off.
+    map.on('dragstart', () => {
+      if (!followStateRef.current) return;
+      setFollowMode(false);
+      try {
+        onShowToastRef.current?.(tRef.current('map.follow_disabled_toast'));
+      } catch { /* ignore */ }
+    });
 
     // Tile layer tuning (shared across all providers):
     //   updateWhenIdle=false    — load during pan, not only on idle
@@ -1062,6 +1118,39 @@ const MapView: React.FC<MapViewProps> = ({
     btn.style.cursor = currentPosition ? 'pointer' : 'not-allowed';
     btn.style.opacity = currentPosition ? '1' : '0.55';
   }, [recenter, currentPosition]);
+
+  const toggleFollow = useCallback(() => {
+    setFollowMode((prev) => !prev);
+  }, []);
+
+  // Sync the follow button's visual state + handler with React state. Active
+  // (blue) when on, neutral surface when off. Title flips between on/off
+  // labels so hover tooltip mirrors current state.
+  useEffect(() => {
+    followHandlerRef.current = toggleFollow;
+    const btn = followBtnRef.current;
+    if (!btn) return;
+    btn.style.background = followMode ? '#6c8cff' : 'var(--bg-surface, #2a2f3a)';
+    btn.style.cursor = 'pointer';
+    btn.style.opacity = '1';
+    btn.title = t(followMode ? 'map.follow_on' : 'map.follow_off');
+    btn.setAttribute('aria-pressed', followMode ? 'true' : 'false');
+  }, [toggleFollow, followMode, t]);
+
+  // Auto-pan the map to the current position whenever follow mode is on.
+  // Uses panTo with a short animation so rapid backend ticks (random walk
+  // can be ~10 Hz) blend into a smooth camera trail rather than jumpy
+  // snaps. Programmatic panTo does NOT fire dragstart, so the auto-disable
+  // wired at map init is safe.
+  useEffect(() => {
+    if (!followMode || !currentPosition) return;
+    const map = mapRef.current;
+    if (!map) return;
+    map.panTo([currentPosition.lat, currentPosition.lng], {
+      animate: true,
+      duration: 0.4,
+    });
+  }, [currentPosition, followMode]);
 
   // Track the last avatar HTML we painted so the position-update effect
   // below can detect "avatar changed, need to rebuild marker even though
