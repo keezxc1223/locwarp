@@ -391,10 +391,13 @@ export function useSimulation(subscribe?: WsSubscribe, primaryUdid?: string | nu
         } else if (st === 'disconnected') {
           // USB unplug or tunnel death of THIS engine. In dual-device
           // mode the surviving device is still running the same sim, so
-          // keep routePath / destination on the map. Clearing them here
-          // would make the polyline vanish until the user re-plugs the
-          // missing device, which is the bug we're avoiding.
-          setStatus((prev) => ({ ...prev, running: false, paused: false, state: st }))
+          // keep routePath / destination AND keep running/paused alone:
+          // flipping running to false here would revert the toolbar's
+          // 停止 button back to 開始 even though the other device is
+          // still actively running the simulation. Just record the new
+          // state for completeness; the global running flag is reset by
+          // the device_disconnected handler when remaining_count hits 0.
+          setStatus((prev) => ({ ...prev, state: st }))
         } else if (st === 'paused') {
           setStatus((prev) => ({ ...prev, paused: true, state: st }))
         } else if (st) {
