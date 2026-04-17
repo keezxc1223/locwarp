@@ -52,6 +52,10 @@ interface MapViewProps {
   // enabled, clicking a marker calls onTeleport at that coordinate.
   bookmarkPins?: Array<{ id?: string; name: string; lat: number; lng: number; country_code?: string }>;
   showBookmarkPins?: boolean;
+  // Imperative escape hatch so non-map components (e.g. the StatusBar's
+  // "Locate PC" pan-only flow) can move the map view without going
+  // through React state.
+  onMapReady?: (api: { panTo: (lat: number, lng: number, zoom?: number) => void }) => void;
 }
 
 const DEVICE_COLORS = ['#4285f4', '#ff9800'];
@@ -95,6 +99,7 @@ const MapView: React.FC<MapViewProps> = ({
   devices,
   bookmarkPins,
   showBookmarkPins,
+  onMapReady,
 }) => {
   // Dual-mode rendering disabled by design: with pre-sync (both devices
   // teleport to the same start before any group action) and shared random
@@ -404,6 +409,21 @@ const MapView: React.FC<MapViewProps> = ({
     });
 
     mapRef.current = map;
+
+    // Hand the parent an imperative panTo so it can move the view without
+    // touching React state (used by the StatusBar's Locate-PC pan-only flow).
+    if (onMapReady) {
+      try {
+        onMapReady({
+          panTo: (lat: number, lng: number, zoom?: number) => {
+            const m = mapRef.current;
+            if (!m) return;
+            const targetZoom = zoom ?? Math.max(m.getZoom(), 16);
+            m.setView([lat, lng], targetZoom, { animate: true });
+          },
+        });
+      } catch { /* non-fatal */ }
+    }
 
     // Fetch the user-saved initial position from the backend (once, on mount).
     // If set, pan the map to it. Brief Taipei flash is acceptable.

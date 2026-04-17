@@ -31,6 +31,11 @@ interface StatusBarProps {
   onRestore?: () => void;
   onOpenLog?: () => void;
   onOpenAvatarPicker?: () => void;
+  // "Locate PC" button: detects this PC's lat/lng via the browser
+  // geolocation API (Wi-Fi positioning under the hood), then asks the
+  // user to either teleport the iPhone there or just pan the map.
+  onLocatePcFly?: (lat: number, lng: number) => void;
+  onLocatePcPanOnly?: (lat: number, lng: number) => void;
   // Group mode: when two devices are connected, cooldown toggle is force-off
   // and displays a different tooltip. Does not modify the saved setting.
   dualDevice?: boolean;
@@ -84,6 +89,8 @@ const StatusBar: React.FC<StatusBarProps> = ({
   onRestore,
   onOpenLog,
   onOpenAvatarPicker,
+  onLocatePcFly,
+  onLocatePcPanOnly,
   dualDevice = false,
   runtimes,
   devices,
@@ -100,6 +107,80 @@ const StatusBar: React.FC<StatusBarProps> = ({
   const [initialDialogValue, setInitialDialogValue] = useState('');
   const [initialDialogError, setInitialDialogError] = useState<string | null>(null);
   const [initialDialogBusy, setInitialDialogBusy] = useState(false);
+
+  // Locate-PC flow: button fires browser geolocation, then this dialog
+  // confirms whether the user wants to teleport the iPhone or just pan
+  // the map view. Errors (denied / unavailable / timeout) surface in
+  // the same dialog body so the user can read them before dismissing.
+  const [locatePcOpen, setLocatePcOpen] = useState(false);
+  const [locatePcBusy, setLocatePcBusy] = useState(false);
+  const [locatePcResult, setLocatePcResult] = useState<{ lat: number; lng: number; accuracy: number; source: 'wifi' | 'ip' } | null>(null);
+  const [locatePcError, setLocatePcError] = useState<string | null>(null);
+
+  // IP fallback: Electron's navigator.geolocation needs GOOGLE_API_KEY to
+  // actually resolve via Wi-Fi positioning. Without it, requests return
+  // POSITION_UNAVAILABLE. ipapi.co is a no-key HTTPS service that gives
+  // city-level coordinates, which is enough to drop the user near home.
+  const fetchIpLocation = async (): Promise<{ lat: number; lng: number; accuracy: number } | null> => {
+    try {
+      const res = await fetch('https://ipapi.co/json/', { cache: 'no-store' });
+      if (!res.ok) return null;
+      const j = await res.json();
+      const lat = parseFloat(j.latitude);
+      const lng = parseFloat(j.longitude);
+      if (!isFinite(lat) || !isFinite(lng)) return null;
+      return { lat, lng, accuracy: 5000 };
+    } catch {
+      return null;
+    }
+  };
+
+  const handleLocatePcClick = () => {
+    setLocatePcOpen(true);
+    setLocatePcResult(null);
+    setLocatePcError(null);
+    setLocatePcBusy(true);
+
+    const tryIpFallback = async (denyMsg: string) => {
+      const ip = await fetchIpLocation();
+      if (ip) {
+        setLocatePcResult({ ...ip, source: 'ip' });
+        setLocatePcError(null);
+      } else {
+        setLocatePcError(denyMsg);
+      }
+      setLocatePcBusy(false);
+    };
+
+    if (typeof navigator === 'undefined' || !navigator.geolocation) {
+      tryIpFallback(t('status.locate_pc_ip_fallback_failed'));
+      return;
+    }
+    navigator.geolocation.getCurrentPosition(
+      (pos) => {
+        setLocatePcBusy(false);
+        setLocatePcResult({
+          lat: pos.coords.latitude,
+          lng: pos.coords.longitude,
+          accuracy: pos.coords.accuracy,
+          source: 'wifi',
+        });
+      },
+      async (err) => {
+        // Permission denied is the user explicitly saying no, so don't
+        // silently fall back to IP without telling them.
+        if (err.code === err.PERMISSION_DENIED) {
+          setLocatePcBusy(false);
+          setLocatePcError(t('status.locate_pc_denied'));
+          return;
+        }
+        // POSITION_UNAVAILABLE / TIMEOUT both happen on no-Google-key
+        // Electron builds and on machines without Wi-Fi. Try IP.
+        await tryIpFallback(t('status.locate_pc_ip_fallback_failed'));
+      },
+      { enableHighAccuracy: true, timeout: 12000, maximumAge: 30000 },
+    );
+  };
 
   const handleInitialDialogSave = async () => {
     const { setInitialPosition } = await import('../services/api');
@@ -423,6 +504,35 @@ const StatusBar: React.FC<StatusBarProps> = ({
             </svg>
             {t('status.set_initial')}
           </button>
+          {/* Locate PC: detect this PC's lat/lng (Wi-Fi positioning) */}
+          {(onLocatePcFly || onLocatePcPanOnly) && (
+            <button
+              onClick={handleLocatePcClick}
+              title={t('status.locate_pc_tooltip')}
+              style={{
+                display: 'flex',
+                alignItems: 'center',
+                gap: 4,
+                padding: '2px 8px',
+                fontSize: 12,
+                background: 'rgba(244, 143, 177, 0.12)',
+                border: '1px solid rgba(244, 143, 177, 0.4)',
+                color: '#f48fb1',
+                borderRadius: 4,
+                cursor: 'pointer',
+              }}
+            >
+              <svg width="11" height="11" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2">
+                <circle cx="12" cy="12" r="10" />
+                <line x1="12" y1="2" x2="12" y2="5" />
+                <line x1="12" y1="19" x2="12" y2="22" />
+                <line x1="2" y1="12" x2="5" y2="12" />
+                <line x1="19" y1="12" x2="22" y2="12" />
+                <circle cx="12" cy="12" r="3" fill="currentColor" />
+              </svg>
+              {t('status.locate_pc')}
+            </button>
+          )}
           {/* 地圖釘 / 使用者頭像 — opens the avatar picker panel */}
           {onOpenAvatarPicker && (
             <button
@@ -488,6 +598,103 @@ const StatusBar: React.FC<StatusBarProps> = ({
           v{APP_VERSION}
         </span>
       </div>
+
+      {locatePcOpen && createPortal((
+        <div
+          onClick={() => { if (!locatePcBusy) { setLocatePcOpen(false); setLocatePcResult(null); setLocatePcError(null); } }}
+          style={{
+            position: 'fixed', inset: 0, zIndex: 2000,
+            background: 'rgba(8, 10, 20, 0.55)', backdropFilter: 'blur(4px)',
+            display: 'flex', alignItems: 'center', justifyContent: 'center',
+          }}
+        >
+          <div
+            onClick={(e) => e.stopPropagation()}
+            style={{
+              width: 380, background: 'rgba(26, 29, 39, 0.96)',
+              border: '1px solid rgba(244, 143, 177, 0.3)', borderRadius: 12,
+              padding: 22, color: '#e8eaf0',
+              boxShadow: '0 20px 60px rgba(12, 18, 40, 0.65)',
+              fontSize: 13,
+            }}
+          >
+            <div style={{ fontSize: 15, fontWeight: 600, marginBottom: 12 }}>
+              {t('status.locate_pc_dialog_title')}
+            </div>
+            {locatePcBusy && (
+              <div style={{ fontSize: 12, opacity: 0.75, padding: '12px 0' }}>
+                {t('status.locate_pc_busy')}
+              </div>
+            )}
+            {locatePcError && (
+              <div style={{ fontSize: 12, color: '#ff7a8a', padding: '8px 0', lineHeight: 1.6 }}>
+                {locatePcError}
+              </div>
+            )}
+            {locatePcResult && (
+              <>
+                <div style={{ fontSize: 12, opacity: 0.85, marginBottom: 6, fontFamily: 'monospace' }}>
+                  {locatePcResult.lat.toFixed(6)}, {locatePcResult.lng.toFixed(6)}
+                </div>
+                <div style={{ fontSize: 11, opacity: 0.6, marginBottom: 4 }}>
+                  {t('status.locate_pc_accuracy').replace('{m}', Math.round(locatePcResult.accuracy).toString())}
+                </div>
+                <div style={{ fontSize: 11, opacity: 0.5, marginBottom: 14 }}>
+                  {t(locatePcResult.source === 'wifi' ? 'status.locate_pc_source_wifi' : 'status.locate_pc_source_ip')}
+                </div>
+                <div style={{ display: 'flex', flexDirection: 'column', gap: 8 }}>
+                  {onLocatePcFly && (
+                    <button
+                      onClick={() => {
+                        if (!locatePcResult) return;
+                        onLocatePcFly(locatePcResult.lat, locatePcResult.lng);
+                        setLocatePcOpen(false);
+                        setLocatePcResult(null);
+                      }}
+                      style={{
+                        padding: '10px 14px', fontSize: 13, fontWeight: 500, cursor: 'pointer',
+                        background: '#6c8cff', color: '#fff',
+                        border: 'none', borderRadius: 8, textAlign: 'left',
+                      }}
+                    >
+                      {t('status.locate_pc_fly')}
+                    </button>
+                  )}
+                  {onLocatePcPanOnly && (
+                    <button
+                      onClick={() => {
+                        if (!locatePcResult) return;
+                        onLocatePcPanOnly(locatePcResult.lat, locatePcResult.lng);
+                        setLocatePcOpen(false);
+                        setLocatePcResult(null);
+                      }}
+                      style={{
+                        padding: '10px 14px', fontSize: 13, fontWeight: 500, cursor: 'pointer',
+                        background: 'rgba(108, 140, 255, 0.15)', color: '#a8b8ff',
+                        border: '1px solid rgba(108, 140, 255, 0.4)', borderRadius: 8, textAlign: 'left',
+                      }}
+                    >
+                      {t('status.locate_pc_pan_only')}
+                    </button>
+                  )}
+                </div>
+              </>
+            )}
+            <div style={{ display: 'flex', justifyContent: 'flex-end', marginTop: 14 }}>
+              <button
+                onClick={() => { setLocatePcOpen(false); setLocatePcResult(null); setLocatePcError(null); }}
+                disabled={locatePcBusy}
+                style={{
+                  padding: '6px 14px', fontSize: 12, cursor: locatePcBusy ? 'not-allowed' : 'pointer',
+                  background: 'transparent', color: '#9499ac',
+                  border: '1px solid rgba(255,255,255,0.12)', borderRadius: 6,
+                  opacity: locatePcBusy ? 0.6 : 1,
+                }}
+              >{t('generic.cancel')}</button>
+            </div>
+          </div>
+        </div>
+      ), document.body)}
 
       {initialDialogOpen && createPortal((
         <div

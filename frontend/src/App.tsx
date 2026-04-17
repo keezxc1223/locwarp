@@ -360,6 +360,11 @@ const App: React.FC = () => {
     }
   }, [sim, device, t, showToast])
 
+  const mapApiRef = useRef<{ panTo: (lat: number, lng: number, zoom?: number) => void } | null>(null)
+  const handleMapPanOnly = useCallback((lat: number, lng: number) => {
+    mapApiRef.current?.panTo(clampLat(lat), normalizeLng(lng))
+  }, [])
+
   const handleNavigate = useCallback(async (latIn: number, lngIn: number) => {
     const lat = clampLat(latIn)
     const lng = normalizeLng(lngIn)
@@ -1139,6 +1144,7 @@ const App: React.FC = () => {
             id: b.id, name: b.name, lat: b.lat, lng: b.lng, country_code: b.country_code || '',
           }))}
           showBookmarkPins={showBookmarkPins}
+          onMapReady={(api) => { mapApiRef.current = api }}
         />
         {avatarPickerOpen && (
           <UserAvatarPicker
@@ -1267,6 +1273,8 @@ const App: React.FC = () => {
           weatherCode={locMeta.weatherCode}
           tempC={locMeta.tempC}
           onOpenAvatarPicker={() => setAvatarPickerOpen((v) => !v)}
+          onLocatePcFly={handleTeleport}
+          onLocatePcPanOnly={handleMapPanOnly}
         />
 
         <UpdateChecker />

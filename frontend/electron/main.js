@@ -105,6 +105,16 @@ async function createWindow() {
       contextIsolation: true,
     },
   })
+  // Auto-grant geolocation requests so the StatusBar's "Locate PC"
+  // button can actually call navigator.geolocation. Electron blocks the
+  // request silently by default, which surfaces in the renderer as a
+  // PERMISSION_DENIED error that looks like a Windows-side denial.
+  try {
+    mainWindow.webContents.session.setPermissionRequestHandler((_wc, permission, callback) => {
+      if (permission === 'geolocation') return callback(true)
+      callback(false)
+    })
+  } catch (e) { console.error('[electron] permission handler hook failed:', e) }
   // Show the window once the first frame is painted. Combined with
   // backgroundColor above, this eliminates the blank/white boot state.
   mainWindow.once('ready-to-show', () => { mainWindow.show() })
