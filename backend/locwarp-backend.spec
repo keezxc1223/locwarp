@@ -2,7 +2,7 @@
 # PyInstaller spec for LocWarp backend (Python 3.13).
 # Build: py -3.13 -m PyInstaller backend/locwarp-backend.spec --noconfirm
 
-from PyInstaller.utils.hooks import collect_all, collect_submodules
+from PyInstaller.utils.hooks import collect_all, collect_submodules, copy_metadata
 
 # pymobiledevice3 has a LOT of dynamic imports — collect everything
 pmd_datas, pmd_binaries, pmd_hiddenimports = collect_all('pymobiledevice3')
@@ -18,6 +18,19 @@ pytun_datas, pytun_binaries, pytun_hidden = collect_all('pytun_pmd3')
 # accepts the call but iOS rejects it without DDI.
 ddi_datas, ddi_binaries, ddi_hidden = collect_all('developer_disk_image')
 
+# pyimg4 is an indirect dep of mobile_image_mounter's Personalized DDI path.
+# pymobiledevice3 calls importlib.metadata.distribution('pyimg4') at import
+# time. collect_all('pymobiledevice3') pulls pyimg4's .py files in as
+# transitive imports, but NOT its .dist-info metadata directory, so the
+# metadata lookup raises PackageNotFoundError and the whole
+# mobile_image_mounter import fails. That cascades into "No such service:
+# com.apple.instruments.dtservicehub" on iOS 17+ devices whose DDI was never
+# pre-mounted by another tool. copy_metadata pulls the dist-info dir into
+# the bundle so importlib.metadata finds it. Also collect_all for the
+# python files and any companion binaries.
+pyimg4_datas, pyimg4_binaries, pyimg4_hidden = collect_all('pyimg4')
+pyimg4_meta = copy_metadata('pyimg4')
+
 # uvicorn/fastapi also need their sub-modules collected
 uvicorn_hidden = collect_submodules('uvicorn')
 fastapi_hidden = collect_submodules('fastapi')
@@ -26,6 +39,7 @@ hidden = [
     *pmd_hiddenimports,
     *pytun_hidden,
     *ddi_hidden,
+    *pyimg4_hidden,
     *uvicorn_hidden,
     *fastapi_hidden,
     'uvicorn.logging',
@@ -50,8 +64,8 @@ hidden = [
 a = Analysis(
     ['main.py'],
     pathex=['.'],
-    binaries=[*pmd_binaries, *pytun_binaries, *ddi_binaries],
-    datas=[*pmd_datas, *pytun_datas, *ddi_datas],
+    binaries=[*pmd_binaries, *pytun_binaries, *ddi_binaries, *pyimg4_binaries],
+    datas=[*pmd_datas, *pytun_datas, *ddi_datas, *pyimg4_datas, *pyimg4_meta],
     hiddenimports=hidden,
     hookspath=[],
     hooksconfig={},
