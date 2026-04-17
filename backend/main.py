@@ -17,10 +17,53 @@ from services.coord_format import CoordinateFormatter
 from services.reconnect import ReconnectManager
 
 # Configure logging — console + rotating file in ~/.locwarp/logs/
+# If Path.home() ever resolves to something weird (Desktop, a network
+# share that's offline, a path the OS later can't write to), fall back
+# to %LOCALAPPDATA%\LocWarp\logs on Windows. That's the OS-conventional
+# place for per-user app logs and can't collide with the Desktop.
 _log_fmt = "%(asctime)s [%(name)s] %(levelname)s: %(message)s"
-_log_dir = Path.home() / ".locwarp" / "logs"
+
+
+def _resolve_log_dir() -> Path:
+    import os
+    candidates: list[Path] = []
+    try:
+        home = Path.home()
+        # Reject home paths that contain "Desktop" or don't look like a
+        # real user profile root. A path ending in "...\Desktop" is the
+        # classic misconfiguration that turned up user logs sitting on
+        # the desktop.
+        if "desktop" not in str(home).lower():
+            candidates.append(home / ".locwarp" / "logs")
+    except Exception:
+        pass
+    local_app = os.environ.get("LOCALAPPDATA")
+    if local_app:
+        candidates.append(Path(local_app) / "LocWarp" / "logs")
+    appdata = os.environ.get("APPDATA")
+    if appdata:
+        candidates.append(Path(appdata) / "LocWarp" / "logs")
+    # Absolute last resort: the PyInstaller _MEIPASS temp dir's parent
+    # gives us SOMETHING writable even if every env var is broken.
+    candidates.append(Path.cwd() / ".locwarp-logs")
+    for c in candidates:
+        try:
+            c.mkdir(parents=True, exist_ok=True)
+            # touch-write a probe file to confirm write access
+            probe = c / ".write_probe"
+            probe.write_text("ok", encoding="utf-8")
+            probe.unlink(missing_ok=True)
+            return c
+        except Exception:
+            continue
+    # All candidates failed — return the first one anyway so the caller
+    # can still try (file handler init will raise and we'll log-to-
+    # stream-only). This branch is effectively unreachable.
+    return candidates[0]
+
+
+_log_dir = _resolve_log_dir()
 try:
-    _log_dir.mkdir(parents=True, exist_ok=True)
     _file_handler = RotatingFileHandler(
         _log_dir / "backend.log",
         maxBytes=2 * 1024 * 1024,  # 2 MB
@@ -34,6 +77,10 @@ except Exception:
     _handlers = [logging.StreamHandler()]
 logging.basicConfig(level=logging.INFO, format=_log_fmt, handlers=_handlers, force=True)
 logger = logging.getLogger("locwarp")
+# Surface the resolved log directory as the first line of every run so
+# we can diagnose misrouted log files (e.g. Desktop appearances) by
+# asking the user for backend.log's first line.
+logger.info("backend log directory resolved to: %s", _log_dir)
 
 
 class AppState:
