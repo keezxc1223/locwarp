@@ -40,11 +40,11 @@ export const STRINGS = {
   'status.restore_all': { zh: '全部還原', en: 'Restore all' },
   'status.set_initial': { zh: '預設畫面', en: 'Default view' },
   'status.locate_pc': { zh: '定位電腦', en: 'Locate PC' },
-  'status.locate_pc_tooltip': { zh: '抓取此電腦的目前位置 (Wi-Fi 定位, 誤差 30 公尺至 100 公尺)', en: 'Detect this PC location via Wi-Fi positioning (accuracy 30m to 100m)' },
+  'status.locate_pc_tooltip': { zh: '抓取此電腦的目前位置 (Wi-Fi 定位, 會有誤差)', en: 'Detect this PC location via Wi-Fi positioning (some inaccuracy expected)' },
   'status.locate_pc_dialog_title': { zh: '定位到電腦當前位置', en: 'Locate to PC current position' },
   'status.locate_pc_accuracy': { zh: '定位精準度: 約 ±{m} 公尺', en: 'Location accuracy: ±{m}m' },
-  'status.locate_pc_fly': { zh: '畫面過去 + 飛過去 (會 teleport iPhone)', en: 'Pan map + teleport iPhone' },
-  'status.locate_pc_pan_only': { zh: '只看地圖,不要飛 (iPhone GPS 不動)', en: 'Pan map only (iPhone GPS untouched)' },
+  'status.locate_pc_fly': { zh: '畫面過去+飛過去 (會定位)', en: 'Pan map + fly (will set iPhone GPS)' },
+  'status.locate_pc_pan_only': { zh: '畫面過去,不要飛 (不會定位)', en: 'Pan map only (will NOT set iPhone GPS)' },
   'status.locate_pc_busy': { zh: '取得位置中...', en: 'Acquiring location...' },
   'status.locate_pc_denied': { zh: 'Windows 定位服務被關閉, 請到 設定 → 隱私權與安全性 → 位置 把「位置服務」開啟並允許桌面應用程式存取', en: 'Windows Location service is off. Go to Settings → Privacy & Security → Location and turn on "Location services" + allow desktop apps.' },
   'status.locate_pc_unavailable': { zh: '電腦無法取得位置 (Wi-Fi 沒開或附近沒有可定位的 AP)', en: 'PC could not acquire a location (Wi-Fi off or no nearby APs)' },
@@ -320,7 +320,7 @@ export const STRINGS = {
 
   // ── Toasts extra ─────────────────────────────
   'toast.no_position_random': { zh: '尚未取得目前位置,無法產生隨機路徑點', en: 'No current position, cannot generate random waypoints' },
-  'toast.timezone_diff': { zh: '已進入 {zone} 時區(時差 {hours} 小時,當地 {time})', en: 'Now in {zone} (offset {hours}h, local {time})' },
+  'toast.timezone_diff': { zh: '已進入 {zone} 時區(時差 {hours} 小時,當地 {time})\n{date}', en: 'Now in {zone} (offset {hours}h, local {time})\n{date}' },
   'toast.route_optimized': { zh: '路線已最佳化(總時長約 {min} 分)', en: 'Route optimized ({min} min total)' },
   'toast.route_optimize_failed': { zh: '路線最佳化失敗', en: 'Route optimize failed' },
   'panel.waypoints_optimize': { zh: '最佳順序', en: 'Optimize' },

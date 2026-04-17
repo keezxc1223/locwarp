@@ -269,6 +269,17 @@ const App: React.FC = () => {
           const destNow = new Date(tz.timestamp * 1000)
           const hh = String(destNow.getUTCHours()).padStart(2, '0')
           const mm = String(destNow.getUTCMinutes()).padStart(2, '0')
+          // Destination-local date (YYYY-MM-DD). en-CA formats as ISO
+          // by default so we don't have to reorder month/day pieces.
+          let dateStr = ''
+          try {
+            dateStr = new Intl.DateTimeFormat('en-CA', {
+              timeZone: tz.zone,
+              year: 'numeric', month: '2-digit', day: '2-digit',
+            }).format(destNow)
+          } catch {
+            dateStr = new Date(destNow.getTime()).toISOString().slice(0, 10)
+          }
           // Localize the zone name via Intl so 'America/New_York' becomes
           // '北美東部夏令時間' for zh users / 'Eastern Daylight Time' for en.
           // Fall back to the raw IANA id if the runtime can't resolve it.
@@ -279,7 +290,14 @@ const App: React.FC = () => {
             const named = parts.find((p) => p.type === 'timeZoneName')?.value
             if (named) zoneLabel = named
           } catch { /* keep IANA id */ }
-          showToast(t('toast.timezone_diff').replace('{zone}', zoneLabel).replace('{hours}', String(diffH)).replace('{time}', `${hh}:${mm}`))
+          showToast(
+            t('toast.timezone_diff')
+              .replace('{zone}', zoneLabel)
+              .replace('{hours}', String(diffH))
+              .replace('{time}', `${hh}:${mm}`)
+              .replace('{date}', dateStr),
+            6000,
+          )
         }
       } catch { /* ignore */ }
       try {
@@ -1302,6 +1320,8 @@ const App: React.FC = () => {
               border: '1px solid rgba(108, 140, 255, 0.3)',
               maxWidth: '70vw',
               textAlign: 'center',
+              whiteSpace: 'pre-line',
+              lineHeight: 1.5,
             }}
           >
             {toastMsg}

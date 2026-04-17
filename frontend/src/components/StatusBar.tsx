@@ -234,17 +234,14 @@ const StatusBar: React.FC<StatusBarProps> = ({
           the left-side DeviceStatus panel already shows all of this, so
           repeating it here only ate horizontal space. */}
 
-      {/* Dual-device pills */}
-      {dualDevice && devices && runtimes && devices.slice(0, 2).map((dev, i) => {
-        const rt = runtimes[dev.udid];
+      {/* Dual-device pills: in group mode both iPhones are kept on the
+          exact same virtual coordinate (see _auto_sync_new_device_to_primary
+          + follower mirroring), so the shared coord / flag / weather /
+          speed / mode are rendered ONCE below this row. The pills here
+          only need to identify A and B. */}
+      {dualDevice && devices && devices.slice(0, 2).map((dev, i) => {
         const color = DEVICE_COLORS[i];
         const letter = DEVICE_LETTERS[i];
-        const coord = rt?.currentPos
-          ? `${rt.currentPos.lat.toFixed(4)},${rt.currentPos.lng.toFixed(4)}`
-          : '—';
-        const spd = rt?.currentSpeedKmh ? rt.currentSpeedKmh.toFixed(0) : String(speed);
-        const dMode = rt ? stateToMode(rt.state) : null;
-        const modeLabel = dMode ? t(modeLabelKeys[dMode]) : t(modeLabelKeys[mode]);
         return (
           <div
             key={dev.udid}
@@ -258,33 +255,16 @@ const StatusBar: React.FC<StatusBarProps> = ({
             title={dev.name}
           >
             <span style={{ color, fontWeight: 700 }}>{letter}</span>
-            {/* Flag icon shared from the reverse-geocode lookup. In dual
-                mode the two devices are kept in sync (same virtual position)
-                so both pills display the same country. */}
-            {countryCode && (
-              <img
-                src={`https://flagcdn.com/w40/${countryCode}.png`}
-                alt={countryCode.toUpperCase()}
-                title={countryCode.toUpperCase()}
-                width={14}
-                height={10}
-                style={{ borderRadius: 2, boxShadow: '0 0 0 1px rgba(255,255,255,0.15)' }}
-                onError={(e) => { (e.currentTarget as HTMLImageElement).style.display = 'none'; }}
-              />
-            )}
-            <span>{coord}</span>
-            <span style={{ opacity: 0.4 }}>·</span>
-            <span>{spd}km/h</span>
-            <span style={{ opacity: 0.4 }}>·</span>
-            <span style={{ opacity: 0.75 }}>{modeLabel}</span>
+            <span style={{ opacity: 0.75 }}>{dev.name}</span>
           </div>
         );
       })}
       {dualDevice && <div style={{ width: 1, height: 14, background: 'rgba(255,255,255,0.12)' }} />}
 
-      {/* Weather chip (single-device; dual mode uses its own pills). Shows
-          current conditions at the virtual location with an animated icon. */}
-      {!dualDevice && currentPosition && weatherCode != null && tempC != null && (() => {
+      {/* Weather chip. Shows current conditions at the virtual location
+          with an animated icon. Renders in both single and dual mode
+          (dual devices share one coordinate). */}
+      {currentPosition && weatherCode != null && tempC != null && (() => {
         const cat = categorize(weatherCode);
         if (!cat) return null;
         const labelKey = labelKeyFor(cat);
@@ -307,8 +287,9 @@ const StatusBar: React.FC<StatusBarProps> = ({
         );
       })()}
 
-      {/* Current coordinates (single-device mode only) */}
-      {!dualDevice && currentPosition && (
+      {/* Current coordinates. Rendered in both single and dual modes
+          because group mode keeps both iPhones on the same coordinate. */}
+      {currentPosition && (
         <>
           <div style={{ display: 'flex', alignItems: 'center', gap: 4, fontFamily: 'monospace', fontSize: 11 }}>
             {countryCode ? (
@@ -361,8 +342,8 @@ const StatusBar: React.FC<StatusBarProps> = ({
         </>
       )}
 
-      {/* Speed + Mode (single-device mode only) */}
-      {!dualDevice && <div style={{ display: 'flex', alignItems: 'center', gap: 4 }}>
+      {/* Speed + Mode. Rendered in both single and dual modes. */}
+      <div style={{ display: 'flex', alignItems: 'center', gap: 4 }}>
         <svg width="11" height="11" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" style={{ opacity: 0.5 }}>
           <path d="M12 2L2 7l10 5 10-5-10-5z" />
           <path d="M2 17l10 5 10-5" />
@@ -371,7 +352,7 @@ const StatusBar: React.FC<StatusBarProps> = ({
         <span>{speed} km/h</span>
         <span style={{ opacity: 0.4 }}>|</span>
         <span style={{ opacity: 0.7 }}>{t(modeLabelKeys[mode])}</span>
-      </div>}
+      </div>
 
       {/* Force wrap to a second row here */}
       <div style={{ flexBasis: '100%', height: 0 }} />
