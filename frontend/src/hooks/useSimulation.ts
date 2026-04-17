@@ -381,11 +381,20 @@ export function useSimulation(subscribe?: WsSubscribe, primaryUdid?: string | nu
       }
       case 'state_change': {
         const st = wsMessage.data?.state
-        if (st === 'idle' || st === 'disconnected') {
+        if (st === 'idle') {
+          // User-initiated stop or natural sim completion: clear the
+          // overlays so the map goes back to a clean state.
           setStatus((prev) => ({ ...prev, running: false, paused: false, state: st }))
           setRoutePath([])
           setDestination(null)
           setEta(null)
+        } else if (st === 'disconnected') {
+          // USB unplug or tunnel death of THIS engine. In dual-device
+          // mode the surviving device is still running the same sim, so
+          // keep routePath / destination on the map. Clearing them here
+          // would make the polyline vanish until the user re-plugs the
+          // missing device, which is the bug we're avoiding.
+          setStatus((prev) => ({ ...prev, running: false, paused: false, state: st }))
         } else if (st === 'paused') {
           setStatus((prev) => ({ ...prev, paused: true, state: st }))
         } else if (st) {

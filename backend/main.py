@@ -299,6 +299,20 @@ async def _usbmux_presence_watchdog():
                     old_eng = app_state.simulation_engines.get(udid)
                     if old_eng is not None:
                         try:
+                            # Mark DISCONNECTED before cancelling the active
+                            # task. Otherwise _run_handler's finally block sees
+                            # a non-IDLE state and forces it to IDLE, emitting
+                            # state_change=idle. In dual-device mode, if the
+                            # primary is the one being unplugged, that idle
+                            # event slips through the frontend filter (primary
+                            # match) and wipes the global routePath / dest so
+                            # the surviving device's polyline disappears.
+                            from models.schemas import SimulationState as _SS
+                            old_eng.state = _SS.DISCONNECTED
+                            try:
+                                await old_eng._emit("state_change", {"state": old_eng.state.value})
+                            except Exception:
+                                logger.debug("watchdog: disconnected state_change emit failed", exc_info=True)
                             old_eng._stop_event.set()
                             old_eng._pause_event.set()  # unstick anyone awaiting pause_event
                             active = getattr(old_eng, "_active_task", None)
