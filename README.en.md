@@ -9,7 +9,7 @@
 
 <p align="center">
   <a href="https://ko-fi.com/haoooooo" target="_blank">
-    <img src="https://storage.ko-fi.com/cdn/kofi2.png?v=3" alt="Buy Me a Coffee at ko-fi.com" height="40">
+    <img src="https://img.shields.io/badge/Ko--fi-Buy%20me%20a%20coffee-FF5E5B?style=for-the-badge&logo=ko-fi&logoColor=white" alt="Ko-fi" height="40">
   </a>
   &nbsp;&nbsp;
   <a href="https://line.me/ti/p/uL__gvPNL4" target="_blank">
