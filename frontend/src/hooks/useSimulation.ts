@@ -1,6 +1,8 @@
 import { useState, useCallback, useEffect, useRef } from 'react'
 import * as api from '../services/api'
+import { applyWsMessage } from '../services/simulation-ws-handler'
 import type { WsMessage } from './useWebSocket'
+import { usePauseSettings } from './usePauseSettings'
 
 export enum SimMode {
   Teleport = 'teleport',
@@ -61,32 +63,12 @@ export function useSimulation(wsMessage: WsMessage | null) {
     return { speed_kmh: customSpeedKmh, speed_min_kmh: null, speed_max_kmh: null }
   }, [customSpeedKmh, customVarianceKmh])
 
-  // Per-mode pause settings, persisted in localStorage.
-  interface PauseSetting { enabled: boolean; min: number; max: number }
-  const defaultPause: PauseSetting = { enabled: true, min: 5, max: 20 }
-  const loadPause = (key: string): PauseSetting => {
-    try {
-      const raw = localStorage.getItem(key)
-      if (!raw) return defaultPause
-      const p = JSON.parse(raw)
-      return {
-        enabled: typeof p.enabled === 'boolean' ? p.enabled : true,
-        min: typeof p.min === 'number' ? p.min : 5,
-        max: typeof p.max === 'number' ? p.max : 20,
-      }
-    } catch {
-      return defaultPause
-    }
-  }
-  const savePause = (key: string, v: PauseSetting) => {
-    try { localStorage.setItem(key, JSON.stringify(v)) } catch { /* ignore */ }
-  }
-  const [pauseMultiStop, setPauseMultiStopRaw] = useState<PauseSetting>(() => loadPause('locwarp.pause.multi_stop'))
-  const [pauseLoop, setPauseLoopRaw] = useState<PauseSetting>(() => loadPause('locwarp.pause.loop'))
-  const [pauseRandomWalk, setPauseRandomWalkRaw] = useState<PauseSetting>(() => loadPause('locwarp.pause.random_walk'))
-  const setPauseMultiStop = (v: PauseSetting) => { setPauseMultiStopRaw(v); savePause('locwarp.pause.multi_stop', v) }
-  const setPauseLoop = (v: PauseSetting) => { setPauseLoopRaw(v); savePause('locwarp.pause.loop', v) }
-  const setPauseRandomWalk = (v: PauseSetting) => { setPauseRandomWalkRaw(v); savePause('locwarp.pause.random_walk', v) }
+  // Per-mode pause settings, persisted in localStorage. See ./usePauseSettings.
+  const {
+    pauseMultiStop, setPauseMultiStop,
+    pauseLoop, setPauseLoop,
+    pauseRandomWalk, setPauseRandomWalk,
+  } = usePauseSettings()
   const [error, setError] = useState<string | null>(null)
   // Random-walk pause countdown (unix epoch seconds of when pause ends)
   const [pauseEndAt, setPauseEndAt] = useState<number | null>(null)
@@ -109,134 +91,15 @@ export function useSimulation(wsMessage: WsMessage | null) {
     return () => clearInterval(id)
   }, [pauseEndAt])
 
-  // Process incoming WS messages
+  // Process incoming WS messages — dispatch to a pure handler so the switch
+  // is testable in isolation. See services/simulation-ws-handler.ts.
   useEffect(() => {
     if (!wsMessage) return
-
-    switch (wsMessage.type) {
-      case 'position_update': {
-        const { lat, lng } = wsMessage.data
-        if (typeof lat === 'number' && typeof lng === 'number') {
-          setCurrentPosition({ lat, lng })
-        }
-        if (wsMessage.data.progress != null) {
-          setProgress(wsMessage.data.progress)
-        }
-        {
-          const etaVal = wsMessage.data.eta_seconds ?? wsMessage.data.eta
-          if (etaVal != null) setEta(etaVal)
-        }
-        {
-          const dr   = wsMessage.data.distance_remaining
-          const dt   = wsMessage.data.distance_traveled
-          // speed_kmh 來自後端 position_update，反映實際執行速度
-          const spd  = wsMessage.data.speed_kmh != null
-            ? Math.round(wsMessage.data.speed_kmh)
-            : wsMessage.data.speed_mps != null
-              ? Math.round(wsMessage.data.speed_mps * 3.6)
-              : null
-          if (dr != null || dt != null || spd != null) {
-            setStatus((prev) => ({
-              ...prev,
-              ...(dr  != null ? { distance_remaining: dr } : {}),
-              ...(dt  != null ? { distance_traveled:  dt } : {}),
-              ...(spd != null ? { speed: spd }              : {}),
-            }))
-          }
-        }
-        break
-      }
-      case 'simulation_state': {
-        const d = wsMessage.data
-        setStatus({
-          running: !!d.running,
-          paused: !!d.paused,
-          speed: d.speed ?? 0,
-          state: d.state,
-          distance_remaining: d.distance_remaining,
-          distance_traveled: d.distance_traveled,
-        })
-        if (d.mode) setMode(d.mode)
-        if (d.progress != null) setProgress(d.progress)
-        if (d.eta != null) setEta(d.eta)
-        if (d.destination) setDestination(d.destination)
-        if (d.waypoints) setWaypoints(d.waypoints)
-        break
-      }
-      case 'simulation_complete': {
-        setStatus((prev) => ({ ...prev, running: false, paused: false }))
-        setProgress(1)
-        setEta(null)
-        setPauseEndAt(null)
-        break
-      }
-      case 'ddi_mounting': {
-        setDdiMounting(true)
-        break
-      }
-      case 'ddi_mounted':
-      case 'ddi_mount_failed': {
-        setDdiMounting(false)
-        break
-      }
-      case 'tunnel_lost': {
-        // Uses localStorage to get current language (hooks don't have i18n context easily here)
-        setError((typeof localStorage !== 'undefined' && localStorage.getItem('locwarp.lang') === 'en')
-          ? 'Wi-Fi tunnel dropped — please reconnect'
-          : 'WiFi Tunnel 連線中斷,請重新建立')
-        break
-      }
-      case 'device_disconnected': {
-        const isEn = typeof localStorage !== 'undefined' && localStorage.getItem('locwarp.lang') === 'en'
-        setError(isEn
-          ? 'Device disconnected (USB unplugged or tunnel died), please reconnect USB'
-          : '裝置連線中斷(USB 拔除或 Tunnel 死亡),請重新插上 USB')
-        setStatus((prev) => ({ ...prev, running: false, paused: false }))
-        break
-      }
-      case 'device_reconnected': {
-        // Auto-reconnected by the usbmux watchdog after a re-plug — clear
-        // the banner; the success is already visible via DeviceStatus.
-        setError(null)
-        break
-      }
-      case 'pause_countdown':
-      case 'random_walk_pause': {
-        const dur = wsMessage.data?.duration_seconds
-        if (typeof dur === 'number' && dur > 0) {
-          setPauseEndAt(Date.now() + dur * 1000)
-        }
-        break
-      }
-      case 'pause_countdown_end':
-      case 'random_walk_pause_end': {
-        setPauseEndAt(null)
-        break
-      }
-      case 'route_path': {
-        const pts = wsMessage.data?.coords
-        if (Array.isArray(pts)) {
-          setRoutePath(pts.map((p: any) => ({ lat: p.lat ?? p[0], lng: p.lng ?? p[1] })))
-        }
-        break
-      }
-      case 'state_change': {
-        const st = wsMessage.data?.state
-        if (st === 'idle' || st === 'disconnected') {
-          setStatus((prev) => ({ ...prev, running: false, paused: false, state: st }))
-          setRoutePath([])
-        } else if (st === 'paused') {
-          setStatus((prev) => ({ ...prev, paused: true, state: st }))
-        } else if (st) {
-          setStatus((prev) => ({ ...prev, running: true, paused: false, state: st }))
-        }
-        break
-      }
-      case 'simulation_error': {
-        setError(wsMessage.data?.message ?? 'Simulation error')
-        break
-      }
-    }
+    applyWsMessage(wsMessage, {
+      setCurrentPosition, setProgress, setEta, setStatus, setMode,
+      setDestination, setWaypoints, setPauseEndAt, setRoutePath,
+      setError, setDdiMounting,
+    })
   }, [wsMessage])
 
   const clearError = useCallback(() => setError(null), [])
