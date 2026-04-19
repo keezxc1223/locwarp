@@ -5,16 +5,18 @@ import { useDevice } from './hooks/useDevice'
 import { useSimulation } from './hooks/useSimulation'
 import { useJoystick } from './hooks/useJoystick'
 import { useBookmarks } from './hooks/useBookmarks'
-import * as api from './services/api'
+import { useToast } from './hooks/useToast'
+import { useCooldown } from './hooks/useCooldown'
+import { useSavedRoutes } from './hooks/useSavedRoutes'
 
 import MapView from './components/MapView'
-import ControlPanel, { SavedRoute } from './components/ControlPanel'
+import ControlPanel from './components/ControlPanel'
 import DeviceStatus from './components/DeviceStatus'
 import TimerPanel from './components/TimerPanel'
 import HistoryPanel from './components/HistoryPanel'
 import MultiDevicePanel from './components/MultiDevicePanel'
 import JoystickPad from './components/JoystickPad'
-import PauseControl from './components/PauseControl'
+import WaypointList from './components/WaypointList'
 import StatusBar from './components/StatusBar'
 import TopBar from './components/TopBar'
 import ActivityRail, { PanelId } from './components/ActivityRail'
@@ -37,20 +39,18 @@ const App: React.FC = () => {
   const joystick = useJoystick(ws.sendMessage, sim.status.running && sim.mode === SimMode.Joystick)
   const bm = useBookmarks()
 
-  const [savedRoutes, setSavedRoutes] = useState<SavedRoute[]>([])
-  const [cooldown, setCooldown] = useState(0)
-  const [cooldownEnabled, setCooldownEnabled] = useState(true)
+  // Toast + cooldown + saved-routes live in their own hooks — see ./hooks/*.
+  const toast = useToast()
+  const cd = useCooldown(ws.connected)
+  const savedRoutes = useSavedRoutes(toast.show, t)
+
   const [randomWalkRadius, setRandomWalkRadius] = useState(500)
-  const [toastMsg, setToastMsg] = useState<string | null>(null)
   const [drawingMode, setDrawingMode] = useState(false)
   const [activePanel, setActivePanel] = useState<PanelId | null>('control')
-  const [cooldownDistanceKm, setCooldownDistanceKm] = useState(0)
   // Bumped after every teleport so HistoryPanel can auto-refresh its list
   // instead of relying on the user to manually collapse/expand the panel.
   const [historyRefreshKey, setHistoryRefreshKey] = useState(0)
   const lastTeleportPosRef = React.useRef<{ lat: number; lng: number } | null>(null)
-  const [dragWpIdx, setDragWpIdx]   = useState<number | null>(null)
-  const [dragWpOver, setDragWpOver] = useState<number | null>(null)
 
   // ── Joystick auto-start/stop on mode change ────────────────────────────
   const prevModeRef = React.useRef<SimMode>(sim.mode)
@@ -72,17 +72,6 @@ const App: React.FC = () => {
   // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [sim.mode])
 
-  const toastTimerRef = React.useRef<ReturnType<typeof setTimeout> | null>(null)
-  const showToast = useCallback((msg: string, ms = 2000) => {
-    if (toastTimerRef.current) clearTimeout(toastTimerRef.current)
-    setToastMsg(msg)
-    toastTimerRef.current = setTimeout(() => {
-      setToastMsg(null)
-      toastTimerRef.current = null
-    }, ms)
-  }, [])
-  useEffect(() => () => { if (toastTimerRef.current) clearTimeout(toastTimerRef.current) }, [])
-
   // Toggle panel: clicking active panel closes it
   const handlePanelToggle = useCallback((panel: PanelId) => {
     setActivePanel(prev => prev === panel ? null : panel)
@@ -91,41 +80,20 @@ const App: React.FC = () => {
   const handleRestore = useCallback(async () => {
     try {
       await sim.restore()
-      showToast(t('status.restore_success'))
+      toast.show(t('status.restore_success'))
     } catch {
-      showToast(t('status.restore_failed'))
+      toast.show(t('status.restore_failed'))
     }
-  }, [showToast, t, sim])
-
-  const handleToggleCooldown = useCallback((enabled: boolean) => {
-    setCooldownEnabled(enabled)
-    api.setCooldownEnabled(enabled).catch(() => setCooldownEnabled((v) => !v))
-  }, [])
+  }, [toast, t, sim])
 
   const handleDrawingToggle = useCallback(() => {
     setDrawingMode(v => !v)
   }, [])
 
   useEffect(() => {
-    api.getSavedRoutes().then(setSavedRoutes).catch(() => {})
-  }, [])
-
-  useEffect(() => {
     if (ws.connected) {
       device.scan()
     }
-  }, [ws.connected])
-
-  useEffect(() => {
-    if (!ws.connected) return
-    const id = setInterval(() => {
-      api.getCooldownStatus().then((s: any) => {
-        setCooldown(s.remaining_seconds ?? 0)
-        if (typeof s.enabled === 'boolean') setCooldownEnabled(s.enabled)
-        if (typeof s.distance_km === 'number') setCooldownDistanceKm(s.distance_km)
-      }).catch(() => {})
-    }, 2000)
-    return () => clearInterval(id)
   }, [ws.connected])
 
   const handleMapClick = useCallback((_lat: number, _lng: number) => {}, [])
@@ -181,30 +149,25 @@ const App: React.FC = () => {
     sim.setWaypoints((prev) => prev.filter((_, i) => i !== index))
   }, [sim])
 
-  const handleWpDrop = useCallback((targetIdx: number) => {
-    if (dragWpIdx === null || dragWpIdx === targetIdx) {
-      setDragWpIdx(null); setDragWpOver(null); return
-    }
-    sim.setWaypoints((prev: any[]) => {
+  const handleWpReorder = useCallback((from: number, to: number) => {
+    sim.setWaypoints((prev) => {
       const arr = [...prev]
-      const [item] = arr.splice(dragWpIdx, 1)
-      arr.splice(targetIdx, 0, item)
+      const [item] = arr.splice(from, 1)
+      arr.splice(to, 0, item)
       return arr
     })
-    setDragWpIdx(null)
-    setDragWpOver(null)
-  }, [dragWpIdx, sim])
+  }, [sim])
 
   const handleStartWaypointRoute = useCallback(() => {
     if (sim.waypoints.length < 1) {
-      showToast(t('toast.no_waypoints'))
+      toast.show(t('toast.no_waypoints'))
       return
     }
     const route = sim.currentPosition
       ? [{ lat: sim.currentPosition.lat, lng: sim.currentPosition.lng }, ...sim.waypoints]
       : sim.waypoints
     if (route.length < 2) {
-      showToast(t('toast.no_waypoints'))
+      toast.show(t('toast.no_waypoints'))
       return
     }
     if (sim.mode === SimMode.Loop) {
@@ -212,85 +175,37 @@ const App: React.FC = () => {
     } else if (sim.mode === SimMode.MultiStop) {
       sim.multiStop(route, 0, false)
     }
-  }, [sim, showToast, t])
+  }, [sim, toast, t])
 
   const handleStart = useCallback(() => {
     if (sim.mode === SimMode.Joystick) {
       sim.joystickStart()
     } else if (sim.mode === SimMode.RandomWalk) {
       if (!sim.currentPosition) {
-        showToast(t('toast.no_position_random'))
+        toast.show(t('toast.no_position_random'))
         return
       }
       sim.randomWalk(sim.currentPosition, randomWalkRadius)
     } else if (sim.mode === SimMode.Loop || sim.mode === SimMode.MultiStop) {
       handleStartWaypointRoute()
     }
-  }, [sim, randomWalkRadius, handleStartWaypointRoute, showToast, t])
+  }, [sim, randomWalkRadius, handleStartWaypointRoute, toast, t])
 
   const handleStop = useCallback(() => {
     sim.restore()
   }, [sim])
 
+  // Thin wrappers: pull current sim state and hand off to useSavedRoutes.
+  // Kept in App.tsx because they bridge two hooks (sim + savedRoutes).
   const handleRouteLoad = useCallback((id: string) => {
-    const route = savedRoutes.find((r) => r.id === id)
-    if (!route || !Array.isArray(route.waypoints)) return
-    sim.setWaypoints(route.waypoints.map((w) => ({ lat: w.lat, lng: w.lng })))
+    const pts = savedRoutes.load(id)
+    if (pts) sim.setWaypoints(pts)
   }, [savedRoutes, sim])
 
-  // Toast-emitting callbacks must depend on `t` — without it React caches the
-  // closure with the previous language's translator and toasts come out in
-  // the wrong language after the user switches via LangToggle.
-  const handleRouteSave = useCallback(async (name: string) => {
-    if (sim.waypoints.length === 0) {
-      showToast(t('toast.route_need_waypoint'))
-      return
-    }
-    try {
-      await api.saveRoute({ name, waypoints: sim.waypoints, profile: sim.moveMode })
-      const routes = await api.getSavedRoutes()
-      setSavedRoutes(routes)
-      showToast(t('toast.route_saved', { name }))
-    } catch (err) {
-      showToast(t('toast.route_save_failed', { msg: api.errMsg(err) }))
-    }
-  }, [sim, showToast, t])
-
-  const handleGpxImport = useCallback(async (file: File) => {
-    try {
-      const res = await api.importGpx(file)
-      const routes = await api.getSavedRoutes()
-      setSavedRoutes(routes)
-      showToast(t('toast.gpx_imported', { n: res.points }))
-    } catch (err) {
-      showToast(t('toast.gpx_import_failed', { msg: api.errMsg(err) }))
-    }
-  }, [showToast, t])
-
-  const handleGpxExport = useCallback((id: string) => {
-    window.open(api.exportGpxUrl(id), '_blank')
-  }, [])
-
-  const handleRouteRename = useCallback(async (id: string, name: string) => {
-    try {
-      await api.renameRoute(id, name)
-      const routes = await api.getSavedRoutes()
-      setSavedRoutes(routes)
-    } catch (err) {
-      showToast(api.errMsg(err) || t('toast.route_rename_failed'))
-    }
-  }, [showToast, t])
-
-  const handleRouteDelete = useCallback(async (id: string) => {
-    try {
-      await api.deleteRoute(id)
-      const routes = await api.getSavedRoutes()
-      setSavedRoutes(routes)
-      showToast(t('toast.route_deleted'))
-    } catch (err) {
-      showToast(api.errMsg(err) || t('toast.route_delete_failed'))
-    }
-  }, [showToast, t])
+  const handleRouteSave = useCallback(
+    (name: string) => savedRoutes.save(name, sim.waypoints, sim.moveMode),
+    [savedRoutes, sim],
+  )
 
   // Derived values
   const currentPos = sim.currentPosition
@@ -422,11 +337,11 @@ const App: React.FC = () => {
                   const cat = bm.categories.find(c => c.name === name)
                   if (cat) bm.deleteCategory(cat.id)
                 }}
-                savedRoutes={savedRoutes.map(r => ({ id: r.id, name: r.name, waypoints: r.waypoints ?? [] }))}
-                onRouteGpxImport={handleGpxImport}
-                onRouteGpxExport={handleGpxExport}
-                onRouteRename={handleRouteRename}
-                onRouteDelete={handleRouteDelete}
+                savedRoutes={savedRoutes.routes.map(r => ({ id: r.id, name: r.name, waypoints: r.waypoints ?? [] }))}
+                onRouteGpxImport={savedRoutes.importGpx}
+                onRouteGpxExport={(id) => window.open(savedRoutes.exportGpxUrl(id), '_blank')}
+                onRouteRename={savedRoutes.rename}
+                onRouteDelete={savedRoutes.remove}
                 onRouteLoad={handleRouteLoad}
                 onRouteSave={handleRouteSave}
                 randomWalkRadius={randomWalkRadius}
@@ -435,75 +350,19 @@ const App: React.FC = () => {
                 onRandomWalkRadiusChange={setRandomWalkRadius}
                 currentWaypointsCount={sim.waypoints.length}
                 modeExtraSection={showWaypointModes ? (
-                  <div className="section" style={{ margin: '0 0 8px 0', padding: '0 0 2px 0' }}>
-                    <div className="section-title" style={{ display: 'flex', alignItems: 'center', gap: 6 }}>
-                      <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2">
-                        <circle cx="12" cy="12" r="3" />
-                        <line x1="12" y1="5" x2="12" y2="1" />
-                        <line x1="12" y1="23" x2="12" y2="19" />
-                      </svg>
-                      {t('panel.waypoints')} ({sim.waypoints.length})
-                      <span style={{ fontSize: 10, opacity: 0.5, marginLeft: 4 }}>{t('panel.waypoints_hint')}</span>
-                    </div>
-                    <div className="section-content">
-                      <PauseControl
-                        labelKey={sim.mode === SimMode.Loop ? 'pause.loop' : 'pause.multi_stop'}
-                        value={sim.mode === SimMode.Loop ? sim.pauseLoop : sim.pauseMultiStop}
-                        onChange={sim.mode === SimMode.Loop ? sim.setPauseLoop : sim.setPauseMultiStop}
-                      />
-                      {sim.waypoints.length === 0 && (
-                        <div style={{ fontSize: 12, opacity: 0.5, padding: '4px 0' }}>
-                          {t('panel.waypoints_empty')}
-                        </div>
-                      )}
-                      {sim.waypoints.map((wp: any, i: number) => (
-                        <div
-                          key={`${wp.lat.toFixed(6)}_${wp.lng.toFixed(6)}_${i}`}
-                          draggable
-                          onDragStart={() => setDragWpIdx(i)}
-                          onDragOver={e => { e.preventDefault(); setDragWpOver(i) }}
-                          onDragEnd={() => { setDragWpIdx(null); setDragWpOver(null) }}
-                          onDrop={() => handleWpDrop(i)}
-                          style={{
-                            display: 'flex', alignItems: 'center', gap: 6,
-                            padding: '3px 4px', fontSize: 12, borderRadius: 4,
-                            background: dragWpOver === i && dragWpIdx !== i
-                              ? 'rgba(108,140,255,0.18)' : 'transparent',
-                            cursor: 'grab', transition: 'background 0.1s',
-                            outline: dragWpOver === i && dragWpIdx !== i
-                              ? '1px solid rgba(108,140,255,0.4)' : 'none',
-                          }}
-                        >
-                          <span style={{ color: '#64748b', opacity: 0.45, fontSize: 14, lineHeight: 1 }}>⠿</span>
-                          <span style={{ color: '#ff9800', fontWeight: 600, width: 20 }}>#{i + 1}</span>
-                          <span style={{ flex: 1, opacity: 0.8 }}>{wp.lat.toFixed(5)}, {wp.lng.toFixed(5)}</span>
-                          <button
-                            className="action-btn"
-                            style={{ padding: '2px 6px', fontSize: 10 }}
-                            onClick={() => handleRemoveWaypoint(i)}
-                            title={t('panel.waypoints_remove')}
-                          >✕</button>
-                        </div>
-                      ))}
-                      {sim.waypoints.length > 0 && (
-                        <div style={{ display: 'flex', gap: 6, marginTop: 6 }}>
-                          <button
-                            className="action-btn primary"
-                            style={{ flex: 1 }}
-                            onClick={handleStartWaypointRoute}
-                            disabled={sim.waypoints.length < 1 || !sim.currentPosition}
-                          >
-                            {sim.mode === SimMode.Loop
-                              ? t('panel.waypoints_start_loop')
-                              : sim.mode === SimMode.MultiStop
-                                ? t('panel.waypoints_start_multi')
-                                : t('panel.waypoints_start_navigate')}
-                          </button>
-                          <button className="action-btn" onClick={handleClearWaypoints}>{t('generic.clear')}</button>
-                        </div>
-                      )}
-                    </div>
-                  </div>
+                  <WaypointList
+                    mode={sim.mode}
+                    waypoints={sim.waypoints}
+                    hasCurrentPosition={!!sim.currentPosition}
+                    pauseLoop={sim.pauseLoop}
+                    setPauseLoop={sim.setPauseLoop}
+                    pauseMultiStop={sim.pauseMultiStop}
+                    setPauseMultiStop={sim.setPauseMultiStop}
+                    onReorder={handleWpReorder}
+                    onRemove={handleRemoveWaypoint}
+                    onClear={handleClearWaypoints}
+                    onStart={handleStartWaypointRoute}
+                  />
                 ) : null}
               />
             )}
@@ -600,9 +459,9 @@ const App: React.FC = () => {
             deviceConnected={isConnected}
             drawingMode={drawingMode && showWaypointModes}
             cooldownCircle={
-              cooldown > 0 && cooldownDistanceKm > 1 && lastTeleportPosRef.current
+              cd.remainingSeconds > 0 && cd.distanceKm > 1 && lastTeleportPosRef.current
                 ? { lat: lastTeleportPosRef.current.lat, lng: lastTeleportPosRef.current.lng,
-                    distanceKm: cooldownDistanceKm, remainingSeconds: cooldown }
+                    distanceKm: cd.distanceKm, remainingSeconds: cd.remainingSeconds }
                 : null
             }
             bookmarkMarkers={bm.bookmarks.map(b => ({
@@ -678,12 +537,12 @@ const App: React.FC = () => {
           )}
 
           {/* Global toast */}
-          {toastMsg && (
+          {toast.message && (
             <div className="global-toast">
               <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="var(--accent-green)" strokeWidth="2.5">
                 <polyline points="20 6 9 17 4 12" />
               </svg>
-              {toastMsg}
+              {toast.message}
             </div>
           )}
         </div>
@@ -718,10 +577,10 @@ const App: React.FC = () => {
         currentPosition={currentPos}
         speed={displaySpeed}
         mode={sim.mode}
-        cooldown={cooldown}
-        cooldownEnabled={cooldownEnabled}
-        cooldownDistanceKm={cooldownDistanceKm}
-        onToggleCooldown={handleToggleCooldown}
+        cooldown={cd.remainingSeconds}
+        cooldownEnabled={cd.enabled}
+        cooldownDistanceKm={cd.distanceKm}
+        onToggleCooldown={cd.toggleEnabled}
         onRestore={handleRestore}
       />
 
