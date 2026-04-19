@@ -19,16 +19,14 @@ from __future__ import annotations
 import asyncio
 import logging
 import socket
-from dataclasses import dataclass, field
+from dataclasses import dataclass
 from pathlib import Path
-from typing import Dict, Optional
+from typing import Optional
 
-from pymobiledevice3.lockdown import create_using_usbmux, create_using_tcp
+from pymobiledevice3.lockdown import create_using_tcp, create_using_usbmux
 from pymobiledevice3.remote.remote_service_discovery import RemoteServiceDiscoveryService
 from pymobiledevice3.remote.tunnel_service import CoreDeviceTunnelProxy
 from pymobiledevice3.services.dvt.instruments.dvt_provider import DvtProvider
-from pymobiledevice3.services.dvt.instruments.location_simulation import LocationSimulation
-from pymobiledevice3.services.simulate_location import DtSimulateLocation
 from pymobiledevice3.usbmux import list_devices
 
 from models.schemas import DeviceInfo
@@ -48,6 +46,25 @@ def _parse_ios_version(version_string: str) -> tuple[int, ...]:
     except (ValueError, AttributeError):
         logger.warning("Unable to parse iOS version '%s', assuming 0.0", version_string)
         return (0, 0)
+
+
+async def _safe_broadcast(event_type: str, data: dict) -> None:
+    """Best-effort WS broadcast that never raises.
+
+    Used in cleanup / notify paths where:
+    * the websocket module may not be importable yet during early startup,
+    * the connection list may have been torn down,
+    * the client may have already gone away.
+
+    Failure is intentionally non-fatal — we just want UI updates when possible.
+    Logs at DEBUG so future websocket regressions are still traceable instead
+    of being silently swallowed (the original ``except Exception: pass``).
+    """
+    try:
+        from api.websocket import broadcast
+        await broadcast(event_type, data)
+    except Exception:
+        logger.debug("Best-effort broadcast '%s' failed", event_type, exc_info=True)
 
 
 @dataclass
@@ -80,7 +97,7 @@ class DeviceManager:
     """
 
     def __init__(self) -> None:
-        self._connections: Dict[str, _ActiveConnection] = {}
+        self._connections: dict[str, _ActiveConnection] = {}
         self._lock = asyncio.Lock()
 
     # ------------------------------------------------------------------
@@ -349,9 +366,9 @@ class DeviceManager:
         """
         try:
             from pymobiledevice3.services.mobile_image_mounter import (
+                AlreadyMountedError,
                 MobileImageMounterService,
                 auto_mount_personalized,
-                AlreadyMountedError,
             )
         except ImportError:
             logger.warning("pymobiledevice3 mobile_image_mounter not available; skipping DDI mount")
@@ -376,11 +393,7 @@ class DeviceManager:
         # 2. Not mounted — download + mount. Notify frontend so the user
         # sees a "preparing device" overlay instead of a frozen UI.
         logger.info("Personalized DDI not mounted on %s; mounting (may download ~20MB)...", conn.udid)
-        try:
-            from api.websocket import broadcast
-            await broadcast("ddi_mounting", {"udid": conn.udid})
-        except Exception:
-            pass
+        await _safe_broadcast("ddi_mounting", {"udid": conn.udid})
         mount_succeeded = False
         try:
             # auto_mount_personalized internally uses requests.get for the
@@ -392,35 +405,23 @@ class DeviceManager:
         except AlreadyMountedError:
             logger.info("DDI was mounted concurrently for %s", conn.udid)
             mount_succeeded = True
-        except asyncio.TimeoutError:
+        except TimeoutError:
             logger.error("DDI mount timed out after 120s for %s", conn.udid)
-            try:
-                from api.websocket import broadcast
-                await broadcast("ddi_mount_failed", {
-                    "udid": conn.udid,
-                    "error": "DDI download/mount timed out (120s). Check network access to github.com.",
-                })
-            except Exception:
-                pass
+            await _safe_broadcast("ddi_mount_failed", {
+                "udid": conn.udid,
+                "error": "DDI download/mount timed out (120s). Check network access to github.com.",
+            })
             raise RuntimeError("DDI mount timed out — check network access to github.com")
         except Exception as exc:
             logger.exception("auto_mount_personalized failed for %s", conn.udid)
-            try:
-                from api.websocket import broadcast
-                await broadcast("ddi_mount_failed", {
-                    "udid": conn.udid,
-                    "error": f"{exc.__class__.__name__}: {exc}",
-                })
-            except Exception:
-                pass
+            await _safe_broadcast("ddi_mount_failed", {
+                "udid": conn.udid,
+                "error": f"{exc.__class__.__name__}: {exc}",
+            })
             raise
         finally:
             if mount_succeeded:
-                try:
-                    from api.websocket import broadcast
-                    await broadcast("ddi_mounted", {"udid": conn.udid})
-                except Exception:
-                    pass
+                await _safe_broadcast("ddi_mounted", {"udid": conn.udid})
 
     async def _create_dvt_location_service(
         self, conn: _ActiveConnection
@@ -472,7 +473,9 @@ class DeviceManager:
         """
         try:
             from pymobiledevice3.services.mobile_image_mounter import (
-                MobileImageMounterService, auto_mount, AlreadyMountedError,
+                AlreadyMountedError,
+                MobileImageMounterService,
+                auto_mount,
             )
         except ImportError:
             logger.warning("pymobiledevice3 mobile_image_mounter not available; skipping classic DDI mount")
@@ -486,16 +489,15 @@ class DeviceManager:
                     logger.debug("Classic DDI already mounted on %s", conn.udid)
                     return
             finally:
-                try: await mounter.close()
-                except Exception: pass
+                try:
+                    await mounter.close()
+                except Exception:
+                    pass
         except Exception:
             logger.debug("Could not query classic DDI mount status; will attempt to mount", exc_info=True)
 
         logger.info("Classic DDI not mounted on %s (iOS %s); mounting...", conn.udid, conn.ios_version)
-        try:
-            from api.websocket import broadcast
-            await broadcast("ddi_mounting", {"udid": conn.udid})
-        except Exception: pass
+        await _safe_broadcast("ddi_mounting", {"udid": conn.udid})
         mounted = False
         try:
             await asyncio.wait_for(auto_mount(conn.lockdown), timeout=120.0)
@@ -503,32 +505,23 @@ class DeviceManager:
             mounted = True
         except AlreadyMountedError:
             mounted = True
-        except asyncio.TimeoutError:
+        except TimeoutError:
             logger.error("Classic DDI mount timed out after 120s for %s", conn.udid)
-            try:
-                from api.websocket import broadcast
-                await broadcast("ddi_mount_failed", {
-                    "udid": conn.udid,
-                    "error": "Classic DDI download/mount timed out (120s)",
-                })
-            except Exception: pass
+            await _safe_broadcast("ddi_mount_failed", {
+                "udid": conn.udid,
+                "error": "Classic DDI download/mount timed out (120s)",
+            })
             raise RuntimeError("Classic DDI mount timed out")
         except Exception as exc:
             logger.exception("auto_mount (classic) failed for %s", conn.udid)
-            try:
-                from api.websocket import broadcast
-                await broadcast("ddi_mount_failed", {
-                    "udid": conn.udid,
-                    "error": f"{exc.__class__.__name__}: {exc}",
-                })
-            except Exception: pass
+            await _safe_broadcast("ddi_mount_failed", {
+                "udid": conn.udid,
+                "error": f"{exc.__class__.__name__}: {exc}",
+            })
             raise
         finally:
             if mounted:
-                try:
-                    from api.websocket import broadcast
-                    await broadcast("ddi_mounted", {"udid": conn.udid})
-                except Exception: pass
+                await _safe_broadcast("ddi_mounted", {"udid": conn.udid})
 
     async def _create_legacy_location_service(
         self, conn: _ActiveConnection
@@ -742,7 +735,7 @@ class DeviceManager:
                 except Exception:
                     # Port open but lockdown failed — still report it
                     return {"ip": ip, "name": "iOS Device", "udid": "", "ios_version": ""}
-            except (OSError, asyncio.TimeoutError):
+            except (TimeoutError, OSError):
                 return None
 
         results = await asyncio.gather(*[_probe(ip) for ip in ips])

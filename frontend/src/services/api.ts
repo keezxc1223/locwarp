@@ -57,6 +57,19 @@ function formatError(detail: unknown, fallback: string): string {
   return fallback
 }
 
+/**
+ * Safe error-message extractor for `catch (err)` blocks.
+ *
+ * `catch (err: any)` is a footgun: TypeScript can't validate that `err.message`
+ * exists, so a thrown non-Error (string, number, undefined, anything) silently
+ * becomes `undefined` in the toast. Use this everywhere instead.
+ */
+export function errMsg(err: unknown): string {
+  if (err instanceof Error) return err.message
+  if (typeof err === 'string') return err
+  return String(err)
+}
+
 async function request<T>(method: string, path: string, body?: unknown): Promise<T> {
   const opts: RequestInit = {
     method,

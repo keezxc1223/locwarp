@@ -1,7 +1,15 @@
+import logging
+
 from fastapi import APIRouter, HTTPException
 from pydantic import BaseModel
 
-from models.schemas import DeviceInfo
+from models.schemas import (
+    DeviceInfo,
+    WifiConnectResponse,
+    WifiTunnelStartConnectResponse,
+)
+
+logger = logging.getLogger(__name__)
 
 router = APIRouter(prefix="/api/device", tags=["device"])
 
@@ -23,23 +31,32 @@ class WifiConnectRequest(BaseModel):
     ip: str
 
 
-@router.post("/wifi/connect")
-async def wifi_connect(req: WifiConnectRequest):
+@router.post("/wifi/connect", response_model=WifiConnectResponse)
+async def wifi_connect(req: WifiConnectRequest) -> WifiConnectResponse:
     """Connect to an iOS device over WiFi by IP address."""
     from main import app_state
     dm = _dm()
     try:
         info = await dm.connect_wifi(req.ip)
         await app_state.create_engine_for_device(info.udid)
-        return {
-            "status": "connected",
-            "udid": info.udid,
-            "name": info.name,
-            "ios_version": info.ios_version,
-            "connection_type": "Network",
-        }
-    except Exception as e:
-        raise HTTPException(status_code=500, detail=str(e))
+        return WifiConnectResponse(
+            status="connected",
+            udid=info.udid,
+            name=info.name,
+            ios_version=info.ios_version,
+        )
+    except RuntimeError as e:
+        # Friendly user-facing message raised by DeviceManager.connect_wifi
+        raise HTTPException(
+            status_code=503,
+            detail={"code": "wifi_connect_failed", "message": str(e)},
+        )
+    except Exception:
+        logger.exception("Unexpected error in wifi_connect for %s", req.ip)
+        raise HTTPException(
+            status_code=500,
+            detail={"code": "internal_error", "message": "WiFi 連線發生未預期錯誤,請查看後端 log"},
+        )
 
 
 @router.get("/wifi/scan")
@@ -58,32 +75,43 @@ class WifiTunnelConnectRequest(BaseModel):
     rsd_port: int
 
 
-@router.post("/wifi/tunnel")
-async def wifi_tunnel_connect(req: WifiTunnelConnectRequest):
+@router.post("/wifi/tunnel", response_model=WifiConnectResponse)
+async def wifi_tunnel_connect(req: WifiTunnelConnectRequest) -> WifiConnectResponse:
     """Connect to a device via an existing WiFi tunnel (RSD address/port)."""
     from main import app_state
     dm = _dm()
     try:
         info = await dm.connect_wifi_tunnel(req.rsd_address, req.rsd_port)
         await app_state.create_engine_for_device(info.udid)
-        return {
-            "status": "connected",
-            "udid": info.udid,
-            "name": info.name,
-            "ios_version": info.ios_version,
-            "connection_type": "Network",
-        }
-    except Exception as e:
-        raise HTTPException(status_code=500, detail=str(e))
+        return WifiConnectResponse(
+            status="connected",
+            udid=info.udid,
+            name=info.name,
+            ios_version=info.ios_version,
+        )
+    except RuntimeError as e:
+        raise HTTPException(
+            status_code=503,
+            detail={"code": "tunnel_connect_failed", "message": str(e)},
+        )
+    except Exception:
+        logger.exception(
+            "Unexpected error in wifi_tunnel_connect for %s:%d",
+            req.rsd_address, req.rsd_port,
+        )
+        raise HTTPException(
+            status_code=500,
+            detail={"code": "internal_error", "message": "WiFi tunnel 連線發生未預期錯誤,請查看後端 log"},
+        )
 
 
 # ── WiFi Tunnel lifecycle (start / status / stop) ───────
 
 import asyncio
 import json
+import logging
 import subprocess
 import sys
-import logging
 from pathlib import Path
 
 _tunnel_logger = logging.getLogger("wifi_tunnel")
@@ -165,12 +193,12 @@ async def wifi_repair():
          ~/.pymobiledevice3/ as a side effect of the RSD handshake.
     """
     from pymobiledevice3.lockdown import create_using_usbmux
-    from pymobiledevice3.usbmux import list_devices as mux_list_devices
+    from pymobiledevice3.remote.remote_service_discovery import RemoteServiceDiscoveryService
     from pymobiledevice3.remote.tunnel_service import (
         CoreDeviceTunnelProxy,
         create_core_device_tunnel_service_using_rsd,
     )
-    from pymobiledevice3.remote.remote_service_discovery import RemoteServiceDiscoveryService
+    from pymobiledevice3.usbmux import list_devices as mux_list_devices
 
     try:
         raw_devices = await mux_list_devices()
@@ -343,7 +371,7 @@ async def _tcp_probe(ip: str, port: int, timeout: float = 0.4) -> bool:
         except (OSError, ConnectionError):
             pass
         return True
-    except (OSError, ConnectionError, asyncio.TimeoutError):
+    except (TimeoutError, OSError, ConnectionError):
         return False
 
 
@@ -424,8 +452,8 @@ async def wifi_tunnel_discover():
 def _find_python313() -> list[str] | None:
     """Find a Python 3.13+ interpreter on the system.  Returns the
     command as a list of strings suitable for ``subprocess.Popen``."""
-    import shutil
     import os
+    import shutil
 
     # Build a search list: explicit version names first, then generic ones.
     # Also prepend Homebrew paths (/opt/homebrew/bin, /usr/local/bin) so macOS
@@ -772,8 +800,8 @@ async def wifi_tunnel_stop():
     return {"status": "stopped"}
 
 
-@router.post("/wifi/tunnel/start-and-connect")
-async def wifi_tunnel_start_and_connect(req: WifiTunnelStartRequest):
+@router.post("/wifi/tunnel/start-and-connect", response_model=WifiTunnelStartConnectResponse)
+async def wifi_tunnel_start_and_connect(req: WifiTunnelStartRequest) -> WifiTunnelStartConnectResponse:
     """Start a WiFi tunnel and immediately connect the device through it."""
     from main import app_state
 
@@ -793,17 +821,28 @@ async def wifi_tunnel_start_and_connect(req: WifiTunnelStartRequest):
     try:
         info = await dm.connect_wifi_tunnel(rsd_address, rsd_port)
         await app_state.create_engine_for_device(info.udid)
-        return {
-            "status": "connected",
-            "udid": info.udid,
-            "name": info.name,
-            "ios_version": info.ios_version,
-            "connection_type": "Network",
-            "rsd_address": rsd_address,
-            "rsd_port": rsd_port,
-        }
-    except Exception as e:
-        raise HTTPException(status_code=500, detail=f"Tunnel started but connection failed: {e}")
+        return WifiTunnelStartConnectResponse(
+            status="connected",
+            udid=info.udid,
+            name=info.name,
+            ios_version=info.ios_version,
+            rsd_address=rsd_address,
+            rsd_port=rsd_port,
+        )
+    except RuntimeError as e:
+        raise HTTPException(
+            status_code=503,
+            detail={"code": "tunnel_connect_failed", "message": f"Tunnel started but connection failed: {e}"},
+        )
+    except Exception:
+        logger.exception(
+            "Unexpected error in wifi_tunnel_start_and_connect (%s:%s)",
+            rsd_address, rsd_port,
+        )
+        raise HTTPException(
+            status_code=500,
+            detail={"code": "internal_error", "message": "Tunnel started but follow-up connect failed unexpectedly"},
+        )
 
 
 # ── Generic UDID routes (MUST be defined after all specific /wifi/* routes

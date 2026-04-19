@@ -19,7 +19,7 @@ interface Bookmark {
   category: string;
 }
 
-interface SavedRoute {
+export interface SavedRoute {
   id: string;
   name: string;
   waypoints: Position[];

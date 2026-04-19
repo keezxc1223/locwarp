@@ -8,7 +8,7 @@ import { useBookmarks } from './hooks/useBookmarks'
 import * as api from './services/api'
 
 import MapView from './components/MapView'
-import ControlPanel from './components/ControlPanel'
+import ControlPanel, { SavedRoute } from './components/ControlPanel'
 import DeviceStatus from './components/DeviceStatus'
 import TimerPanel from './components/TimerPanel'
 import HistoryPanel from './components/HistoryPanel'
@@ -37,7 +37,7 @@ const App: React.FC = () => {
   const joystick = useJoystick(ws.sendMessage, sim.status.running && sim.mode === SimMode.Joystick)
   const bm = useBookmarks()
 
-  const [savedRoutes, setSavedRoutes] = useState<any[]>([])
+  const [savedRoutes, setSavedRoutes] = useState<SavedRoute[]>([])
   const [cooldown, setCooldown] = useState(0)
   const [cooldownEnabled, setCooldownEnabled] = useState(true)
   const [randomWalkRadius, setRandomWalkRadius] = useState(500)
@@ -235,7 +235,7 @@ const App: React.FC = () => {
   const handleRouteLoad = useCallback((id: string) => {
     const route = savedRoutes.find((r) => r.id === id)
     if (!route || !Array.isArray(route.waypoints)) return
-    sim.setWaypoints(route.waypoints.map((w: any) => ({ lat: w.lat, lng: w.lng })))
+    sim.setWaypoints(route.waypoints.map((w) => ({ lat: w.lat, lng: w.lng })))
   }, [savedRoutes, sim])
 
   // Toast-emitting callbacks must depend on `t` — without it React caches the
@@ -251,8 +251,8 @@ const App: React.FC = () => {
       const routes = await api.getSavedRoutes()
       setSavedRoutes(routes)
       showToast(t('toast.route_saved', { name }))
-    } catch (err: any) {
-      showToast(t('toast.route_save_failed', { msg: err.message || '' }))
+    } catch (err) {
+      showToast(t('toast.route_save_failed', { msg: api.errMsg(err) }))
     }
   }, [sim, showToast, t])
 
@@ -262,8 +262,8 @@ const App: React.FC = () => {
       const routes = await api.getSavedRoutes()
       setSavedRoutes(routes)
       showToast(t('toast.gpx_imported', { n: res.points }))
-    } catch (err: any) {
-      showToast(t('toast.gpx_import_failed', { msg: err.message || '' }))
+    } catch (err) {
+      showToast(t('toast.gpx_import_failed', { msg: api.errMsg(err) }))
     }
   }, [showToast, t])
 
@@ -276,8 +276,8 @@ const App: React.FC = () => {
       await api.renameRoute(id, name)
       const routes = await api.getSavedRoutes()
       setSavedRoutes(routes)
-    } catch (err: any) {
-      showToast(err.message || t('toast.route_rename_failed'))
+    } catch (err) {
+      showToast(api.errMsg(err) || t('toast.route_rename_failed'))
     }
   }, [showToast, t])
 
@@ -287,8 +287,8 @@ const App: React.FC = () => {
       const routes = await api.getSavedRoutes()
       setSavedRoutes(routes)
       showToast(t('toast.route_deleted'))
-    } catch (err: any) {
-      showToast(err.message || t('toast.route_delete_failed'))
+    } catch (err) {
+      showToast(api.errMsg(err) || t('toast.route_delete_failed'))
     }
   }, [showToast, t])
 

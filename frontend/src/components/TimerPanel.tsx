@@ -72,8 +72,8 @@ const TimerPanel: React.FC<Props> = ({ wsMessage, onExpired }) => {
       setActive(true)
       setRemaining(seconds)
       setDuration(seconds)
-    } catch (e: any) {
-      setToast(e.message)
+    } catch (e) {
+      setToast(api.errMsg(e))
       setTimeout(() => setToast(null), 3000)
     } finally {
       setLoading(false)

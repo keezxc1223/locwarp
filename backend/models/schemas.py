@@ -1,6 +1,8 @@
 from __future__ import annotations
 
 from enum import Enum
+from typing import Annotated, Literal, Union
+
 from pydantic import BaseModel, Field
 
 
@@ -104,6 +106,46 @@ class JoystickStartRequest(BaseModel):
 class JoystickInput(BaseModel):
     direction: float = Field(ge=0, le=360)
     intensity: float = Field(ge=0, le=1)
+
+
+# ── Inbound WebSocket message envelopes ───────────────────
+# Discriminated union — Pydantic validates `type` first, then dispatches
+# the rest of the payload against the matching variant. Garbage / unknown
+# `type` values raise ValidationError instead of silently no-op'ing.
+class WsPong(BaseModel):
+    type: Literal["pong"]
+
+
+class WsJoystickInput(BaseModel):
+    type: Literal["joystick_input"]
+    data: JoystickInput
+
+
+class WsJoystickStop(BaseModel):
+    type: Literal["joystick_stop"]
+
+
+IncomingWsMessage = Annotated[
+    Union[WsPong, WsJoystickInput, WsJoystickStop],
+    Field(discriminator="type"),
+]
+
+
+# ── Device API response envelopes ─────────────────────────
+# These replace the ad-hoc dict returns from /wifi/* endpoints so the response
+# shape is documented in OpenAPI and validated by FastAPI before sending.
+class WifiConnectResponse(BaseModel):
+    status: Literal["connected"]
+    udid: str
+    name: str
+    ios_version: str
+    connection_type: Literal["Network"] = "Network"
+
+
+class WifiTunnelStartConnectResponse(WifiConnectResponse):
+    """Same as WifiConnectResponse plus the RSD address/port the tunnel landed on."""
+    rsd_address: str
+    rsd_port: int
 
 
 # ── Simulation status ────────────────────────────────────

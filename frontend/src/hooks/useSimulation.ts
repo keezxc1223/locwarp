@@ -251,8 +251,8 @@ export function useSimulation(wsMessage: WsMessage | null) {
       setProgress(0)
       setEta(null)
       return res
-    } catch (err: any) {
-      setError(err.message)
+    } catch (err) {
+      setError(api.errMsg(err))
       throw err
     }
   }, [])
@@ -267,8 +267,8 @@ export function useSimulation(wsMessage: WsMessage | null) {
         const res = await api.navigate(lat, lng, moveMode, buildSpeedOpts())
         setStatus((prev) => ({ ...prev, running: true, paused: false }))
         return res
-      } catch (err: any) {
-        setError(err.message)
+      } catch (err) {
+        setError(api.errMsg(err))
         throw err
       }
     },
@@ -285,8 +285,8 @@ export function useSimulation(wsMessage: WsMessage | null) {
         const res = await api.startLoop(wps, moveMode, buildSpeedOpts(), { pause_enabled: pauseLoop.enabled, pause_min: pauseLoop.min, pause_max: pauseLoop.max })
         setStatus((prev) => ({ ...prev, running: true, paused: false }))
         return res
-      } catch (err: any) {
-        setError(err.message)
+      } catch (err) {
+        setError(api.errMsg(err))
         throw err
       }
     },
@@ -303,8 +303,8 @@ export function useSimulation(wsMessage: WsMessage | null) {
         const res = await api.multiStop(wps, moveMode, stopDuration, loop, buildSpeedOpts(), { pause_enabled: pauseMultiStop.enabled, pause_min: pauseMultiStop.min, pause_max: pauseMultiStop.max })
         setStatus((prev) => ({ ...prev, running: true, paused: false }))
         return res
-      } catch (err: any) {
-        setError(err.message)
+      } catch (err) {
+        setError(api.errMsg(err))
         throw err
       }
     },
@@ -320,8 +320,8 @@ export function useSimulation(wsMessage: WsMessage | null) {
         const res = await api.randomWalk(center, radiusM, moveMode, buildSpeedOpts(), { pause_enabled: pauseRandomWalk.enabled, pause_min: pauseRandomWalk.min, pause_max: pauseRandomWalk.max })
         setStatus((prev) => ({ ...prev, running: true, paused: false }))
         return res
-      } catch (err: any) {
-        setError(err.message)
+      } catch (err) {
+        setError(api.errMsg(err))
         throw err
       }
     },
@@ -335,8 +335,8 @@ export function useSimulation(wsMessage: WsMessage | null) {
       const res = await api.joystickStart(moveMode, buildSpeedOpts())
       setStatus((prev) => ({ ...prev, running: true, paused: false }))
       return res
-    } catch (err: any) {
-      setError(err.message)
+    } catch (err) {
+      setError(api.errMsg(err))
       throw err
     }
   }, [moveMode, buildSpeedOpts])
@@ -348,8 +348,8 @@ export function useSimulation(wsMessage: WsMessage | null) {
       // leave mode as-is; status drives running state
       setStatus((prev) => ({ ...prev, running: false, paused: false }))
       return res
-    } catch (err: any) {
-      setError(err.message)
+    } catch (err) {
+      setError(api.errMsg(err))
       throw err
     }
   }, [])
@@ -360,8 +360,8 @@ export function useSimulation(wsMessage: WsMessage | null) {
       const res = await api.pauseSim()
       setStatus((prev) => ({ ...prev, paused: true }))
       return res
-    } catch (err: any) {
-      setError(err.message)
+    } catch (err) {
+      setError(api.errMsg(err))
       throw err
     }
   }, [])
@@ -372,8 +372,8 @@ export function useSimulation(wsMessage: WsMessage | null) {
       const res = await api.resumeSim()
       setStatus((prev) => ({ ...prev, paused: false }))
       return res
-    } catch (err: any) {
-      setError(err.message)
+    } catch (err) {
+      setError(api.errMsg(err))
       throw err
     }
   }, [])
@@ -394,8 +394,8 @@ export function useSimulation(wsMessage: WsMessage | null) {
       // 實體 GPS 要 10~30s 才會重新取得，map 空白正好提示這個過渡狀態。
       setCurrentPosition(null)
       return res
-    } catch (err: any) {
-      setError(err.message)
+    } catch (err) {
+      setError(api.errMsg(err))
       throw err
     }
   }, [])

@@ -1,6 +1,6 @@
 import React, { useState } from 'react';
 import { createPortal } from 'react-dom';
-import { wifiTunnelDiscover, wifiRepair } from '../services/api';
+import { wifiTunnelDiscover, wifiRepair, errMsg } from '../services/api';
 import { useT } from '../i18n';
 
 interface Device {
@@ -60,9 +60,9 @@ const DeviceStatus: React.FC<DeviceStatusProps> = ({
       const res = await wifiRepair();
       setRepairState('success');
       setRepairMessage(`${res.name || 'iPhone'} (iOS ${res.ios_version})`);
-    } catch (err: any) {
+    } catch (err) {
       setRepairState('failed');
-      setRepairMessage(err?.message || 'Unknown error');
+      setRepairMessage(errMsg(err) || 'Unknown error');
     }
   };
   const [scanning, setScanning] = useState(false);
@@ -100,8 +100,8 @@ const DeviceStatus: React.FC<DeviceStatusProps> = ({
     setLegacyError(null);
     try {
       await onWifiConnect(legacyIp.trim());
-    } catch (err: any) {
-      setLegacyError(err.message || t('device.connect_failed'));
+    } catch (err) {
+      setLegacyError(errMsg(err) || t('device.connect_failed'));
     } finally {
       setLegacyConnecting(false);
     }
@@ -119,8 +119,8 @@ const DeviceStatus: React.FC<DeviceStatusProps> = ({
       } else {
         setTunnelError(t('wifi.device_not_detected'));
       }
-    } catch (err: any) {
-      setTunnelError(err.message || t('wifi.detect_failed'));
+    } catch (err) {
+      setTunnelError(errMsg(err) || t('wifi.detect_failed'));
     } finally {
       setDiscovering(false);
     }
@@ -522,8 +522,8 @@ const DeviceStatus: React.FC<DeviceStatusProps> = ({
                           // Remember on success
                           localStorage.setItem('locwarp.tunnel.ip', tunnelIp.trim());
                           localStorage.setItem('locwarp.tunnel.port', tunnelPort || '49152');
-                        } catch (err: any) {
-                          setTunnelError(err.message || 'WiFi tunnel failed');
+                        } catch (err) {
+                          setTunnelError(errMsg(err) || 'WiFi tunnel failed');
                         } finally { setTunnelConnecting(false); }
                       }}
                       disabled={tunnelConnecting || !tunnelIp.trim()}

@@ -3,14 +3,24 @@ import json
 import logging
 
 from fastapi import APIRouter, WebSocket, WebSocketDisconnect
+from pydantic import TypeAdapter, ValidationError
 
-from models.schemas import JoystickInput
+from models.schemas import (
+    IncomingWsMessage,
+    WsJoystickInput,
+    WsJoystickStop,
+    WsPong,
+)
 
 router = APIRouter(tags=["websocket"])
 logger = logging.getLogger(__name__)
 
 # Active WebSocket connections
 _connections: list[WebSocket] = []
+
+# Validates every inbound frame against the discriminated union once at the
+# boundary. Built once at module import — TypeAdapter is safe to reuse.
+_incoming_adapter: TypeAdapter[IncomingWsMessage] = TypeAdapter(IncomingWsMessage)
 
 
 async def broadcast(event_type: str, data: dict):
@@ -46,28 +56,38 @@ async def websocket_endpoint(ws: WebSocket):
     try:
         while True:
             text = await ws.receive_text()
+
+            # Parse + schema-validate at the boundary. Any malformed JSON,
+            # unknown `type`, or out-of-range field is dropped with a debug
+            # log instead of crashing the receive loop.
             try:
-                msg = json.loads(text)
+                raw = json.loads(text)
             except json.JSONDecodeError:
+                logger.debug("Discarding non-JSON WS frame")
                 continue
 
-            msg_type = msg.get("type", "")
+            try:
+                msg = _incoming_adapter.validate_python(raw)
+            except ValidationError as exc:
+                # `errors()[:1]` keeps the log compact; full validation
+                # detail can be re-enabled at DEBUG via exc_info=True.
+                logger.warning(
+                    "Rejecting WS message (type=%r): %s",
+                    raw.get("type") if isinstance(raw, dict) else None,
+                    exc.errors()[:1],
+                )
+                continue
 
-            if msg_type == "pong":
-                pass  # keep-alive reply from client, nothing to do
+            if isinstance(msg, WsPong):
+                pass  # keepalive reply, nothing to do
 
-            elif msg_type == "joystick_input":
-                data = msg.get("data", {})
+            elif isinstance(msg, WsJoystickInput):
                 from main import app_state
                 engine = app_state.simulation_engine
                 if engine:
-                    inp = JoystickInput(
-                        direction=data.get("direction", 0),
-                        intensity=data.get("intensity", 0),
-                    )
-                    engine.joystick_move(inp)
+                    engine.joystick_move(msg.data)
 
-            elif msg_type == "joystick_stop":
+            elif isinstance(msg, WsJoystickStop):
                 from main import app_state
                 engine = app_state.simulation_engine
                 if engine:

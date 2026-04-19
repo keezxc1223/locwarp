@@ -86,8 +86,8 @@ const MultiDevicePanel: React.FC<Props> = ({ wsMessage }) => {
     try {
       await api.addSyncDevice(udid)
       await loadSync()
-    } catch (e: any) {
-      showToast(e.message || '加入失敗')
+    } catch (e) {
+      showToast(api.errMsg(e) || '加入失敗')
     } finally {
       setLoadingUdid(null)
     }
@@ -98,8 +98,8 @@ const MultiDevicePanel: React.FC<Props> = ({ wsMessage }) => {
     try {
       await api.removeSyncDevice(udid)
       setSyncDevices(d => d.filter(s => s.udid !== udid))
-    } catch (e: any) {
-      showToast(e.message || '移除失敗')
+    } catch (e) {
+      showToast(api.errMsg(e) || '移除失敗')
     } finally {
       setLoadingUdid(null)
     }
