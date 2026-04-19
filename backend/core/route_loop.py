@@ -6,8 +6,8 @@ import asyncio
 import logging
 import random
 
+from config import get_osrm_profile, resolve_speed_profile
 from models.schemas import Coordinate, MovementMode, SimulationState
-from config import resolve_speed_profile, get_osrm_profile
 
 logger = logging.getLogger(__name__)
 
@@ -117,7 +117,7 @@ class RouteLooper:
                         # stop fired during the inter-lap pause — emit end before exiting
                         await engine._emit("pause_countdown_end", {"source": "loop"})
                         break
-                    except asyncio.TimeoutError:
+                    except TimeoutError:
                         pass
                     await engine._emit("pause_countdown_end", {"source": "loop"})
 

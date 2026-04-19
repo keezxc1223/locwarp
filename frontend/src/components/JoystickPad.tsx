@@ -52,8 +52,8 @@ const JoystickPad: React.FC<JoystickPadProps> = ({
       const centerX = rect.left + rect.width  / 2;
       const centerY = rect.top  + rect.height / 2;
 
-      let dx =   clientX - centerX;
-      let dy = -(clientY - centerY); // invert Y for math coords
+      const dx =   clientX - centerX;
+      const dy = -(clientY - centerY); // invert Y for math coords
 
       const distance    = Math.sqrt(dx * dx + dy * dy);
       const clampedDist = Math.min(distance, MAX_DISTANCE);

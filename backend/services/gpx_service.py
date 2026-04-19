@@ -3,7 +3,7 @@
 from __future__ import annotations
 
 import logging
-from datetime import datetime, timezone
+from datetime import UTC, datetime
 
 import gpxpy
 import gpxpy.gpx
@@ -103,7 +103,7 @@ class GpxService:
                     time = None
 
             if time is not None and time.tzinfo is None:
-                time = time.replace(tzinfo=timezone.utc)
+                time = time.replace(tzinfo=UTC)
 
             elevation = pt.get("elevation") or pt.get("ele")
             track_point = gpxpy.gpx.GPXTrackPoint(

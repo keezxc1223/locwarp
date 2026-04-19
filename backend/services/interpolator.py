@@ -9,8 +9,8 @@ from models.schemas import Coordinate
 
 # 嘗試匯入 scipy，用於 PCHIP 插值和 RDP 化簡
 try:
-    from scipy.interpolate import PchipInterpolator   # 比 CubicSpline 更適合 GPS（不 overshoot）
     import numpy as np
+    from scipy.interpolate import PchipInterpolator  # 比 CubicSpline 更適合 GPS（不 overshoot）
     _SCIPY_AVAILABLE = True
 except ImportError:
     _SCIPY_AVAILABLE = False

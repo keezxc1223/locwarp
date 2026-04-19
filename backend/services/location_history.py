@@ -3,9 +3,10 @@ LocationHistory — 自動記錄最近走過的地點
 儲存最近 100 筆，每筆含時間戳與可選名稱。
 """
 from __future__ import annotations
-import time
+
 import json
 import logging
+import time
 from pathlib import Path
 
 logger = logging.getLogger(__name__)

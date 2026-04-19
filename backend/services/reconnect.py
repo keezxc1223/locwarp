@@ -4,7 +4,8 @@ from __future__ import annotations
 
 import asyncio
 import logging
-from typing import Any, Callable, Coroutine
+from collections.abc import Callable, Coroutine
+from typing import Any
 
 from config import RECONNECT_BASE_DELAY, RECONNECT_MAX_DELAY, RECONNECT_MAX_RETRIES
 from models.schemas import Coordinate, SimulationState

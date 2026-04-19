@@ -2,7 +2,6 @@
 
 from __future__ import annotations
 
-import math
 import re
 
 from models.schemas import Coordinate, CoordinateFormat

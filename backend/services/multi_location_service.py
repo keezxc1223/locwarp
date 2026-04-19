@@ -11,7 +11,8 @@ from __future__ import annotations
 
 import asyncio
 import logging
-from services.location_service import LocationService, DeviceLostError
+
+from services.location_service import LocationService
 
 _log = logging.getLogger("locwarp")
 

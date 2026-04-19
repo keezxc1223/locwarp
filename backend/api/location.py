@@ -1,21 +1,19 @@
 from fastapi import APIRouter, HTTPException
 
-from services.location_service import DeviceLostError
-
 from models.schemas import (
-    TeleportRequest,
-    NavigateRequest,
-    LoopRequest,
-    MultiStopRequest,
-    RandomWalkRequest,
-    JoystickStartRequest,
-    SimulationStatus,
-    Coordinate,
     CooldownSettings,
     CooldownStatus,
     CoordFormatRequest,
-    CoordinateFormat,
+    Coordinate,
+    JoystickStartRequest,
+    LoopRequest,
+    MultiStopRequest,
+    NavigateRequest,
+    RandomWalkRequest,
+    SimulationStatus,
+    TeleportRequest,
 )
+from services.location_service import DeviceLostError
 
 router = APIRouter(prefix="/api/location", tags=["location"])
 
@@ -26,8 +24,9 @@ async def _engine():
     we just rebuild the engine; if that fails we force a full disconnect +
     reconnect + engine rebuild (covers the common iOS 17+ case where the
     RSD tunnel is alive but the DVT channel has silently gone stale)."""
-    from main import app_state
     import logging as _logging
+
+    from main import app_state
     _log = _logging.getLogger("locwarp")
 
     if app_state.simulation_engine is not None:
@@ -98,9 +97,10 @@ async def _handle_device_lost(exc: Exception) -> "HTTPException":
     DeviceManager, drop the simulation engine, broadcast an explicit
     `device_disconnected` WebSocket event so the frontend can banner it.
     Returns an HTTPException the caller should raise."""
-    from main import app_state
-    from api.websocket import broadcast
     import logging as _logging
+
+    from api.websocket import broadcast
+    from main import app_state
     _log = _logging.getLogger("locwarp")
 
     dm = app_state.device_manager
@@ -187,7 +187,8 @@ async def teleport(req: TeleportRequest):
     except DeviceLostError as e:
         raise (await _handle_device_lost(e))
     except Exception as e:
-        import traceback, logging
+        import logging
+        import traceback
         logging.getLogger("locwarp").error("Teleport failed:\n%s", traceback.format_exc())
         # Also inspect the cause — nested DeviceLostError (e.g. re-raised from
         # the simulation engine retry loop) should still trigger cleanup.
@@ -427,7 +428,9 @@ async def get_initial_position():
 
 # ── Scheduled Return (定時回家) ───────────────────────────
 
-from pydantic import BaseModel, Field as _Field
+from pydantic import BaseModel
+from pydantic import Field as _Field
+
 
 class TimerRequest(BaseModel):
     seconds: int = _Field(gt=0, le=86400)

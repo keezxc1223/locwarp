@@ -59,8 +59,8 @@ class ScheduledReturn:
         await self._execute_return()
 
     async def _execute_return(self) -> None:
-        from main import app_state
         from api.websocket import broadcast
+        from main import app_state
 
         engine = app_state.simulation_engine
         if engine is None:

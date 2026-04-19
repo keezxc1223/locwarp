@@ -1,0 +1,78 @@
+# Ruff: ultra-fast Python linter + formatter (replaces flake8/isort/black combo).
+# Run from backend/ as: ruff check . && ruff format --check .
+# Auto-fix:              ruff check --fix . && ruff format .
+[tool.ruff]
+target-version = "py311"
+line-length = 110
+extend-exclude = [
+    "build",
+    "dist",
+    "__pycache__",
+    "*.spec",
+]
+
+[tool.ruff.lint]
+# Curated rule set — opinionated but pragmatic.
+# See https://docs.astral.sh/ruff/rules/ for codes.
+select = [
+    "E",      # pycodestyle errors
+    "W",      # pycodestyle warnings
+    "F",      # pyflakes (unused imports, undefined names)
+    "I",      # isort (import sorting)
+    "B",      # flake8-bugbear (likely bugs: mutable defaults, etc.)
+    "UP",     # pyupgrade (use modern syntax)
+    "SIM",    # flake8-simplify (simplifiable code)
+    "RUF",    # ruff-specific rules
+    "ASYNC",  # flake8-async (catches sync calls in async funcs)
+    "PIE",    # flake8-pie (misc small wins)
+]
+ignore = [
+    "E501",    # line too long — formatter handles wrappable lines; URLs/strings exempted
+    "B008",    # Depends() / Field() in defaults are FastAPI/Pydantic idioms
+    "SIM108",  # ternary not always more readable
+    "SIM105",  # contextlib.suppress vs explicit try/except — explicit is fine
+    "RUF012",  # ClassVar annotations — too noisy for our Pydantic models
+    "UP007",   # Optional[X] vs X | None — both fine, don't churn existing code
+    "UP045",   # X | None vs Optional[X] — same reason
+    # Chinese codebase — fullwidth punctuation in strings/comments is intentional, not ambiguous.
+    "RUF001",  # ambiguous unicode in string
+    "RUF002",  # ambiguous unicode in docstring
+    "RUF003",  # ambiguous unicode in comment
+    # We already wrap exceptions into structured HTTPException(detail={...}); the
+    # original cause is logged via logger.exception elsewhere. `from err` adds
+    # noise to API endpoints without value.
+    "B904",
+]
+
+[tool.ruff.lint.per-file-ignores]
+# Tests can have unused imports (fixtures) and longer assert chains
+"tests/**/*.py" = ["F401", "F811"]
+# main.py imports for side effects + has FastAPI app boilerplate
+"main.py" = ["E402"]
+# api/* uses lazy `from main import app_state` to avoid circular imports;
+# also has fire-and-forget `asyncio.create_task(engine.navigate(...))`
+# patterns where the engine internally tracks the task.
+"api/*.py" = ["E402", "RUF006"]
+# services/* — same lazy-import pattern in scheduler/reconnect callbacks.
+"services/scheduler.py" = ["E402"]
+"services/reconnect.py" = ["E402"]
+
+[tool.ruff.lint.isort]
+known-first-party = ["api", "core", "models", "services", "config"]
+
+[tool.ruff.format]
+quote-style = "double"
+indent-style = "space"
+
+
+# Pytest — minimal smoke tests covering schemas + API contract.
+# Run from backend/ as:  pytest -v
+[tool.pytest.ini_options]
+testpaths = ["tests"]
+asyncio_mode = "auto"
+# Cleaner output — one-line summary on failure, no pytest's own deprecation noise
+addopts = "-ra --tb=short --strict-markers"
+# Treat unknown markers as errors so typos don't silently pass
+markers = [
+    "slow: tests that take >1s; skipped by default in fast runs",
+]

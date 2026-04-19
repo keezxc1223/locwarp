@@ -4,8 +4,8 @@ from __future__ import annotations
 
 import logging
 
+from config import get_osrm_profile, resolve_speed_profile
 from models.schemas import Coordinate, MovementMode, SimulationState
-from config import resolve_speed_profile, get_osrm_profile
 
 logger = logging.getLogger(__name__)
 

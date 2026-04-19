@@ -5,9 +5,9 @@ from __future__ import annotations
 import asyncio
 import logging
 
+from config import resolve_speed_profile
 from models.schemas import JoystickInput, MovementMode, SimulationState
 from services.interpolator import RouteInterpolator
-from config import SPEED_PROFILES, resolve_speed_profile
 
 logger = logging.getLogger(__name__)
 

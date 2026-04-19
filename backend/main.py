@@ -1,6 +1,7 @@
 import asyncio
 import json
 import logging
+import sys
 
 # 使用 uvloop 替換預設事件迴圈，提升計時精度與效能（macOS/Linux）
 try:
@@ -18,15 +19,15 @@ from fastapi.middleware.cors import CORSMiddleware
 from fastapi.staticfiles import StaticFiles
 from starlette.responses import FileResponse
 
-from config import API_HOST, API_PORT, SETTINGS_FILE, DEFAULT_LOCATION
+from config import API_HOST, API_PORT, DEFAULT_LOCATION, SETTINGS_FILE
 from core.device_manager import DeviceManager
-from services.cooldown import CooldownTimer
 from services.bookmarks import BookmarkManager
+from services.cooldown import CooldownTimer
 from services.coord_format import CoordinateFormatter
-from services.reconnect import ReconnectManager
-from services.scheduler import ScheduledReturn
 from services.location_history import LocationHistory
 from services.multi_location_service import MultiLocationService
+from services.reconnect import ReconnectManager
+from services.scheduler import ScheduledReturn
 
 # Configure logging — console + rotating file in ~/.locwarp/logs/
 _log_fmt = "%(asctime)s [%(name)s] %(levelname)s: %(message)s"
@@ -172,8 +173,8 @@ class AppState:
         Uses the persistent MultiLocationService (_multi_loc) so that any
         previously registered sync devices remain active across engine rebuilds.
         """
-        from core.simulation_engine import SimulationEngine
         from api.websocket import broadcast
+        from core.simulation_engine import SimulationEngine
 
         loc_service = await self.device_manager.get_location_service(udid)
 
@@ -302,8 +303,9 @@ class AppState:
 
     def remove_sync_device(self, udid: str) -> None:
         """Remove a secondary device from the GPS fan-out group."""
-        from api.websocket import broadcast as _broadcast
         import asyncio as _asyncio
+
+        from api.websocket import broadcast as _broadcast
 
         self._multi_loc.remove_sync(udid)
         name = self._sync_device_names.pop(udid, udid)
@@ -372,7 +374,9 @@ async def _usbmux_presence_watchdog():
     """
     import asyncio
     import time
+
     from pymobiledevice3.usbmux import list_devices
+
     from api.websocket import broadcast
 
     miss_counts: dict[str, int] = {}
@@ -524,14 +528,14 @@ app.add_middleware(
 )
 
 # Register routers
+from api.bookmarks import router as bookmarks_router
 from api.device import router as device_router
+from api.geocode import router as geocode_router
+from api.history import router as history_router
 from api.location import router as location_router
 from api.route import router as route_router
-from api.geocode import router as geocode_router
-from api.bookmarks import router as bookmarks_router
-from api.websocket import router as ws_router
-from api.history import router as history_router
 from api.sync_device import router as sync_router
+from api.websocket import router as ws_router
 
 app.include_router(device_router)
 app.include_router(location_router)

@@ -7,10 +7,9 @@ iOS versions, wrapping pymobiledevice3's location simulation capabilities.
 
 from __future__ import annotations
 
+import asyncio
 import logging
 from abc import ABC, abstractmethod
-
-import asyncio
 
 from pymobiledevice3.exceptions import ConnectionTerminatedError
 from pymobiledevice3.services.dvt.instruments.dvt_provider import DvtProvider
@@ -136,8 +135,7 @@ class DvtLocationService(LocationService):
             await sim.set(lat, lng)
             self._active = True
             logger.debug("DVT location set to (%.6f, %.6f)", lat, lng)
-        except (ConnectionTerminatedError, OSError, EOFError, BrokenPipeError,
-                ConnectionResetError, asyncio.TimeoutError) as exc:
+        except (TimeoutError, ConnectionTerminatedError, OSError, EOFError, BrokenPipeError, ConnectionResetError) as exc:
             logger.warning("DVT channel dropped (%s: %s); reconnecting and retrying",
                            type(exc).__name__, exc)
             await self._reconnect()
@@ -162,8 +160,7 @@ class DvtLocationService(LocationService):
             await sim.clear()
             self._active = False
             logger.info("DVT simulated location cleared")
-        except (ConnectionTerminatedError, OSError, EOFError, BrokenPipeError,
-                ConnectionResetError, asyncio.TimeoutError) as exc:
+        except (TimeoutError, ConnectionTerminatedError, OSError, EOFError, BrokenPipeError, ConnectionResetError) as exc:
             logger.warning("DVT channel dropped during clear (%s: %s); reconnecting",
                            type(exc).__name__, exc)
             await self._reconnect()

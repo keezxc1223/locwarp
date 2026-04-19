@@ -6,8 +6,8 @@ import asyncio
 import logging
 import random
 
+from config import get_osrm_profile, resolve_speed_profile
 from models.schemas import Coordinate, MovementMode, SimulationState
-from config import resolve_speed_profile, get_osrm_profile
 from services.interpolator import RouteInterpolator
 
 logger = logging.getLogger(__name__)
@@ -182,7 +182,7 @@ class MultiStopNavigator:
                             timeout=this_pause,
                         )
                         break
-                    except asyncio.TimeoutError:
+                    except TimeoutError:
                         pass
                     await engine._emit("pause_countdown_end", {"source": "multi_stop"})
 

@@ -1,13 +1,13 @@
 import json
 import uuid
-from datetime import datetime, timezone
+from datetime import UTC, datetime
 from pathlib import Path
 
-from fastapi import APIRouter, HTTPException, UploadFile, File
+from fastapi import APIRouter, File, HTTPException, UploadFile
 
-from models.schemas import RoutePlanRequest, SavedRoute, Coordinate
-from services.route_service import RouteService
+from models.schemas import RoutePlanRequest, SavedRoute
 from services.gpx_service import GpxService
+from services.route_service import RouteService
 
 router = APIRouter(prefix="/api/route", tags=["route"])
 
@@ -61,7 +61,7 @@ async def list_saved():
 @router.post("/saved", response_model=SavedRoute)
 async def save_route(route: SavedRoute):
     route.id = str(uuid.uuid4())
-    route.created_at = datetime.now(timezone.utc).isoformat()
+    route.created_at = datetime.now(UTC).isoformat()
     _saved_routes[route.id] = route
     _save_routes(_saved_routes)
     return route
@@ -106,7 +106,7 @@ async def import_gpx(file: UploadFile = File(...)):
         name=file.filename or "Imported GPX",
         waypoints=coords,
         profile="walking",
-        created_at=datetime.now(timezone.utc).isoformat(),
+        created_at=datetime.now(UTC).isoformat(),
     )
     _saved_routes[route.id] = route
     _save_routes(_saved_routes)

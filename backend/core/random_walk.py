@@ -6,9 +6,9 @@ import asyncio
 import logging
 import random
 
+from config import get_osrm_profile, resolve_speed_profile
 from models.schemas import Coordinate, MovementMode, SimulationState
 from services.interpolator import RouteInterpolator
-from config import resolve_speed_profile, get_osrm_profile
 
 logger = logging.getLogger(__name__)
 
@@ -159,7 +159,7 @@ class RandomWalkHandler:
                         engine._stop_event.wait(), timeout=backoff,
                     )
                     break  # User requested stop during wait
-                except asyncio.TimeoutError:
+                except TimeoutError:
                     pass
                 continue
             except Exception:
@@ -215,7 +215,7 @@ class RandomWalkHandler:
                 )
                 # Stop was requested during the pause
                 break
-            except asyncio.TimeoutError:
+            except TimeoutError:
                 # Normal timeout -- continue to next random destination
                 pass
 

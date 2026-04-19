@@ -1,5 +1,6 @@
 """Location History API"""
 from fastapi import APIRouter
+
 router = APIRouter(prefix="/api/history", tags=["history"])
 
 @router.get("")
@@ -16,9 +17,10 @@ async def clear_history():
 @router.get("/export/gpx")
 async def export_history_gpx():
     """Export all location history entries as a GPX track file."""
+    from fastapi.responses import Response
+
     from main import app_state
     from services.gpx_service import GpxService
-    from fastapi.responses import Response
 
     entries = app_state.location_history.get_all()
     # get_all() returns newest-first; reverse to chronological order for GPX

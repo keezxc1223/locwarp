@@ -6,8 +6,16 @@ import asyncio
 import logging
 import random
 import time
-from datetime import datetime, timedelta, timezone
+from datetime import UTC, datetime, timedelta
 
+from config import SpeedProfile
+from core.joystick import JoystickHandler
+from core.multi_stop import MultiStopNavigator
+from core.navigator import Navigator
+from core.random_walk import RandomWalkHandler
+from core.restore import RestoreHandler
+from core.route_loop import RouteLooper
+from core.teleport import TeleportHandler
 from models.schemas import (
     Coordinate,
     JoystickInput,
@@ -17,15 +25,6 @@ from models.schemas import (
 )
 from services.interpolator import RouteInterpolator
 from services.route_service import RouteService
-from config import SPEED_PROFILES, SpeedProfile
-
-from core.teleport import TeleportHandler
-from core.navigator import Navigator
-from core.route_loop import RouteLooper
-from core.joystick import JoystickHandler
-from core.multi_stop import MultiStopNavigator
-from core.random_walk import RandomWalkHandler
-from core.restore import RestoreHandler
 
 logger = logging.getLogger(__name__)
 
@@ -73,7 +72,7 @@ class EtaTracker:
         secs = self.eta_seconds
         if secs <= 0:
             return ""
-        arrival = datetime.now(timezone.utc) + timedelta(seconds=secs)
+        arrival = datetime.now(UTC) + timedelta(seconds=secs)
         return arrival.isoformat(timespec="seconds")
 
     @property
@@ -381,7 +380,7 @@ class SimulationEngine:
     async def _move_along_route(
         self,
         coords: list[Coordinate],
-        speed_profile: "SpeedProfile",
+        speed_profile: SpeedProfile,
     ) -> None:
         """Core movement loop shared by navigate, loop, multi-stop, and
         random walk modes.
@@ -572,7 +571,7 @@ class SimulationEngine:
                     timeout=sleep_time,
                 )
                 break  # stop event fired
-            except asyncio.TimeoutError:
+            except TimeoutError:
                 pass  # 正常，繼續下一個 tick
 
         self._current_speed_mps = 0.0
