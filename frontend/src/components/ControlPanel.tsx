@@ -1,8 +1,8 @@
-import React, { useState } from 'react';
+import React, { useState, useRef } from 'react';
 import { createPortal } from 'react-dom';
 import { useT } from '../i18n';
 import PauseControl from './PauseControl';
-import { SimMode, MoveMode } from '../hooks/useSimulation';
+import { SimMode } from '../hooks/useSimulation';
 import AddressSearch from './AddressSearch';
 import BookmarkList from './BookmarkList';
 
@@ -27,25 +27,19 @@ interface SavedRoute {
 
 interface ControlPanelProps {
   simMode: SimMode;
-  moveMode: MoveMode;
-  speed: number;
+  defaultSpeed: number;
   isRunning: boolean;
   isPaused: boolean;
   currentPosition: Position | null;
   onModeChange: (mode: SimMode) => void;
-  onSpeedChange: (speed: number) => void;
-  onMoveModeChange: (mode: MoveMode) => void;
   customSpeedKmh: number | null;
   onCustomSpeedChange: (speed: number | null) => void;
-  speedMinKmh: number | null;
-  onSpeedMinChange: (v: number | null) => void;
-  speedMaxKmh: number | null;
-  onSpeedMaxChange: (v: number | null) => void;
+  customVarianceKmh: number | null;
+  onCustomVarianceChange: (v: number | null) => void;
   onStart: () => void;
   onStop: () => void;
   onPause: () => void;
   onResume: () => void;
-  onRestore: () => void;
   onTeleport: (lat: number, lng: number) => void;
   onNavigate: (lat: number, lng: number) => void;
   bookmarks: Bookmark[];
@@ -143,25 +137,19 @@ const modeLabelKeys: Record<SimMode, StringKey> = {
 
 const ControlPanel: React.FC<ControlPanelProps> = ({
   simMode,
-  moveMode,
-  speed,
+  defaultSpeed,
   isRunning,
   isPaused,
   currentPosition,
   onModeChange,
-  onSpeedChange,
-  onMoveModeChange,
   customSpeedKmh,
   onCustomSpeedChange,
-  speedMinKmh,
-  onSpeedMinChange,
-  speedMaxKmh,
-  onSpeedMaxChange,
+  customVarianceKmh,
+  onCustomVarianceChange,
   onStart,
   onStop,
   onPause,
   onResume,
-  onRestore,
   onTeleport,
   onNavigate,
   bookmarks,
@@ -201,6 +189,8 @@ const ControlPanel: React.FC<ControlPanelProps> = ({
   const [routeName, setRouteName] = useState('');
   const [editingRouteId, setEditingRouteId] = useState<string | null>(null);
   const [editingRouteName, setEditingRouteName] = useState('');
+  // tracks whether Escape was pressed so onBlur doesn't commit the rename
+  const renameCancelledRef = useRef(false);
   const [libraryOpen, setLibraryOpen] = useState(false);
   const [libraryTab, setLibraryTab] = useState<'bookmarks' | 'routes'>('bookmarks');
   const [libraryPos, setLibraryPos] = useState<{ x: number; y: number }>(() => ({
@@ -361,117 +351,81 @@ const ControlPanel: React.FC<ControlPanelProps> = ({
         </div>
         {sections.speed && (
           <div className="section-content">
-            <div className="speed-selector">
-              {[
-                { labelKey: 'move.walking' as const, value: 5, mode: 'walking' as MoveMode },
-                { labelKey: 'move.running' as const, value: 10, mode: 'running' as MoveMode },
-                { labelKey: 'move.driving' as const, value: 40, mode: 'driving' as MoveMode },
-              ].map((opt) => (
-                <button
-                  key={opt.value}
-                  className={`speed-btn${(moveMode === opt.mode && customSpeedKmh == null && speedMinKmh == null && speedMaxKmh == null) ? ' active' : ''}`}
-                  onClick={() => {
-                    onMoveModeChange(opt.mode);
-                    onSpeedChange(opt.value);
-                    onCustomSpeedChange(null);
-                  }}
-                  style={{ padding: '6px 4px' }}
-                >
-                  <div style={{ fontSize: 12, fontWeight: 500 }}>{t(opt.labelKey)}</div>
-                  <div style={{ fontSize: 10, opacity: 0.6 }}>{opt.value} km/h</div>
-                </button>
-              ))}
-            </div>
-            <div style={{ display: 'flex', gap: 6, marginTop: 8, alignItems: 'center' }}>
+            {/* 自訂固定速度 + 上下浮動 — 整個速度設定唯一入口 */}
+            <div style={{ display: 'flex', gap: 6, alignItems: 'center', flexWrap: 'wrap' }}>
               <span style={{ fontSize: 12, opacity: 0.7, whiteSpace: 'nowrap' }}>{t('panel.custom_speed')}:</span>
               <input
                 type="number"
                 className="search-input"
-                placeholder="km/h"
+                placeholder={`${defaultSpeed}`}
                 value={customSpeedKmh ?? ''}
                 onChange={(e) => {
                   const v = e.target.value
                   if (v === '') {
                     onCustomSpeedChange(null)
+                    onCustomVarianceChange(null)
                   } else {
                     const n = parseFloat(v)
                     if (!isNaN(n) && n > 0) onCustomSpeedChange(n)
                   }
                 }}
-                style={{ flex: 1, maxWidth: 80 }}
+                style={{ width: 70 }}
                 min="0.1"
                 step="0.5"
               />
               <span style={{ fontSize: 11, opacity: 0.5 }}>km/h</span>
-              {customSpeedKmh && (
+              <span style={{ fontSize: 12, opacity: 0.7, marginLeft: 4 }}>±</span>
+              <input
+                type="number"
+                className="search-input"
+                placeholder="0"
+                value={customVarianceKmh ?? ''}
+                onChange={(e) => {
+                  const v = e.target.value
+                  if (v === '') return onCustomVarianceChange(null)
+                  const n = parseFloat(v)
+                  if (!isNaN(n) && n >= 0) onCustomVarianceChange(n)
+                }}
+                disabled={customSpeedKmh == null}
+                title={customSpeedKmh == null ? t('panel.custom_speed') : t('panel.speed_variance')}
+                style={{ width: 56, opacity: customSpeedKmh == null ? 0.4 : 1 }}
+                min="0"
+                step="0.5"
+              />
+              <span style={{ fontSize: 11, opacity: 0.5 }}>km/h</span>
+              {customSpeedKmh != null && (
                 <button
                   className="action-btn"
-                  style={{ padding: '2px 8px', fontSize: 11 }}
-                  onClick={() => onCustomSpeedChange(null)}
+                  style={{ padding: '2px 8px', fontSize: 11, marginLeft: 'auto' }}
+                  onClick={() => { onCustomSpeedChange(null); onCustomVarianceChange(null); }}
                 >
                   {t('generic.clear')}
                 </button>
               )}
             </div>
-            {customSpeedKmh && (
-              <div style={{ fontSize: 11, color: '#4caf50', marginTop: 4 }}>
-                {t('panel.custom_speed_active')}: {customSpeedKmh} km/h ({(customSpeedKmh / 3.6).toFixed(1)} m/s)
-              </div>
-            )}
 
-            {/* Random range (overrides fixed) */}
-            <div style={{ marginTop: 8 }}>
-              <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', marginBottom: 4 }}>
-                <span style={{ fontSize: 12, opacity: 0.7 }}>{t('panel.speed_range')}:</span>
-                {(speedMinKmh != null || speedMaxKmh != null) && (
-                  <button
-                    className="action-btn"
-                    style={{ padding: '2px 8px', fontSize: 11 }}
-                    onClick={() => { onSpeedMinChange(null); onSpeedMaxChange(null); }}
-                  >
-                    {t('generic.clear')}
-                  </button>
-                )}
-              </div>
-              <div style={{ display: 'flex', gap: 6, alignItems: 'center' }}>
-                <input
-                  type="number"
-                  className="search-input"
-                  placeholder={t('panel.speed_range_min')}
-                  value={speedMinKmh ?? ''}
-                  onChange={(e) => {
-                    const v = e.target.value
-                    if (v === '') return onSpeedMinChange(null)
-                    const n = parseFloat(v)
-                    if (!isNaN(n) && n > 0) onSpeedMinChange(n)
-                  }}
-                  style={{ flex: 1, fontSize: 12 }}
-                  min="0.1"
-                  step="1"
-                />
-                <span style={{ fontSize: 12, opacity: 0.5 }}>~</span>
-                <input
-                  type="number"
-                  className="search-input"
-                  placeholder={t('panel.speed_range_max')}
-                  value={speedMaxKmh ?? ''}
-                  onChange={(e) => {
-                    const v = e.target.value
-                    if (v === '') return onSpeedMaxChange(null)
-                    const n = parseFloat(v)
-                    if (!isNaN(n) && n > 0) onSpeedMaxChange(n)
-                  }}
-                  style={{ flex: 1, fontSize: 12 }}
-                  min="0.1"
-                  step="1"
-                />
-              </div>
+            {/* 實際速度摘要：空白時用 defaultSpeed 顯示後端 fallback */}
+            <div
+              style={{
+                marginTop: 8, padding: '6px 10px', borderRadius: 4,
+                background: 'rgba(108,140,255,0.10)',
+                border: '1px solid rgba(108,140,255,0.22)',
+                fontSize: 11, color: '#c7d2fe',
+                display: 'flex', alignItems: 'center', gap: 6,
+              }}
+            >
+              <svg width="11" height="11" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2">
+                <polyline points="20 6 9 17 4 12" />
+              </svg>
+              <span style={{ opacity: 0.75 }}>{t('panel.actual_speed')}：</span>
+              <span style={{ fontWeight: 600 }}>
+                {customSpeedKmh != null && customVarianceKmh != null && customVarianceKmh > 0
+                  ? `${Math.max(0.1, customSpeedKmh - customVarianceKmh).toFixed(1)}~${(customSpeedKmh + customVarianceKmh).toFixed(1)} km/h`
+                  : customSpeedKmh != null
+                    ? `${customSpeedKmh} km/h`
+                    : `${defaultSpeed} km/h`}
+              </span>
             </div>
-            {speedMinKmh != null && speedMaxKmh != null && (
-              <div style={{ fontSize: 11, color: '#ffb74d', marginTop: 4 }}>
-                {t('panel.speed_range_active')}: {Math.min(speedMinKmh, speedMaxKmh)}~{Math.max(speedMinKmh, speedMaxKmh)} km/h ({t('panel.speed_range_hint')})
-              </div>
-            )}
           </div>
         )}
       </div>
@@ -718,6 +672,7 @@ const ControlPanel: React.FC<ControlPanelProps> = ({
                   {savedRoutes.map((route) => {
                     const isEditing = editingRouteId === route.id;
                     const commitRename = () => {
+                      if (renameCancelledRef.current) { renameCancelledRef.current = false; return; }
                       const n = editingRouteName.trim();
                       if (n && n !== route.name && onRouteRename) onRouteRename(route.id, n);
                       setEditingRouteId(null);
@@ -740,7 +695,10 @@ const ControlPanel: React.FC<ControlPanelProps> = ({
                             onBlur={commitRename}
                             onKeyDown={(e) => {
                               if (e.key === 'Enter') commitRename();
-                              else if (e.key === 'Escape') setEditingRouteId(null);
+                              else if (e.key === 'Escape') {
+                                renameCancelledRef.current = true;
+                                setEditingRouteId(null);
+                              }
                             }}
                             style={{ flex: 1, fontSize: 13, padding: '2px 4px' }}
                           />

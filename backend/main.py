@@ -15,6 +15,8 @@ from pathlib import Path
 import uvicorn
 from fastapi import FastAPI
 from fastapi.middleware.cors import CORSMiddleware
+from fastapi.staticfiles import StaticFiles
+from starlette.responses import FileResponse
 
 from config import API_HOST, API_PORT, SETTINGS_FILE, DEFAULT_LOCATION
 from core.device_manager import DeviceManager
@@ -24,8 +26,6 @@ from services.coord_format import CoordinateFormatter
 from services.reconnect import ReconnectManager
 from services.scheduler import ScheduledReturn
 from services.location_history import LocationHistory
-from services.geofence import GeofenceService
-from services.schedule_service import ScheduleService
 from services.multi_location_service import MultiLocationService
 
 # Configure logging — console + rotating file in ~/.locwarp/logs/
@@ -60,11 +60,8 @@ class AppState:
         self.reconnect_manager = None
         self._last_position = None
         self._home_position: dict | None = None  # 手動設定的固定起始位置
-        self._adb_serial: str | None = None        # 目前連線的 ADB 裝置
         self.scheduled_return = ScheduledReturn()   # 定時回家
         self.location_history = LocationHistory()   # 地點歷史
-        self.geofence = GeofenceService()           # 地理圍欄
-        self.schedule_service = ScheduleService()   # 排程跳點
         self.jitter_enabled = True                  # GPS 抖動偽裝
         # Multi-device GPS sync
         self._multi_loc = MultiLocationService()                 # fan-out service (reused across engine rebuilds)
@@ -199,18 +196,6 @@ class AppState:
                 lat, lng = data["lat"], data["lng"]
                 self.update_last_position(lat, lng)
                 self.location_history.record(lat, lng)
-                # Geofence check
-                if await self.geofence.check(lat, lng):
-                    await broadcast("geofence_violated", {"lat": lat, "lng": lng,
-                        "center": {"lat": self.geofence.center_lat, "lng": self.geofence.center_lng},
-                        "radius_m": self.geofence.radius_m})
-                    if self.geofence.auto_return and self.simulation_engine:
-                        try:
-                            await self.simulation_engine.restore()
-                            await self.simulation_engine.teleport(
-                                self.geofence.center_lat, self.geofence.center_lng)
-                        except Exception:
-                            logger.exception("Geofence auto-return failed")
 
         # Engine always uses the multi-location service
         self.simulation_engine = SimulationEngine(self._multi_loc, event_callback)
@@ -332,55 +317,39 @@ class AppState:
         except Exception:
             pass
 
-    async def create_engine_for_adb(self, serial: str, name: str, loc_service):
-        """Create a SimulationEngine for a BlueStacks / Android device via ADB."""
-        from core.simulation_engine import SimulationEngine
-        from api.websocket import broadcast
-
-        self._adb_serial = serial
-
-        async def event_callback(event_type: str, data: dict):
-            await broadcast(event_type, data)
-            if event_type == "position_update" and "lat" in data:
-                lat, lng = data["lat"], data["lng"]
-                self.update_last_position(lat, lng)
-                self.location_history.record(lat, lng)
-                if await self.geofence.check(lat, lng):
-                    await broadcast("geofence_violated", {"lat": lat, "lng": lng})
-                    if self.geofence.auto_return and self.simulation_engine:
-                        try:
-                            await self.simulation_engine.restore()
-                            await self.simulation_engine.teleport(
-                                self.geofence.center_lat, self.geofence.center_lng)
-                        except Exception:
-                            logger.exception("Geofence auto-return failed (ADB)")
-
-        self.simulation_engine = SimulationEngine(loc_service, event_callback)
-
-        init = await self.get_initial_position_async()
-        from models.schemas import Coordinate
-        self.simulation_engine.current_position = Coordinate(lat=init["lat"], lng=init["lng"])
-
-        for attempt in range(3):
-            try:
-                await loc_service.set(init["lat"], init["lng"])
-                logger.info("ADB initial position set: (%.6f, %.6f)", init["lat"], init["lng"])
-                break
-            except Exception as exc:
-                logger.warning("ADB initial position push failed (attempt %d/3): %s", attempt + 1, exc)
-                if attempt < 2:
-                    await asyncio.sleep(1.0)
-
-        try:
-            await broadcast("position_update", {"lat": init["lat"], "lng": init["lng"],
-                                                "bearing": 0.0, "speed_mps": 0.0})
-        except Exception:
-            pass
-
-        logger.info("Simulation engine created for ADB device %s (%s)", name, serial)
-
 
 app_state = AppState()
+
+
+# ── Frontend dist detection ───────────────────────────────
+
+def _find_dist() -> Path | None:
+    """Locate frontend/dist for production-mode static serving.
+
+    Search order:
+      1. ../frontend/dist  — relative to backend/main.py (dev tree or Makefile build)
+      2. sys._MEIPASS/../frontend/dist — PyInstaller one-file bundle
+    Returns None when the dist folder is absent (dev server mode expected).
+    """
+    # Normal project layout: backend/main.py → ../frontend/dist
+    candidate = Path(__file__).resolve().parent.parent / "frontend" / "dist"
+    if (candidate / "index.html").is_file():
+        return candidate
+
+    # PyInstaller bundle: _MEIPASS is the temp extraction root
+    if hasattr(sys, "_MEIPASS"):
+        candidate2 = Path(sys._MEIPASS).parent / "frontend" / "dist"
+        if (candidate2 / "index.html").is_file():
+            return candidate2
+
+    return None
+
+
+_DIST_PATH: Path | None = _find_dist()
+if _DIST_PATH:
+    logger.info("Production mode: serving frontend from %s", _DIST_PATH)
+else:
+    logger.info("Development mode: expecting Vite dev server on port 5173")
 
 
 # ── Lifespan ─────────────────────────────────────────────
@@ -514,12 +483,10 @@ async def lifespan(application: FastAPI):
         logger.exception("Auto-connect on startup failed (device may need manual connect)")
 
     watchdog_task = asyncio.create_task(_usbmux_presence_watchdog())
-    app_state.schedule_service.start_background()
 
     yield
 
     # ── Shutdown ──
-    app_state.schedule_service.stop_background()
     watchdog_task.cancel()
     try:
         await watchdog_task
@@ -527,6 +494,8 @@ async def lifespan(application: FastAPI):
         pass
 
     app_state.save_settings()
+    # 將尚未批量寫入的地點歷史強制寫入磁碟，避免正常關閉時遺失最後幾筆記錄
+    app_state.location_history.flush()
     await app_state.device_manager.disconnect_all()
     logger.info("LocWarp shut down")
 
@@ -535,12 +504,23 @@ async def lifespan(application: FastAPI):
 
 app = FastAPI(title="LocWarp", version="0.1.0", description="iOS Virtual Location Simulator", lifespan=lifespan)
 
+# CORS：限制為 localhost + 區網（RFC1918）。手機從 LAN 連 Vite dev server
+# 時，瀏覽器 Origin 會是區網 IP（如 http://192.168.x.x:5173），需允許。
+# 公網網站即使發出 request 也會被瀏覽器擋下 preflight。
+_LAN_ORIGIN_REGEX = (
+    r"^https?://("
+    r"localhost|127\.0\.0\.1"
+    r"|192\.168\.\d{1,3}\.\d{1,3}"
+    r"|10\.\d{1,3}\.\d{1,3}\.\d{1,3}"
+    r"|172\.(1[6-9]|2\d|3[01])\.\d{1,3}\.\d{1,3}"
+    r")(:\d+)?$"
+)
 app.add_middleware(
     CORSMiddleware,
-    allow_origins=["*"],
-    allow_credentials=True,
-    allow_methods=["*"],
-    allow_headers=["*"],
+    allow_origin_regex=_LAN_ORIGIN_REGEX,
+    allow_credentials=False,  # 本 app 不使用 cookies／session，關閉以收斂攻擊面
+    allow_methods=["GET", "POST", "PUT", "PATCH", "DELETE"],
+    allow_headers=["Content-Type"],
 )
 
 # Register routers
@@ -550,10 +530,7 @@ from api.route import router as route_router
 from api.geocode import router as geocode_router
 from api.bookmarks import router as bookmarks_router
 from api.websocket import router as ws_router
-from api.bluestacks import router as bluestacks_router
 from api.history import router as history_router
-from api.geofence import router as geofence_router
-from api.schedule import router as schedule_router
 from api.sync_device import router as sync_router
 
 app.include_router(device_router)
@@ -562,15 +539,47 @@ app.include_router(route_router)
 app.include_router(geocode_router)
 app.include_router(bookmarks_router)
 app.include_router(ws_router)
-app.include_router(bluestacks_router)
 app.include_router(history_router)
-app.include_router(geofence_router)
-app.include_router(schedule_router)
 app.include_router(sync_router)
+
+# ── Static file serving (production mode) ────────────────
+# Mounted AFTER all API routers so API paths always take priority.
+# StaticFiles mounts are handled before the catch-all route below.
+
+if _DIST_PATH:
+    _assets_dir = _DIST_PATH / "assets"
+    if _assets_dir.is_dir():
+        # Vite puts hashed JS/CSS bundles under dist/assets/
+        app.mount("/assets", StaticFiles(directory=str(_assets_dir)), name="assets")
+
+    # Serve other top-level static files (favicon, vite.svg, manifest…)
+    _extra_statics = [f for f in _DIST_PATH.iterdir()
+                      if f.is_file() and f.name != "index.html"]
+    if _extra_statics:
+        # Mount the whole dist root as a read-only directory for exact-name files.
+        # Starlette's StaticFiles raises 404 for missing entries, falling through
+        # to the SPA catch-all below.
+        app.mount("/static-root", StaticFiles(directory=str(_DIST_PATH)), name="static-root")
+
+
+# ── Root & SPA catch-all ──────────────────────────────────
+
+_NO_CACHE_HEADERS = {
+    # index.html 引用的 JS bundle 檔名會隨每次 build 改變 hash，
+    # 若 browser 繼續用舊的 cached index.html，它就會載到被刪掉的舊 JS
+    # 或是根本沒更新到。對 index.html 強制 no-cache 確保版本一定是最新。
+    # assets 下的 JS/CSS 已有 hash，交給 StaticFiles 預設快取即可。
+    "Cache-Control": "no-cache, no-store, must-revalidate",
+    "Pragma": "no-cache",
+    "Expires": "0",
+}
 
 
 @app.get("/")
 async def root():
+    """Serve SPA index.html in production, or JSON status in dev mode."""
+    if _DIST_PATH:
+        return FileResponse(str(_DIST_PATH / "index.html"), headers=_NO_CACHE_HEADERS)
     return {
         "name": "LocWarp",
         "version": "0.1.0",
@@ -578,6 +587,30 @@ async def root():
         "initial_position": app_state.get_initial_position(),
     }
 
+
+@app.get("/api/status")
+async def api_status():
+    """Always-available JSON health-check endpoint (also in production mode)."""
+    return {
+        "name": "LocWarp",
+        "version": "0.1.0",
+        "status": "running",
+        "mode": "production" if _DIST_PATH else "development",
+        "initial_position": app_state.get_initial_position(),
+    }
+
+
+if _DIST_PATH:
+    # SPA catch-all: any path not matched by an API route or StaticFiles mount
+    # gets index.html so React Router can handle client-side navigation.
+    # MUST be registered last.
+    @app.get("/{catchall:path}")
+    async def serve_spa(catchall: str):
+        # Serve real files from dist root when they exist (favicon.ico, robots.txt…)
+        candidate = _DIST_PATH / catchall
+        if candidate.is_file():
+            return FileResponse(str(candidate))
+        return FileResponse(str(_DIST_PATH / "index.html"), headers=_NO_CACHE_HEADERS)
 
 
 if __name__ == "__main__":

@@ -36,8 +36,10 @@ interface MapViewProps {
   deviceConnected?: boolean;
   /** When true, left-clicking the map directly adds a waypoint instead of showing pin */
   drawingMode?: boolean;
-  /** Geofence circle to display on the map */
-  geofence?: { lat: number; lng: number; radius_m: number } | null;
+  /** Cooldown circle — drawn from the last teleport point with radius = jump distance */
+  cooldownCircle?: { lat: number; lng: number; distanceKm: number; remainingSeconds: number } | null;
+  /** Bookmark markers -- clicking teleports/navigates like the list in the Library panel */
+  bookmarkMarkers?: { id?: string; lat: number; lng: number; name: string; category?: string }[];
 }
 
 const MapView: React.FC<MapViewProps> = ({
@@ -54,7 +56,8 @@ const MapView: React.FC<MapViewProps> = ({
   showWaypointOption,
   deviceConnected = true,
   drawingMode = false,
-  geofence,
+  cooldownCircle,
+  bookmarkMarkers = [],
 }) => {
   const t = useT();
   // The map-init useEffect only runs once, so its click handler captures the
@@ -71,7 +74,12 @@ const MapView: React.FC<MapViewProps> = ({
   const polylineRef = useRef<L.Polyline | null>(null);
   const clickMarkerRef = useRef<L.Marker | null>(null);
   const radiusCircleRef = useRef<L.Circle | null>(null);
-  const geofenceCircleRef = useRef<L.Circle | null>(null);
+  const cooldownCircleRef = useRef<L.Circle | null>(null);
+  const bookmarkMarkersRef = useRef<L.Marker[]>([]);
+  const [showBookmarkLayer, setShowBookmarkLayer] = useState(true);
+  const [bookmarkSearch, setBookmarkSearch] = useState('');
+  const onTeleportRef = useRef(onTeleport);
+  onTeleportRef.current = onTeleport;
   // Keep drawingMode accessible inside the stable map click handler
   const drawingModeRef = useRef(drawingMode);
   drawingModeRef.current = drawingMode;
@@ -397,30 +405,85 @@ const MapView: React.FC<MapViewProps> = ({
     }
   }, [randomWalkRadius, currentPosition]);
 
-  // Update geofence circle
+  // Cooldown circle: shows jump distance as an orange dashed ring
+  useEffect(() => {
+    const map = mapRef.current;
+    if (!map) return;
+    if (cooldownCircleRef.current) {
+      cooldownCircleRef.current.remove();
+      cooldownCircleRef.current = null;
+    }
+    if (cooldownCircle && cooldownCircle.distanceKm > 1) {
+      const radiusM = cooldownCircle.distanceKm * 1000;
+      const mins = Math.ceil(cooldownCircle.remainingSeconds / 60);
+      const circle = L.circle([cooldownCircle.lat, cooldownCircle.lng], {
+        radius: radiusM,
+        color: '#f59e0b',
+        weight: 1.5,
+        opacity: 0.7,
+        fillColor: '#f59e0b',
+        fillOpacity: 0.04,
+        dashArray: '8, 6',
+      }).addTo(map);
+      circle.bindTooltip(
+        `⏱ 跳點 ${cooldownCircle.distanceKm.toFixed(1)} km → 冷卻 ${mins} 分`,
+        { direction: 'top', sticky: true }
+      );
+      cooldownCircleRef.current = circle;
+    }
+  }, [cooldownCircle]);
+
+  // Bookmark markers — render the saved bookmarks on the map so users can
+  // pick a destination visually instead of scrolling the Library list.
+  // Click a marker → teleport (same as clicking it in the list).
   useEffect(() => {
     const map = mapRef.current;
     if (!map) return;
 
-    if (geofenceCircleRef.current) {
-      geofenceCircleRef.current.remove();
-      geofenceCircleRef.current = null;
-    }
+    bookmarkMarkersRef.current.forEach(m => m.remove());
+    bookmarkMarkersRef.current = [];
 
-    if (geofence && geofence.radius_m > 0) {
-      const circle = L.circle([geofence.lat, geofence.lng], {
-        radius: geofence.radius_m,
-        color: '#06b6d4',
-        weight: 2,
-        opacity: 0.8,
-        fillColor: '#06b6d4',
-        fillOpacity: 0.06,
-        dashArray: '6, 4',
-      }).addTo(map);
-      circle.bindTooltip(`圍欄 ${geofence.radius_m}m`, { direction: 'top', sticky: true });
-      geofenceCircleRef.current = circle;
-    }
-  }, [geofence]);
+    if (!bookmarkMarkers || bookmarkMarkers.length === 0 || !showBookmarkLayer) return;
+
+    // 搜尋：比對 name / category（大小寫不敏感）。空字串視為顯示全部。
+    const q = bookmarkSearch.trim().toLowerCase();
+    const visible = q
+      ? bookmarkMarkers.filter(bm =>
+          bm.name.toLowerCase().includes(q) ||
+          (bm.category ?? '').toLowerCase().includes(q)
+        )
+      : bookmarkMarkers;
+
+    visible.forEach(bm => {
+      const icon = L.divIcon({
+        className: 'bookmark-map-marker',
+        html: `<div style="
+          background:#f59e0b;border:2px solid #fff;border-radius:50% 50% 50% 0;
+          width:20px;height:20px;transform:rotate(-45deg);
+          box-shadow:0 2px 4px rgba(0,0,0,0.4);display:flex;align-items:center;
+          justify-content:center;">
+          <span style="transform:rotate(45deg);font-size:11px;color:#fff;">★</span>
+        </div>`,
+        iconSize: [20, 20],
+        iconAnchor: [10, 18],
+      });
+      const marker = L.marker([bm.lat, bm.lng], { icon });
+      marker.bindTooltip(
+        `<div style="text-align:center;line-height:1.5;min-width:100px">
+          <div style="font-weight:600;font-size:12px;color:#fbbf24">★ ${bm.name}</div>
+          ${bm.category ? `<div style="font-size:10px;color:#94a3b8">${bm.category}</div>` : ''}
+          <div style="font-size:10px;color:#fbbf24;margin-top:2px">點擊傳送</div>
+        </div>`,
+        { direction: 'top', offset: [0, -12] }
+      );
+      marker.on('click', (e) => {
+        L.DomEvent.stopPropagation(e);
+        onTeleportRef.current(bm.lat, bm.lng);
+      });
+      marker.addTo(map);
+      bookmarkMarkersRef.current.push(marker);
+    });
+  }, [bookmarkMarkers, showBookmarkLayer, bookmarkSearch]);
 
   // Close context menu on outside click
   useEffect(() => {
@@ -452,6 +515,101 @@ const MapView: React.FC<MapViewProps> = ({
           pointerEvents: 'none', boxShadow: '0 2px 8px rgba(0,0,0,0.3)',
         }}>
           ✏️ 繪圖模式：點擊地圖新增航點
+        </div>
+      )}
+
+      {/* Bookmark layer toggle + 搜尋 — 放在地圖右上，避開右下那一堆按鈕。
+          圖層關閉時只顯示星星 pill；開啟時一起顯示搜尋框與過濾後的清單。 */}
+      {bookmarkMarkers.length > 0 && (
+        <div
+          style={{
+            position: 'absolute', top: 10, right: 10, zIndex: 950,
+            display: 'flex', flexDirection: 'column', alignItems: 'flex-end', gap: 6,
+            maxWidth: 260,
+          }}
+        >
+          <div style={{ display: 'flex', alignItems: 'center', gap: 6 }}>
+            {showBookmarkLayer && (
+              <input
+                type="text"
+                value={bookmarkSearch}
+                onChange={(e) => setBookmarkSearch(e.target.value)}
+                placeholder="搜尋收藏…"
+                style={{
+                  height: 34, width: 180, padding: '0 10px', borderRadius: 8,
+                  background: 'rgba(30,30,36,0.92)', color: '#fbbf24',
+                  border: '1px solid #555', fontSize: 13,
+                  boxShadow: '0 2px 8px rgba(0,0,0,0.45)',
+                  outline: 'none',
+                }}
+              />
+            )}
+            <button
+              onClick={() => setShowBookmarkLayer(v => !v)}
+              title={showBookmarkLayer ? `隱藏 ${bookmarkMarkers.length} 個收藏標記` : `顯示 ${bookmarkMarkers.length} 個收藏標記`}
+              style={{
+                height: 34, minWidth: 56, padding: '0 10px', borderRadius: 8, cursor: 'pointer',
+                display: 'flex', alignItems: 'center', gap: 5,
+                background: showBookmarkLayer ? 'rgba(245,158,11,0.92)' : 'rgba(30,30,36,0.92)',
+                border: `1px solid ${showBookmarkLayer ? '#fbbf24' : '#555'}`,
+                color: showBookmarkLayer ? '#1a1a1a' : '#fbbf24',
+                fontWeight: 600,
+                boxShadow: '0 2px 8px rgba(0,0,0,0.45)',
+                transition: 'all 0.15s',
+              }}
+            >
+              <span style={{ fontSize: 16, lineHeight: 1 }}>★</span>
+              <span style={{ fontSize: 12, lineHeight: 1 }}>
+                {bookmarkMarkers.length}
+              </span>
+            </button>
+          </div>
+
+          {/* 搜尋結果清單：當有輸入字串時顯示符合的前 10 筆，點一下直接飛過去+傳送 */}
+          {showBookmarkLayer && bookmarkSearch.trim() !== '' && (() => {
+            const q = bookmarkSearch.trim().toLowerCase();
+            const hits = bookmarkMarkers.filter(bm =>
+              bm.name.toLowerCase().includes(q) ||
+              (bm.category ?? '').toLowerCase().includes(q)
+            ).slice(0, 10);
+            return (
+              <div style={{
+                background: 'rgba(30,30,36,0.96)', border: '1px solid #555', borderRadius: 8,
+                maxHeight: 260, overflowY: 'auto', minWidth: 200, width: '100%',
+                boxShadow: '0 4px 12px rgba(0,0,0,0.5)',
+              }}>
+                {hits.length === 0 ? (
+                  <div style={{ padding: '10px 12px', color: '#94a3b8', fontSize: 12 }}>
+                    找不到符合的收藏
+                  </div>
+                ) : (
+                  hits.map((bm, i) => (
+                    <div
+                      key={bm.id ?? `${bm.lat},${bm.lng},${i}`}
+                      onClick={() => {
+                        const map = mapRef.current;
+                        if (map) map.setView([bm.lat, bm.lng], Math.max(map.getZoom(), 16), { animate: true });
+                        onTeleportRef.current(bm.lat, bm.lng);
+                        setBookmarkSearch('');
+                      }}
+                      style={{
+                        padding: '8px 12px', cursor: 'pointer', fontSize: 12,
+                        color: '#fbbf24', borderBottom: '1px solid #3a3a42',
+                        display: 'flex', flexDirection: 'column', gap: 2,
+                      }}
+                      onMouseEnter={(e) => (e.currentTarget.style.background = '#3a3a42')}
+                      onMouseLeave={(e) => (e.currentTarget.style.background = 'transparent')}
+                    >
+                      <span style={{ fontWeight: 600 }}>★ {bm.name}</span>
+                      {bm.category && (
+                        <span style={{ fontSize: 10, color: '#94a3b8' }}>{bm.category}</span>
+                      )}
+                    </div>
+                  ))
+                )}
+              </div>
+            );
+          })()}
         </div>
       )}
 

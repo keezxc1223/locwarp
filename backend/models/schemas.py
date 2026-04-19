@@ -97,6 +97,8 @@ class RandomWalkRequest(BaseModel):
 class JoystickStartRequest(BaseModel):
     mode: MovementMode = MovementMode.WALKING
     speed_kmh: float | None = None
+    speed_min_kmh: float | None = None
+    speed_max_kmh: float | None = None
 
 
 class JoystickInput(BaseModel):

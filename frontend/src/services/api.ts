@@ -107,8 +107,8 @@ export const multiStop = (waypoints: { lat: number; lng: number }[], mode: strin
   request<any>('POST', '/api/location/multistop', { waypoints, mode, stop_duration, loop, ...sp(speed), ...pp(pause) })
 export const randomWalk = (center: { lat: number; lng: number }, radius_m: number, mode: string, speed?: SpeedOpts, pause?: PauseOpts) =>
   request<any>('POST', '/api/location/randomwalk', { center, radius_m, mode, ...sp(speed), ...pp(pause) })
-export const joystickStart = (mode: string) =>
-  request<any>('POST', '/api/location/joystick/start', { mode })
+export const joystickStart = (mode: string, speed?: SpeedOpts) =>
+  request<any>('POST', '/api/location/joystick/start', { mode, ...sp(speed) })
 export const joystickStop = () => request<any>('POST', '/api/location/joystick/stop')
 export const pauseSim = () => request<any>('POST', '/api/location/pause')
 export const resumeSim = () => request<any>('POST', '/api/location/resume')
@@ -123,20 +123,9 @@ export const timerStatus = () => request<any>('GET', '/api/location/timer/status
 // Location history
 export const getHistory = () => request<{ entries: any[] }>('GET', '/api/history')
 export const clearHistory = () => request<any>('DELETE', '/api/history')
-
-// Geofence
-export const setGeofence = (lat: number, lng: number, radius_m: number, auto_return: boolean) =>
-  request<any>('PUT', '/api/geofence', { lat, lng, radius_m, auto_return })
-export const clearGeofence = () => request<any>('DELETE', '/api/geofence')
-export const getGeofence = () => request<any>('GET', '/api/geofence')
-
-// Schedule
-export const getSchedule = () => request<{ entries: any[] }>('GET', '/api/schedule')
-export const addSchedule = (entry: any) => request<any>('POST', '/api/schedule', entry)
-export const removeSchedule = (id: string) => request<any>('DELETE', `/api/schedule/${id}`)
-export const toggleSchedule = (id: string, enabled: boolean) =>
-  request<any>('PATCH', `/api/schedule/${id}/toggle?enabled=${enabled}`)
-export const clearSchedule = () => request<any>('DELETE', '/api/schedule')
+export function exportHistoryGpxUrl(): string {
+  return `${API}/api/history/export/gpx`
+}
 
 // GPS Jitter
 export const getJitter = () => request<any>('GET', '/api/location/settings/jitter')
@@ -165,12 +154,6 @@ export const setHomePosition = (lat: number, lng: number) =>
   request<any>('PUT', '/api/location/settings/home-position', { lat, lng })
 export const clearHomePosition = () =>
   request<any>('DELETE', '/api/location/settings/home-position')
-
-// BlueStacks / Android Emulator
-export const listAdbDevices = () => request<{ devices: any[] }>('GET', '/api/bluestacks/list')
-export const connectAdb = (serial: string) => request<any>('POST', '/api/bluestacks/connect', { serial })
-export const disconnectAdb = () => request<any>('DELETE', '/api/bluestacks/connect')
-export const getAdbStatus = () => request<any>('GET', '/api/bluestacks/status')
 
 // Multi-device GPS sync
 export const getSyncDevices = () =>

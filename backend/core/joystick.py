@@ -7,7 +7,7 @@ import logging
 
 from models.schemas import JoystickInput, MovementMode, SimulationState
 from services.interpolator import RouteInterpolator
-from config import SPEED_PROFILES
+from config import SPEED_PROFILES, resolve_speed_profile
 
 logger = logging.getLogger(__name__)
 
@@ -33,7 +33,14 @@ class JoystickHandler:
         self._task: asyncio.Task | None = None
         self._current_input = JoystickInput(direction=0, intensity=0)
 
-    async def start(self, mode: MovementMode) -> None:
+    async def start(
+        self,
+        mode: MovementMode,
+        *,
+        speed_kmh: float | None = None,
+        speed_min_kmh: float | None = None,
+        speed_max_kmh: float | None = None,
+    ) -> None:
         """Activate joystick mode with the given movement speed profile."""
         engine = self.engine
 
@@ -47,10 +54,22 @@ class JoystickHandler:
             await engine.stop()
 
         profile_name = mode.value
-        self.speed_profile = SPEED_PROFILES[profile_name]
+        # 使用 resolve_speed_profile 以支援自訂速度（含速度範圍）
+        self.speed_profile = resolve_speed_profile(
+            profile_name, speed_kmh, speed_min_kmh, speed_max_kmh,
+        )
+        logger.info(
+            "Joystick speed: %.1f km/h (profile=%s, custom=%s)",
+            self.speed_profile["speed_mps"] * 3.6,
+            profile_name,
+            speed_kmh,
+        )
         self.is_active = True
         self._current_input = JoystickInput(direction=0, intensity=0)
 
+        # 重置累計距離，與其他模式（navigate/loop/multi_stop/random_walk）一致。
+        # 否則 status bar 會顯示上一輪 navigate 累積的距離，造成 UI 不一致。
+        engine.distance_traveled = 0.0
         engine.state = SimulationState.JOYSTICK
         engine._stop_event.clear()
 
@@ -118,6 +137,7 @@ class JoystickHandler:
                         "lat": new_lat,
                         "lng": new_lng,
                         "speed_mps": speed_mps,
+                        "speed_kmh": round(speed_mps * 3.6, 1),
                         "bearing": smooth_bearing,
                     })
 

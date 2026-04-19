@@ -201,9 +201,21 @@ class SimulationEngine:
             "Loop",
         )
 
-    async def joystick_start(self, mode: MovementMode) -> None:
+    async def joystick_start(
+        self,
+        mode: MovementMode,
+        *,
+        speed_kmh: float | None = None,
+        speed_min_kmh: float | None = None,
+        speed_max_kmh: float | None = None,
+    ) -> None:
         """Activate joystick mode."""
-        await self._joystick.start(mode)
+        await self._joystick.start(
+            mode,
+            speed_kmh=speed_kmh,
+            speed_min_kmh=speed_min_kmh,
+            speed_max_kmh=speed_max_kmh,
+        )
 
     def joystick_move(self, joystick_input: JoystickInput) -> None:
         """Update the joystick direction/intensity (non-blocking)."""
@@ -420,6 +432,15 @@ class SimulationEngine:
         accumulated_distance = 0.0  # 實際累計距離（用於 ETA 和進度追蹤）
         smooth_bearing = timed_points[0].get("bearing", 0.0)  # 平滑方位角
 
+        # ── 速度平滑 ──────────────────────────────────────────────────────────
+        # 在路線開頭和結尾各加 RAMP_STEPS 個 tick 的速度漸變，
+        # 讓 status bar 的速度顯示從 0 平滑地加速到目標速度再緩速停下。
+        # 短路線（總 tick < 2×RAMP_STEPS）直接顯示全速，避免速度永遠達不到設定值。
+        _RAMP_STEPS = 4          # 漸變步數（約 4 秒 @ 1s interval）
+        _ramp_step  = 0          # 當前 tick 計數
+        _total_ticks_est = max(1, int(total_duration / max(update_interval, 0.1)))
+        _use_ramp = _total_ticks_est > _RAMP_STEPS * 2  # 短路線不做 ramp
+
         # ── 時間驅動迴圈 ──────────────────────────────────────────────
         # 每次 tick 以「牆鐘經過時間」查詢路線上的正確位置，
         # 而不是逐點迭代。好處：
@@ -477,6 +498,20 @@ class SimulationEngine:
                 diff = ((raw_bearing - smooth_bearing + 180) % 360) - 180
                 smooth_bearing = (smooth_bearing + 0.3 * diff) % 360
 
+            # ── 速度平滑：根據路線進度漸變顯示速度 ────────────────────────────
+            _ramp_step += 1
+            if not _use_ramp:
+                # 短路線或高速場景：直接顯示設定速度，避免永遠達不到設定值
+                self._current_speed_mps = speed_mps
+            elif _ramp_step <= _RAMP_STEPS:
+                _ramp = _ramp_step / _RAMP_STEPS           # ease-in  0→1
+                self._current_speed_mps = speed_mps * max(0.05, _ramp)
+            elif _total_ticks_est - _ramp_step <= _RAMP_STEPS:
+                _ramp = max(0.0, (_total_ticks_est - _ramp_step) / _RAMP_STEPS)  # ease-out 1→0
+                self._current_speed_mps = speed_mps * max(0.05, _ramp)
+            else:
+                self._current_speed_mps = speed_mps
+
             # Add GPS jitter for realism
             jittered_lat, jittered_lng = RouteInterpolator.add_jitter(lat, lng, jitter)
 
@@ -499,6 +534,10 @@ class SimulationEngine:
                     break
             if not pushed:
                 logger.error("Giving up on this route after repeated push failures")
+                await self._emit("simulation_error", {
+                    "message": "GPS 定位推送失敗，路線已中止",
+                    "code": "push_failure",
+                })
                 break
 
             # 更新距離追蹤（使用實際累計距離，而非速度估算）
@@ -507,11 +546,13 @@ class SimulationEngine:
             self.eta_tracker.update(accumulated_distance)
 
             # Emit position update
+            # speed_mps 發實際設定值（供前端顯示時速），不發 ramp 後的平滑值
             await self._emit("position_update", {
                 "lat": jittered_lat,
                 "lng": jittered_lng,
                 "bearing": smooth_bearing,
                 "speed_mps": speed_mps,
+                "speed_kmh": round(speed_mps * 3.6, 1),
                 "progress": self.eta_tracker.progress,
                 "distance_remaining": self.distance_remaining,
                 "distance_traveled": self.distance_traveled,

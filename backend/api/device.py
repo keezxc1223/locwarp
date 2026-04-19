@@ -379,8 +379,8 @@ async def wifi_tunnel_discover():
         from pymobiledevice3.bonjour import browse_remotepairing
         instances = await browse_remotepairing(timeout=3.0)
         for inst in instances:
-            ipv4s = [a for a in (inst.addresses or []) if ":" not in a]
-            addrs = ipv4s if ipv4s else list(inst.addresses or [])
+            ipv4s = [str(a) for a in (inst.addresses or []) if ":" not in str(a)]
+            addrs = ipv4s if ipv4s else [str(a) for a in (inst.addresses or [])]
             for addr in addrs:
                 results.append({
                     "ip": addr,
@@ -646,9 +646,21 @@ async def wifi_tunnel_start(req: WifiTunnelStartRequest):
             if _tunnel.proc.poll() is not None:
                 output = _tunnel.proc.stdout.read() if _tunnel.proc.stdout else ""
                 _tunnel.proc = None
+                # Provide actionable message for the most common failure modes
+                tail = output[-800:]
+                if "ConnectionTerminated" in output or "connection_terminated" in output.lower():
+                    friendly = (
+                        "裝置已透過 tunneld 建立連線，拒絕第二條 RemotePairing 通道。\n"
+                        "請先停止 tunneld（關閉執行 tunneld 的終端機視窗），再重試 WiFi Tunnel。\n"
+                        f"原始訊息：{tail[-300:]}"
+                    )
+                    raise HTTPException(status_code=409, detail={"code": "tunnel_already_connected", "message": friendly})
+                if "PasswordRequired" in output or "password" in output.lower():
+                    friendly = f"Tunnel 需要管理員密碼，請確認以 sudo 執行。\n原始訊息：{tail[-300:]}"
+                    raise HTTPException(status_code=403, detail={"code": "tunnel_password_required", "message": friendly})
                 raise HTTPException(
                     status_code=500,
-                    detail={"code": "tunnel_exited", "message": f"Tunnel 進程異常結束:{output[-500:]}"},
+                    detail={"code": "tunnel_exited", "message": f"Tunnel 進程異常結束:\n{tail}"},
                 )
             if info_path.exists():
                 try:

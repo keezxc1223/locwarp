@@ -29,7 +29,7 @@ export const STRINGS = {
   'status.cooldown_tooltip': { zh: '關閉後瞬移將不觸發冷卻', en: 'When off, teleports skip the cooldown' },
   'status.restore': { zh: '一鍵還原', en: 'Restore' },
   'status.restore_tooltip': { zh: '清除 iPhone 上的虛擬定位,恢復真實 GPS', en: 'Clear the virtual location and restore real GPS' },
-  'status.restore_success': { zh: '已清除虛擬定位', en: 'Virtual location cleared' },
+  'status.restore_success': { zh: '已清除虛擬定位 · iPhone 需 10~30 秒取得真實 GPS', en: 'Virtual location cleared · iPhone needs 10-30s to reacquire real GPS' },
   'status.restore_failed': { zh: '清除失敗', en: 'Clear failed' },
   'status.copy_coord': { zh: '複製座標', en: 'Copy coordinates' },
 
@@ -48,13 +48,11 @@ export const STRINGS = {
 
   // ── Control panel ────────────────────────────
   'panel.speed': { zh: '速度', en: 'Speed' },
-  'panel.custom_speed': { zh: '自訂', en: 'Custom' },
+  'panel.custom_speed': { zh: '自訂速度', en: 'Custom speed' },
   'panel.custom_speed_active': { zh: '使用自訂速度', en: 'Using custom speed' },
-  'panel.speed_range': { zh: '隨機速度範圍 (km/h)', en: 'Random speed range (km/h)' },
-  'panel.speed_range_min': { zh: '最小', en: 'Min' },
-  'panel.speed_range_max': { zh: '最大', en: 'Max' },
-  'panel.speed_range_active': { zh: '隨機範圍', en: 'Random range' },
-  'panel.speed_range_hint': { zh: '每段路重抽', en: 're-picked per leg' },
+  'panel.speed_variance': { zh: '上下浮動', en: 'Variance' },
+  'panel.speed_variance_hint': { zh: '每趟隨機', en: 're-picked per leg' },
+  'panel.actual_speed': { zh: '實際速度', en: 'Actual speed' },
   'panel.coords': { zh: '座標', en: 'Coordinates' },
   'panel.coord_lat': { zh: '緯度', en: 'Latitude' },
   'panel.coord_lng': { zh: '經度', en: 'Longitude' },
@@ -139,7 +137,7 @@ export const STRINGS = {
   'map.add_waypoint': { zh: '添加路徑點', en: 'Add waypoint' },
   'map.add_bookmark': { zh: '加入書籤', en: 'Add bookmark' },
 
-  // ── EtaBar ───────────────────────────────────
+  // ── ETA / 進度 ──────────────────────────────
   'eta.remaining': { zh: '剩餘', en: 'Remaining' },
   'eta.eta': { zh: '預計到達', en: 'ETA' },
   'eta.traveled': { zh: '已行', en: 'Traveled' },
@@ -241,6 +239,20 @@ export const STRINGS = {
   // ── DDI mount overlay ───────────────────────
   'ddi.mounting_title': { zh: '首次設定裝置中', en: 'Preparing device' },
   'ddi.mounting_hint': { zh: '正在下載並掛載 Developer Disk Image(約 20MB),請保持網路連線,約需 10~30 秒...', en: 'Downloading and mounting the Developer Disk Image (~20MB). Please keep your internet connected. This takes 10–30 seconds...' },
+
+  // ── Activity rail (left navigation) ─────────
+  'rail.control': { zh: '控制', en: 'Control' },
+  'rail.device': { zh: '裝置', en: 'Device' },
+  'rail.tools': { zh: '工具', en: 'Tools' },
+
+  // ── History panel ───────────────────────────
+  'history.title': { zh: '地點歷史', en: 'Location History' },
+  'history.count_unit': { zh: '筆', en: '' },
+  'history.empty': { zh: '尚無記錄', en: 'No history yet' },
+  'history.jump': { zh: '跳', en: 'Go' },
+  'history.jump_tooltip': { zh: '跳到此座標', en: 'Teleport to this point' },
+  'history.export_gpx': { zh: '↓ 匯出 GPX', en: '↓ Export GPX' },
+  'history.clear': { zh: '清除歷史', en: 'Clear history' },
 } as const;
 
 export type StringKey = keyof typeof STRINGS;

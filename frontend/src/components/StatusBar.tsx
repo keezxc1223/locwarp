@@ -1,8 +1,25 @@
-import React, { useEffect, useState, useCallback } from 'react';
+import React, { useEffect, useState, useCallback, memo } from 'react';
 import { SimMode } from '../hooks/useSimulation';
 import { useT } from '../i18n';
 import LangToggle from './LangToggle';
 import * as api from '../services/api';
+
+/**
+ * LiveClock — 獨立元件每秒更新時鐘，避免帶動整個 StatusBar 重渲染。
+ * 使用 memo 確保父元件狀態變更時不重渲染此元件。
+ */
+const LiveClock = memo(() => {
+  const [now, setNow] = useState(() => new Date());
+  useEffect(() => {
+    const timer = setInterval(() => setNow(new Date()), 1000);
+    return () => clearInterval(timer);
+  }, []);
+  return (
+    <span style={{ opacity: 0.4, fontSize: 10 }}>
+      {now.toLocaleTimeString(undefined, { hour12: false })}
+    </span>
+  );
+});
 
 interface Position {
   lat: number;
@@ -18,6 +35,7 @@ interface StatusBarProps {
   mode: SimMode;
   cooldown: number; // seconds remaining, 0 if inactive
   cooldownEnabled: boolean;
+  cooldownDistanceKm?: number; // teleport distance that triggered current cooldown
   onToggleCooldown: (enabled: boolean) => void;
   onRestore?: () => void;
 }
@@ -47,25 +65,20 @@ const StatusBar: React.FC<StatusBarProps> = ({
   mode,
   cooldown,
   cooldownEnabled,
+  cooldownDistanceKm = 0,
   onToggleCooldown,
   onRestore,
 }) => {
   const t = useT();
   const [cooldownDisplay, setCooldownDisplay] = useState(cooldown);
+  const lastServerCooldown = React.useRef(cooldown);
   const [copied, setCopied] = useState(false);
   const [homePos, setHomePos] = useState<{ lat: number; lng: number } | null>(null);
   const [homeSaved, setHomeSaved] = useState(false);
-  const [now, setNow] = useState(() => new Date());
 
   // Load home position on mount
   useEffect(() => {
     api.getHomePosition().then(r => setHomePos(r.home_position)).catch(() => {});
-  }, []);
-
-  // Keep the timestamp ticking every second
-  useEffect(() => {
-    const timer = setInterval(() => setNow(new Date()), 1000);
-    return () => clearInterval(timer);
   }, []);
 
   // ~10 m tolerance in decimal degrees (1° ≈ 111 km, so 0.0001° ≈ 11 m).
@@ -91,22 +104,24 @@ const StatusBar: React.FC<StatusBarProps> = ({
     }
   }, [currentPosition, isHomeSet]);
 
+  // Sync from server value: accept if it differs by > 2 s from our local
+  // counter (prevents the ±1 s stutter when the API poll overlaps the tick).
   useEffect(() => {
-    setCooldownDisplay(cooldown);
-    if (cooldown <= 0) return;
-
-    const interval = setInterval(() => {
-      setCooldownDisplay((prev) => {
-        if (prev <= 1) {
-          clearInterval(interval);
-          return 0;
-        }
-        return prev - 1;
-      });
-    }, 1000);
-
-    return () => clearInterval(interval);
+    const delta = Math.abs(cooldown - lastServerCooldown.current);
+    lastServerCooldown.current = cooldown;
+    if (cooldown <= 0 || delta > 2) {
+      setCooldownDisplay(cooldown);
+    }
   }, [cooldown]);
+
+  // Local 1-second tick for smooth display
+  useEffect(() => {
+    if (cooldownDisplay <= 0) return;
+    const timer = setTimeout(() => {
+      setCooldownDisplay(prev => Math.max(0, prev - 1));
+    }, 1000);
+    return () => clearTimeout(timer);
+  }, [cooldownDisplay]);
 
   return (
     <div
@@ -296,12 +311,14 @@ const StatusBar: React.FC<StatusBarProps> = ({
         <>
           <div style={{ width: 1, height: 14, background: '#333' }} />
           <div
+            title={cooldownDistanceKm > 0 ? `傳送距離 ${cooldownDistanceKm.toFixed(0)} km` : undefined}
             style={{
               display: 'flex',
               alignItems: 'center',
               gap: 4,
               color: '#ff9800',
               fontWeight: 600,
+              cursor: cooldownDistanceKm > 0 ? 'help' : 'default',
             }}
           >
             <svg width="11" height="11" viewBox="0 0 24 24" fill="none" stroke="#ff9800" strokeWidth="2">
@@ -309,6 +326,11 @@ const StatusBar: React.FC<StatusBarProps> = ({
               <polyline points="12,6 12,12 16,14" />
             </svg>
             <span>{t('status.cooldown_active')} {formatCooldown(cooldownDisplay)}</span>
+            {cooldownDistanceKm > 0 && (
+              <span style={{ fontSize: 10, opacity: 0.65, fontWeight: 400 }}>
+                ({cooldownDistanceKm.toFixed(0)} km)
+              </span>
+            )}
           </div>
         </>
       )}
@@ -320,10 +342,8 @@ const StatusBar: React.FC<StatusBarProps> = ({
       <LangToggle />
       <div style={{ width: 1, height: 14, background: '#333' }} />
 
-      {/* Live clock */}
-      <span style={{ opacity: 0.4, fontSize: 10 }}>
-        {now.toLocaleTimeString(undefined, { hour12: false })}
-      </span>
+      {/* Live clock — 獨立元件，避免每秒帶動整個 StatusBar 重渲染 */}
+      <LiveClock />
     </div>
   );
 };

@@ -1,0 +1,250 @@
+name: Build & Release
+
+# ── Triggers ──────────────────────────────────────────────
+# Push a version tag (e.g. v1.2.3) to trigger a release build.
+# Manual dispatch is also available for testing.
+on:
+  push:
+    tags:
+      - 'v*.*.*'
+  workflow_dispatch:
+    inputs:
+      draft:
+        description: 'Create draft release (no public publish)'
+        type: boolean
+        default: true
+
+# ── Permissions ────────────────────────────────────────────
+permissions:
+  contents: write   # needed to create GitHub Release assets
+
+# ══════════════════════════════════════════════════════════
+#  Job 1: Build macOS DMG
+# ══════════════════════════════════════════════════════════
+jobs:
+  build-mac:
+    name: 🍎 macOS (Universal 2)
+    runs-on: macos-14        # Apple Silicon runner (M1) — fastest for arm64
+    timeout-minutes: 60
+
+    steps:
+      # ── Checkout ──────────────────────────────────────
+      - name: Checkout
+        uses: actions/checkout@v4
+
+      # ── Python 3.12 for backend ───────────────────────
+      - name: Set up Python 3.12 (backend)
+        uses: actions/setup-python@v5
+        with:
+          python-version: '3.12'
+          cache: 'pip'
+          cache-dependency-path: backend/requirements.txt
+
+      - name: Install backend dependencies
+        run: |
+          python3.12 -m pip install --upgrade pip
+          python3.12 -m pip install -r backend/requirements.txt pyinstaller uvloop
+
+      # ── Python 3.13 for WiFi tunnel ───────────────────
+      - name: Set up Python 3.13 (wifi-tunnel)
+        uses: actions/setup-python@v5
+        with:
+          python-version: '3.13'
+
+      - name: Install tunnel dependencies
+        run: |
+          python3.13 -m pip install --upgrade pip
+          python3.13 -m pip install pymobiledevice3 pytun-pmd3 pyinstaller
+
+      # ── Node.js ───────────────────────────────────────
+      - name: Set up Node.js
+        uses: actions/setup-node@v4
+        with:
+          node-version: '20'
+          cache: 'npm'
+          cache-dependency-path: frontend/package-lock.json
+
+      - name: Install frontend dependencies
+        run: cd frontend && npm ci
+
+      # ── Build backend (PyInstaller) ───────────────────
+      - name: Build backend binary (Python 3.12)
+        run: |
+          cd backend
+          python3.12 -m PyInstaller locwarp-backend.spec \
+            --noconfirm \
+            --distpath "${{ github.workspace }}/dist-py" \
+            --workpath "${{ github.workspace }}/build-py/backend"
+
+      # ── Build tunnel (PyInstaller) ────────────────────
+      - name: Build wifi-tunnel binary (Python 3.13)
+        run: |
+          python3.13 -m PyInstaller wifi-tunnel.spec \
+            --noconfirm \
+            --distpath "${{ github.workspace }}/dist-py" \
+            --workpath "${{ github.workspace }}/build-py/tunnel"
+
+      # ── Ad-hoc sign (CI has no Developer cert) ────────
+      - name: Ad-hoc sign native binaries
+        run: |
+          for dir in dist-py/locwarp-backend dist-py/wifi-tunnel; do
+            find "$dir" \( -name "*.dylib" -o -name "*.so" \) \
+              -exec codesign --force --sign - {} \; 2>/dev/null || true
+            exe=$(find "$dir" -maxdepth 1 -type f -perm +0111 | head -1)
+            [ -n "$exe" ] && codesign --force --sign - "$exe" || true
+          done
+          echo "Ad-hoc signing complete"
+
+      # ── Notarisation (only when Apple creds available) ─
+      - name: Set up notarisation credentials
+        if: ${{ env.APPLE_ID != '' }}
+        env:
+          APPLE_ID: ${{ secrets.APPLE_ID }}
+          APPLE_APP_SPECIFIC_PASSWORD: ${{ secrets.APPLE_APP_SPECIFIC_PASSWORD }}
+          APPLE_TEAM_ID: ${{ secrets.APPLE_TEAM_ID }}
+        run: echo "Notarisation credentials available"
+
+      # ── Build Vite frontend ───────────────────────────
+      - name: Build frontend (Vite)
+        run: cd frontend && npm run build
+
+      # ── Package Electron DMG (Universal 2) ───────────
+      - name: Package Electron Universal DMG
+        env:
+          APPLE_ID: ${{ secrets.APPLE_ID }}
+          APPLE_APP_SPECIFIC_PASSWORD: ${{ secrets.APPLE_APP_SPECIFIC_PASSWORD }}
+          APPLE_TEAM_ID: ${{ secrets.APPLE_TEAM_ID }}
+          GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+        run: cd frontend && npx electron-builder --mac dmg --universal
+
+      # ── Upload artefact ───────────────────────────────
+      - name: Upload macOS DMG
+        uses: actions/upload-artifact@v4
+        with:
+          name: LocWarp-mac
+          path: frontend/release/*.dmg
+          retention-days: 7
+
+# ══════════════════════════════════════════════════════════
+#  Job 2: Build Windows NSIS Installer
+# ══════════════════════════════════════════════════════════
+  build-win:
+    name: 🪟 Windows (x64)
+    runs-on: windows-latest
+    timeout-minutes: 60
+
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+
+      # ── Python 3.12 for backend ───────────────────────
+      - name: Set up Python 3.12 (backend)
+        uses: actions/setup-python@v5
+        with:
+          python-version: '3.12'
+          cache: 'pip'
+          cache-dependency-path: backend/requirements.txt
+
+      - name: Install backend dependencies
+        run: |
+          py -3.12 -m pip install --upgrade pip
+          py -3.12 -m pip install -r backend/requirements.txt pyinstaller
+
+      # ── Python 3.13 for WiFi tunnel ───────────────────
+      - name: Set up Python 3.13 (wifi-tunnel)
+        uses: actions/setup-python@v5
+        with:
+          python-version: '3.13'
+
+      - name: Install tunnel dependencies
+        run: |
+          py -3.13 -m pip install --upgrade pip
+          py -3.13 -m pip install pymobiledevice3 pytun-pmd3 pyinstaller
+
+      # ── Node.js ───────────────────────────────────────
+      - name: Set up Node.js
+        uses: actions/setup-node@v4
+        with:
+          node-version: '20'
+          cache: 'npm'
+          cache-dependency-path: frontend/package-lock.json
+
+      - name: Install frontend dependencies
+        run: cd frontend && npm ci
+
+      # ── Build backend ─────────────────────────────────
+      - name: Build backend binary (Python 3.12)
+        run: |
+          cd backend
+          py -3.12 -m PyInstaller locwarp-backend.spec `
+            --noconfirm `
+            --distpath "$env:GITHUB_WORKSPACE\dist-py" `
+            --workpath "$env:GITHUB_WORKSPACE\build-py\backend"
+
+      # ── Build tunnel ──────────────────────────────────
+      - name: Build wifi-tunnel binary (Python 3.13)
+        run: |
+          py -3.13 -m PyInstaller wifi-tunnel.spec `
+            --noconfirm `
+            --distpath "$env:GITHUB_WORKSPACE\dist-py" `
+            --workpath "$env:GITHUB_WORKSPACE\build-py\tunnel"
+
+      # ── Build frontend ────────────────────────────────
+      - name: Build frontend (Vite)
+        run: cd frontend && npm run build
+
+      # ── Package Electron NSIS ─────────────────────────
+      - name: Package Electron NSIS installer
+        env:
+          GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+        run: cd frontend && npx electron-builder --win nsis
+
+      # ── Upload artefact ───────────────────────────────
+      - name: Upload Windows installer
+        uses: actions/upload-artifact@v4
+        with:
+          name: LocWarp-win
+          path: frontend/release/*.exe
+          retention-days: 7
+
+# ══════════════════════════════════════════════════════════
+#  Job 3: Create GitHub Release (runs after both builds)
+# ══════════════════════════════════════════════════════════
+  create-release:
+    name: 📦 Create GitHub Release
+    needs: [build-mac, build-win]
+    runs-on: ubuntu-latest
+    # Only create a release on tag push (not manual dispatch)
+    if: startsWith(github.ref, 'refs/tags/')
+
+    steps:
+      - name: Download macOS DMG
+        uses: actions/download-artifact@v4
+        with:
+          name: LocWarp-mac
+          path: release/
+
+      - name: Download Windows installer
+        uses: actions/download-artifact@v4
+        with:
+          name: LocWarp-win
+          path: release/
+
+      - name: Create Release
+        uses: softprops/action-gh-release@v2
+        with:
+          draft: ${{ github.event.inputs.draft == 'true' }}
+          generate_release_notes: true
+          files: release/*
+          body: |
+            ## LocWarp ${{ github.ref_name }}
+
+            ### 下載
+            | 平台 | 檔案 |
+            |------|------|
+            | 🍎 macOS (Universal / M1+Intel) | `LocWarp-*.dmg` |
+            | 🪟 Windows (x64) | `LocWarp Setup *.exe` |
+
+            ### 安裝說明
+            **macOS:** 下載 `.dmg`，拖入 Applications，首次開啟右鍵選「開啟」
+            **Windows:** 以系統管理員身份執行 `.exe` 安裝程式

@@ -46,7 +46,21 @@ async def run_tunnel(udid: str, ip: str, port: int) -> None:
     )
 
     logger.info("Connecting to RemotePairing service at %s:%d ...", ip, port)
-    service = await create_core_device_tunnel_service_using_remotepairing(udid, ip, port)
+    try:
+        service = await create_core_device_tunnel_service_using_remotepairing(udid, ip, port)
+    except Exception as e:
+        err_cls = type(e).__name__
+        err_str = str(e)
+        if "ConnectionTerminated" in err_cls or "ConnectionTerminated" in err_str:
+            logger.error(
+                "ConnectionTerminatedError: 裝置已透過 tunneld 佔用 RemotePairing 通道，"
+                "無法同時建立第二條 WiFi Tunnel 連線。\n"
+                "解決方法：關閉執行 'sudo python3 -m pymobiledevice3 remote tunneld' "
+                "的終端機視窗後重試。\n原始錯誤：%s", e
+            )
+            sys.exit(3)
+        logger.error("RemotePairing 連線失敗 (%s): %s", err_cls, e)
+        raise
     logger.info("RemotePairing connected (identifier: %s)", service.remote_identifier)
 
     logger.info("Starting TCP tunnel ...")

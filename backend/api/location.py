@@ -268,7 +268,12 @@ async def random_walk(req: RandomWalkRequest):
 async def joystick_start(req: JoystickStartRequest):
     engine = await _engine()
     try:
-        await engine.joystick_start(req.mode)
+        await engine.joystick_start(
+            req.mode,
+            speed_kmh=req.speed_kmh,
+            speed_min_kmh=req.speed_min_kmh,
+            speed_max_kmh=req.speed_max_kmh,
+        )
     except Exception as e:
         raise HTTPException(status_code=500, detail=str(e))
     return {"status": "started", "mode": req.mode}

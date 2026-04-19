@@ -89,12 +89,410 @@ body {
   background: var(--border-light);
 }
 
-/* ---------- App Layout ---------- */
+/* ---------- App Layout (v3 — column) ---------- */
 .app-layout {
   display: flex;
-  flex-direction: row;
+  flex-direction: column;
   height: 100%;
   width: 100%;
+}
+
+/* ── Top bar ── */
+.top-bar {
+  height: 36px;
+  min-height: 36px;
+  display: flex;
+  align-items: center;
+  gap: 0;
+  padding: 0 14px;
+  background: var(--bg-primary);
+  border-bottom: 1px solid var(--border-color);
+  flex-shrink: 0;
+  z-index: 20;
+  overflow: hidden;
+}
+
+.top-bar-brand {
+  display: flex;
+  align-items: center;
+  gap: 6px;
+  flex-shrink: 0;
+}
+
+.top-bar-logo {
+  font-size: 16px;
+  line-height: 1;
+}
+
+.top-bar-title {
+  font-size: 14px;
+  font-weight: 700;
+  letter-spacing: -0.02em;
+  color: var(--text-primary);
+}
+
+.top-bar-sep {
+  width: 1px;
+  height: 16px;
+  background: var(--border-color);
+  margin: 0 10px;
+  flex-shrink: 0;
+}
+
+.top-bar-device {
+  display: flex;
+  align-items: center;
+  gap: 6px;
+  flex-shrink: 0;
+  min-width: 0;
+}
+
+.top-bar-dot {
+  width: 7px;
+  height: 7px;
+  border-radius: 50%;
+  flex-shrink: 0;
+  transition: all var(--transition-fast);
+}
+.top-bar-dot.connected {
+  background: var(--accent-green);
+  box-shadow: 0 0 5px var(--accent-green);
+}
+.top-bar-dot.disconnected {
+  background: var(--text-muted);
+}
+
+.top-bar-device-name {
+  font-size: 12px;
+  font-weight: 500;
+  color: var(--text-primary);
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  max-width: 140px;
+}
+.top-bar-no-device {
+  color: var(--text-muted);
+}
+
+.top-bar-device-ver {
+  font-size: 11px;
+  color: var(--text-muted);
+  flex-shrink: 0;
+}
+
+.top-bar-conn-type {
+  font-size: 12px;
+  flex-shrink: 0;
+}
+
+.top-bar-coords {
+  font-size: 11px;
+  font-family: 'SF Mono', 'Fira Code', monospace;
+  color: var(--text-muted);
+  white-space: nowrap;
+}
+
+.top-bar-spacer {
+  flex: 1;
+}
+
+.top-bar-speed {
+  display: flex;
+  align-items: center;
+  gap: 4px;
+  font-size: 12px;
+  color: var(--accent-green);
+  font-family: 'SF Mono', 'Fira Code', monospace;
+  font-weight: 600;
+  flex-shrink: 0;
+}
+.top-bar-speed-unit {
+  font-size: 10px;
+  font-weight: 400;
+  color: var(--text-muted);
+}
+
+.top-bar-mode {
+  font-size: 11px;
+  font-weight: 600;
+  padding: 2px 8px;
+  border-radius: var(--radius-full);
+  background: rgba(255,255,255,0.06);
+  border: 1px solid rgba(255,255,255,0.1);
+  flex-shrink: 0;
+  white-space: nowrap;
+}
+
+/* ── Body (rail + panel + map) ── */
+.app-body {
+  flex: 1;
+  display: flex;
+  flex-direction: row;
+  min-height: 0;
+  overflow: hidden;
+}
+
+/* ── Activity Rail ── */
+.activity-rail {
+  width: 52px;
+  min-width: 52px;
+  background: var(--bg-primary);
+  border-right: 1px solid var(--border-color);
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  padding: 6px 0;
+  gap: 2px;
+  flex-shrink: 0;
+  z-index: 15;
+}
+
+.rail-btn {
+  width: 44px;
+  height: 48px;
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  justify-content: center;
+  gap: 2px;
+  background: transparent;
+  border: none;
+  border-radius: var(--radius-md);
+  color: var(--text-muted);
+  cursor: pointer;
+  transition: all var(--transition-fast);
+  position: relative;
+  user-select: none;
+}
+.rail-btn:hover {
+  background: var(--bg-surface-hover);
+  color: var(--text-secondary);
+}
+.rail-btn--active {
+  background: var(--accent-blue-dim);
+  color: var(--accent-blue);
+}
+.rail-btn--active:hover {
+  background: rgba(108,140,255,0.22);
+  color: var(--accent-blue);
+}
+
+.rail-btn-icon {
+  font-size: 18px;
+  line-height: 1;
+}
+
+.rail-btn-label {
+  font-size: 9px;
+  font-weight: 500;
+  letter-spacing: 0.02em;
+}
+
+/* Green indicator dot (device connected) */
+.rail-btn-dot {
+  position: absolute;
+  top: 6px;
+  right: 6px;
+  width: 6px;
+  height: 6px;
+  border-radius: 50%;
+  background: var(--accent-green);
+  box-shadow: 0 0 4px var(--accent-green);
+  border: 1.5px solid var(--bg-surface);
+}
+
+/* ── Side Panel ── */
+.side-panel {
+  width: 0;
+  overflow: hidden;
+  transition: width 0.22s cubic-bezier(0.4, 0, 0.2, 1);
+  background: var(--bg-surface);
+  border-right: 1px solid rgba(255,255,255,0.07);
+  display: flex;
+  flex-direction: column;
+  flex-shrink: 0;
+  z-index: 14;
+}
+.side-panel--open {
+  width: 300px;
+}
+
+.side-panel-content {
+  width: 300px;
+  flex: 1;
+  overflow-y: auto;
+  overflow-x: hidden;
+  padding: 8px 0;
+  scrollbar-gutter: stable;
+}
+
+/* ── Map Area ── */
+.map-area {
+  flex: 1;
+  display: flex;
+  flex-direction: column;
+  position: relative;
+  overflow: hidden;
+  min-width: 0;
+}
+
+/* ── Action Bar ── */
+.action-bar {
+  background: var(--bg-primary);
+  border-top: 1px solid var(--border-color);
+  flex-shrink: 0;
+  z-index: 20;
+}
+
+/* Single button row — 52px tall */
+.action-bar-btns {
+  display: flex;
+  align-items: center;
+  gap: 6px;
+  padding: 0 14px;
+  height: 52px;
+}
+
+/* Thin vertical separator between button groups and ETA */
+.action-bar-btn-vsep {
+  width: 1px;
+  height: 18px;
+  background: var(--border-color);
+  flex-shrink: 0;
+  margin: 0 2px;
+}
+
+/* Inline ETA: progress track + percentage */
+.action-bar-eta-inline {
+  display: flex;
+  align-items: center;
+  gap: 6px;
+  min-width: 100px;
+}
+
+.action-bar-eta-track {
+  flex: 1;
+  height: 4px;
+  border-radius: var(--radius-full);
+  background: rgba(255,255,255,0.07);
+  overflow: hidden;
+}
+
+.action-bar-eta-fill {
+  height: 100%;
+  border-radius: var(--radius-full);
+  background: linear-gradient(90deg, var(--accent-blue), var(--accent-green));
+  transition: width 0.5s ease-out;
+}
+
+.action-bar-eta-pct {
+  font-size: 11px;
+  font-weight: 600;
+  font-family: 'SF Mono', 'Fira Code', monospace;
+  color: var(--accent-blue);
+  white-space: nowrap;
+}
+
+/* ETA stat chips (remaining distance / time) */
+.action-bar-eta-stat {
+  display: flex;
+  align-items: center;
+  gap: 4px;
+  white-space: nowrap;
+  color: var(--text-secondary);
+  font-size: 11px;
+}
+.action-bar-eta-stat--time {
+  color: var(--accent-yellow);
+  font-weight: 500;
+}
+
+.action-bar-btn {
+  display: inline-flex;
+  align-items: center;
+  gap: 5px;
+  padding: 6px 14px;
+  border-radius: var(--radius-md);
+  border: 1px solid var(--border-color);
+  background: var(--bg-elevated);
+  color: var(--text-secondary);
+  font-size: 12px;
+  font-weight: 500;
+  cursor: pointer;
+  transition: all var(--transition-fast);
+  white-space: nowrap;
+}
+.action-bar-btn:hover:not(:disabled) {
+  background: var(--bg-surface-hover);
+  color: var(--text-primary);
+  border-color: var(--border-light);
+}
+.action-bar-btn:disabled {
+  opacity: 0.35;
+  cursor: not-allowed;
+}
+
+.action-bar-btn-label {
+  font-size: 11px;
+}
+
+/* Variant colours */
+.action-bar-btn--start {
+  background: var(--accent-blue);
+  color: #fff;
+  border-color: var(--accent-blue);
+  font-weight: 600;
+  padding: 6px 20px;
+}
+.action-bar-btn--start:hover:not(:disabled) {
+  background: var(--accent-blue-hover);
+  border-color: var(--accent-blue-hover);
+}
+
+.action-bar-btn--pause {
+  background: var(--accent-yellow-dim);
+  color: var(--accent-yellow);
+  border-color: rgba(255,217,61,0.35);
+}
+.action-bar-btn--pause:hover:not(:disabled) {
+  background: rgba(255,217,61,0.22);
+}
+
+.action-bar-btn--resume {
+  background: var(--accent-green-dim);
+  color: var(--accent-green);
+  border-color: rgba(78,205,196,0.35);
+}
+.action-bar-btn--resume:hover:not(:disabled) {
+  background: rgba(78,205,196,0.22);
+}
+
+.action-bar-btn--stop {
+  background: var(--accent-pink-dim);
+  color: var(--accent-pink);
+  border-color: rgba(255,107,157,0.35);
+}
+.action-bar-btn--stop:hover:not(:disabled) {
+  background: rgba(255,107,157,0.22);
+}
+
+.action-bar-btn--restore {
+  color: var(--text-muted);
+  background: var(--bg-elevated);
+  border-color: var(--border-color);
+}
+
+.action-bar-btn--draw {
+  font-size: 13px;
+  background: var(--bg-elevated);
+  border-color: var(--border-color);
+  color: var(--text-secondary);
+}
+.action-bar-btn--draw.active {
+  background: rgba(255,152,0,0.15);
+  border-color: rgba(255,152,0,0.45);
+  color: var(--accent-orange);
 }
 
 /* ---------- Sidebar ---------- */
@@ -1640,12 +2038,13 @@ body {
 /* ---------- Status Bar (enhanced) ---------- */
 .status-bar {
   min-height: var(--status-bar-height);
-  background: var(--bg-surface);
-  border-top: 1px solid var(--border-color);
+  /* Same dark base as action bar — the two bars read as one unit */
+  background: var(--bg-primary);
+  border-top: 1px solid rgba(255,255,255,0.04);
   display: flex;
   align-items: center;
   flex-wrap: wrap;
-  padding: 4px 12px;
+  padding: 4px 14px;
   column-gap: 12px;
   row-gap: 4px;
   font-size: 11px;

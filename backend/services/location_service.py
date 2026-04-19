@@ -150,10 +150,13 @@ class DvtLocationService(LocationService):
             raise
 
     async def clear(self) -> None:
-        """Clear the simulated location via the DVT instrument channel."""
-        if not self._active:
-            logger.debug("DVT clear called but no simulation is active")
-            return
+        """Clear the simulated location via the DVT instrument channel.
+
+        Always attempts the underlying clear regardless of the cached `_active`
+        flag.  After a LocWarp restart the iOS side may still hold a stale fake
+        location while this new service instance has `_active=False`; short-
+        circuiting here would make「一鍵還原」默默失敗，讓使用者看不到變化。
+        """
         try:
             sim = await self._ensure_instrument()
             await sim.clear()
@@ -229,10 +232,11 @@ class LegacyLocationService(LocationService):
             raise
 
     async def clear(self) -> None:
-        """Clear the simulated location using the legacy service."""
-        if not self._active:
-            logger.debug("Legacy clear called but no simulation is active")
-            return
+        """Clear the simulated location using the legacy service.
+
+        一律呼叫 underlying clear()，不看 `_active`；詳見 DvtLocationService.clear()
+        的說明，避免重啟後殘留的 fake GPS 無法還原。
+        """
         try:
             svc = self._ensure_service()
             svc.clear()

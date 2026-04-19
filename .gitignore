@@ -27,6 +27,7 @@ backend/wifi_tunnel_info.json
 # ── IDE / OS ────────────────────────────────────────
 .vscode/
 .idea/
+.claude/
 *.swp
 .DS_Store
 Thumbs.db

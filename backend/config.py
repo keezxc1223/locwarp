@@ -30,17 +30,16 @@ class SpeedProfile(TypedDict):
 # 正確做法：固定 interval = 1.0s，讓「步長 = speed_mps × 1.0s」直接決定
 # 速度感知。每秒跳越的公尺數 = 手機 app 計算到的速度（km/h）。
 #
-#   走路  5 km/h  ≈  1.4 m/s  → 每秒移動 1.4 m   → app 顯示 ~5 km/h  ✓
-#   跑步 10 km/h  ≈  2.8 m/s  → 每秒移動 2.8 m   → app 顯示 ~10 km/h ✓
-#   開車 40 km/h  ≈ 11.1 m/s  → 每秒移動 11.1 m  → app 顯示 ~40 km/h ✓
-#   自訂100 km/h  ≈ 27.8 m/s  → 每秒移動 27.8 m  → app 顯示 ~100 km/h ✓
+#   走路   5 km/h  ≈  1.39 m/s  → 每秒移動 1.39 m  → app 顯示 ~5 km/h   ✓
+#   跑步  18 km/h  ≈  5.00 m/s  → 每秒移動 5.00 m  → app 顯示 ~18 km/h  ✓
+#   開車 100 km/h  ≈ 27.78 m/s  → 每秒移動 27.78 m → app 顯示 ~100 km/h ✓
 GPS_UPDATE_INTERVAL = 1.0   # 秒，所有速度模式統一使用
 
 # Speed profiles (m/s)
 SPEED_PROFILES: dict[str, SpeedProfile] = {
-    "walking": {"speed_mps": 1.4,  "jitter": 0.4,  "update_interval": GPS_UPDATE_INTERVAL},
-    "running": {"speed_mps": 2.8,  "jitter": 0.6,  "update_interval": GPS_UPDATE_INTERVAL},
-    "driving": {"speed_mps": 11.1, "jitter": 1.5,  "update_interval": GPS_UPDATE_INTERVAL},
+    "walking": {"speed_mps": 1.39,  "jitter": 0.4, "update_interval": GPS_UPDATE_INTERVAL},
+    "running": {"speed_mps": 5.00,  "jitter": 0.7, "update_interval": GPS_UPDATE_INTERVAL},
+    "driving": {"speed_mps": 27.78, "jitter": 2.5, "update_interval": GPS_UPDATE_INTERVAL},
 }
 
 
@@ -74,7 +73,7 @@ def resolve_speed_profile(
         lo, hi = sorted((float(speed_min_kmh), float(speed_max_kmh)))
         lo = max(lo, 0.1)
         return make_speed_profile(random.uniform(lo, hi))
-    if speed_kmh:
+    if speed_kmh is not None:
         return make_speed_profile(float(speed_kmh))
     return SPEED_PROFILES[profile_name]
 
@@ -116,17 +115,19 @@ def get_osrm_profile(
 
 
 # Cooldown table: (max_distance_km, cooldown_seconds)
+# Calibrated for Pikmin Bloom based on community research (2025–2026):
+#   Pikmin Bloom is less strict than Pokémon GO, but still bans on obvious teleports.
+#   Source: pokeep.com/lbs-games/pikmin-bloom-spoofing, locachange.com community reports
+#   Key data points: ~100 km → 35 min recommended; ~1 000 km → 2 hr recommended.
 COOLDOWN_TABLE = [
-    (1, 0),
-    (5, 30),
-    (10, 120),
-    (25, 300),
-    (100, 900),
-    (250, 1500),
-    (500, 2700),
-    (750, 3600),
-    (1000, 5400),
-    (float("inf"), 7200),
+    (10,          0),      #  ≤ 10 km  — safe, no cooldown required
+    (30,        300),      #  ≤ 30 km  —  5 min
+    (80,       1200),      #  ≤ 80 km  — 20 min
+    (150,      2100),      # ≤ 150 km  — 35 min  (community-confirmed 100 km threshold)
+    (300,      2700),      # ≤ 300 km  — 45 min
+    (600,      4500),      # ≤ 600 km  — 75 min
+    (1000,     7200),      # ≤  1 000 km — 2 hr
+    (float("inf"), 7200),  # > 1 000 km — 2 hr  (Niantic max observed)
 ]
 
 # Reconnect

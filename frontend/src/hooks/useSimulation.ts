@@ -46,8 +46,20 @@ export function useSimulation(wsMessage: WsMessage | null) {
   const [waypoints, setWaypoints] = useState<LatLng[]>([])
   const [routePath, setRoutePath] = useState<LatLng[]>([])
   const [customSpeedKmh, setCustomSpeedKmh] = useState<number | null>(null)
-  const [speedMinKmh, setSpeedMinKmh] = useState<number | null>(null)
-  const [speedMaxKmh, setSpeedMaxKmh] = useState<number | null>(null)
+  // 上下浮動 (±km/h)：自訂速度的隨機抖動量。設為 0 或 null = 固定速度。
+  // 送到後端時會轉為 speed_min_kmh/speed_max_kmh（後端的 range 路徑）。
+  const [customVarianceKmh, setCustomVarianceKmh] = useState<number | null>(null)
+
+  // 將「自訂速度 + 浮動」轉成後端 SpeedOpts。
+  // variance > 0 → 用 range（後端每趟隨機）；否則送 fixed speed_kmh。
+  const buildSpeedOpts = useCallback((): { speed_kmh: number | null; speed_min_kmh: number | null; speed_max_kmh: number | null } => {
+    if (customSpeedKmh != null && customVarianceKmh != null && customVarianceKmh > 0) {
+      const lo = Math.max(0.1, customSpeedKmh - customVarianceKmh)
+      const hi = customSpeedKmh + customVarianceKmh
+      return { speed_kmh: null, speed_min_kmh: lo, speed_max_kmh: hi }
+    }
+    return { speed_kmh: customSpeedKmh, speed_min_kmh: null, speed_max_kmh: null }
+  }, [customSpeedKmh, customVarianceKmh])
 
   // Per-mode pause settings, persisted in localStorage.
   interface PauseSetting { enabled: boolean; min: number; max: number }
@@ -115,13 +127,20 @@ export function useSimulation(wsMessage: WsMessage | null) {
           if (etaVal != null) setEta(etaVal)
         }
         {
-          const dr = wsMessage.data.distance_remaining
-          const dt = wsMessage.data.distance_traveled
-          if (dr != null || dt != null) {
+          const dr   = wsMessage.data.distance_remaining
+          const dt   = wsMessage.data.distance_traveled
+          // speed_kmh 來自後端 position_update，反映實際執行速度
+          const spd  = wsMessage.data.speed_kmh != null
+            ? Math.round(wsMessage.data.speed_kmh)
+            : wsMessage.data.speed_mps != null
+              ? Math.round(wsMessage.data.speed_mps * 3.6)
+              : null
+          if (dr != null || dt != null || spd != null) {
             setStatus((prev) => ({
               ...prev,
-              ...(dr != null ? { distance_remaining: dr } : {}),
-              ...(dt != null ? { distance_traveled: dt } : {}),
+              ...(dr  != null ? { distance_remaining: dr } : {}),
+              ...(dt  != null ? { distance_traveled:  dt } : {}),
+              ...(spd != null ? { speed: spd }              : {}),
             }))
           }
         }
@@ -245,7 +264,7 @@ export function useSimulation(wsMessage: WsMessage | null) {
         setMode(SimMode.Navigate)
         setDestination({ lat, lng })
         setProgress(0)
-        const res = await api.navigate(lat, lng, moveMode, { speed_kmh: customSpeedKmh, speed_min_kmh: speedMinKmh, speed_max_kmh: speedMaxKmh })
+        const res = await api.navigate(lat, lng, moveMode, buildSpeedOpts())
         setStatus((prev) => ({ ...prev, running: true, paused: false }))
         return res
       } catch (err: any) {
@@ -253,7 +272,7 @@ export function useSimulation(wsMessage: WsMessage | null) {
         throw err
       }
     },
-    [moveMode, customSpeedKmh, speedMinKmh, speedMaxKmh],
+    [moveMode, buildSpeedOpts],
   )
 
   const startLoop = useCallback(
@@ -263,7 +282,7 @@ export function useSimulation(wsMessage: WsMessage | null) {
         setMode(SimMode.Loop)
         setWaypoints(wps)
         setProgress(0)
-        const res = await api.startLoop(wps, moveMode, { speed_kmh: customSpeedKmh, speed_min_kmh: speedMinKmh, speed_max_kmh: speedMaxKmh }, { pause_enabled: pauseLoop.enabled, pause_min: pauseLoop.min, pause_max: pauseLoop.max })
+        const res = await api.startLoop(wps, moveMode, buildSpeedOpts(), { pause_enabled: pauseLoop.enabled, pause_min: pauseLoop.min, pause_max: pauseLoop.max })
         setStatus((prev) => ({ ...prev, running: true, paused: false }))
         return res
       } catch (err: any) {
@@ -271,7 +290,7 @@ export function useSimulation(wsMessage: WsMessage | null) {
         throw err
       }
     },
-    [moveMode, customSpeedKmh, speedMinKmh, speedMaxKmh, pauseLoop],
+    [moveMode, buildSpeedOpts, pauseLoop],
   )
 
   const multiStop = useCallback(
@@ -281,7 +300,7 @@ export function useSimulation(wsMessage: WsMessage | null) {
         setMode(SimMode.MultiStop)
         setWaypoints(wps)
         setProgress(0)
-        const res = await api.multiStop(wps, moveMode, stopDuration, loop, { speed_kmh: customSpeedKmh, speed_min_kmh: speedMinKmh, speed_max_kmh: speedMaxKmh }, { pause_enabled: pauseMultiStop.enabled, pause_min: pauseMultiStop.min, pause_max: pauseMultiStop.max })
+        const res = await api.multiStop(wps, moveMode, stopDuration, loop, buildSpeedOpts(), { pause_enabled: pauseMultiStop.enabled, pause_min: pauseMultiStop.min, pause_max: pauseMultiStop.max })
         setStatus((prev) => ({ ...prev, running: true, paused: false }))
         return res
       } catch (err: any) {
@@ -289,7 +308,7 @@ export function useSimulation(wsMessage: WsMessage | null) {
         throw err
       }
     },
-    [moveMode, customSpeedKmh, speedMinKmh, speedMaxKmh, pauseMultiStop],
+    [moveMode, buildSpeedOpts, pauseMultiStop],
   )
 
   const randomWalk = useCallback(
@@ -298,7 +317,7 @@ export function useSimulation(wsMessage: WsMessage | null) {
       try {
         setMode(SimMode.RandomWalk)
         setProgress(0)
-        const res = await api.randomWalk(center, radiusM, moveMode, { speed_kmh: customSpeedKmh, speed_min_kmh: speedMinKmh, speed_max_kmh: speedMaxKmh }, { pause_enabled: pauseRandomWalk.enabled, pause_min: pauseRandomWalk.min, pause_max: pauseRandomWalk.max })
+        const res = await api.randomWalk(center, radiusM, moveMode, buildSpeedOpts(), { pause_enabled: pauseRandomWalk.enabled, pause_min: pauseRandomWalk.min, pause_max: pauseRandomWalk.max })
         setStatus((prev) => ({ ...prev, running: true, paused: false }))
         return res
       } catch (err: any) {
@@ -306,21 +325,21 @@ export function useSimulation(wsMessage: WsMessage | null) {
         throw err
       }
     },
-    [moveMode, customSpeedKmh, speedMinKmh, speedMaxKmh, pauseRandomWalk],
+    [moveMode, buildSpeedOpts, pauseRandomWalk],
   )
 
   const joystickStart = useCallback(async () => {
     setError(null)
     try {
       setMode(SimMode.Joystick)
-      const res = await api.joystickStart(moveMode)
+      const res = await api.joystickStart(moveMode, buildSpeedOpts())
       setStatus((prev) => ({ ...prev, running: true, paused: false }))
       return res
     } catch (err: any) {
       setError(err.message)
       throw err
     }
-  }, [moveMode])
+  }, [moveMode, buildSpeedOpts])
 
   const joystickStop = useCallback(async () => {
     setError(null)
@@ -370,6 +389,10 @@ export function useSimulation(wsMessage: WsMessage | null) {
       setEta(null)
       setWaypoints([])
       setRoutePath([])
+      // 清掉 currentPosition 給使用者視覺回饋：
+      // 之前 map pin 停留在虛擬位置，讓使用者以為「還原沒作用」。
+      // 實體 GPS 要 10~30s 才會重新取得，map 空白正好提示這個過渡狀態。
+      setCurrentPosition(null)
       return res
     } catch (err: any) {
       setError(err.message)
@@ -437,10 +460,8 @@ export function useSimulation(wsMessage: WsMessage | null) {
     routePath,
     customSpeedKmh,
     setCustomSpeedKmh,
-    speedMinKmh,
-    setSpeedMinKmh,
-    speedMaxKmh,
-    setSpeedMaxKmh,
+    customVarianceKmh,
+    setCustomVarianceKmh,
     pauseMultiStop,
     setPauseMultiStop,
     pauseLoop,

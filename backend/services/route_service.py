@@ -140,7 +140,11 @@ class RouteService:
             msg = data.get("message", "Unknown OSRM error")
             raise RuntimeError(f"OSRM error: {msg}")
 
-        route = data["routes"][0]
+        routes = data.get("routes", [])
+        if not routes:
+            raise RuntimeError("OSRM returned no routes for the given waypoints")
+
+        route = routes[0]
         geometry = route["geometry"]  # GeoJSON LineString
 
         # GeoJSON coordinates are [lon, lat]; convert to [lat, lng]

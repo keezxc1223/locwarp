@@ -6,3 +6,6 @@ gpxpy>=1.6.0
 httpx>=0.27.0
 pydantic>=2.0.0
 python-multipart>=0.0.9
+# macOS/Linux: faster asyncio event loop (better GPS timer precision)
+# Windows: silently ignored (uvloop is POSIX-only)
+uvloop>=0.19.0; sys_platform != "win32"

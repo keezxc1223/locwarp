@@ -9,7 +9,9 @@
     "build": "tsc && vite build",
     "electron": "electron .",
     "start": "concurrently \"vite\" \"wait-on http://localhost:5173 && electron .\"",
-    "dist": "electron-builder --win nsis"
+    "dist": "electron-builder --win nsis",
+    "dist:mac": "electron-builder --mac dmg",
+    "dist:mac:universal": "electron-builder --mac dmg --universal"
   },
   "dependencies": {
     "leaflet": "^1.9.4",
@@ -42,26 +44,38 @@
       {
         "from": "../dist-py/locwarp-backend",
         "to": "backend",
-        "filter": [
-          "**/*"
-        ]
+        "filter": ["**/*"]
       },
       {
         "from": "../dist-py/wifi-tunnel",
         "to": "wifi-tunnel",
-        "filter": [
-          "**/*"
-        ]
+        "filter": ["**/*"]
       }
     ],
+    "afterSign": "scripts/notarize.js",
+    "mac": {
+      "target": [
+        { "target": "dmg", "arch": ["universal"] },
+        { "target": "zip", "arch": ["universal"] }
+      ],
+      "icon": "build/icon.icns",
+      "hardenedRuntime": true,
+      "gatekeeperAssess": false,
+      "entitlements": "build/entitlements.mac.plist",
+      "entitlementsInherit": "build/entitlements.mac.plist",
+      "extendInfo": {
+        "NSLocalNetworkUsageDescription": "LocWarp 需要區域網路權限來與 iOS 裝置連線"
+      }
+    },
+    "dmg": {
+      "sign": false,
+      "title": "LocWarp ${version}",
+      "background": null,
+      "window": { "width": 540, "height": 380 }
+    },
     "win": {
       "target": [
-        {
-          "target": "nsis",
-          "arch": [
-            "x64"
-          ]
-        }
+        { "target": "nsis", "arch": ["x64"] }
       ],
       "requestedExecutionLevel": "requireAdministrator",
       "icon": "build/icon.ico",

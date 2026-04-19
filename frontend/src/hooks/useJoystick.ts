@@ -1,48 +1,16 @@
+/**
+ * useJoystick — manages joystick direction/intensity state and WS dispatch.
+ *
+ * Keyboard handling is intentionally delegated entirely to JoystickPad.tsx
+ * (which also drives the visual handle).  This hook only owns:
+ *   • direction/intensity React state (for display)
+ *   • updateFromPad — called by JoystickPad on pointer AND keyboard events
+ */
 import { useState, useEffect, useCallback, useRef } from 'react'
 
-interface KeyState {
-  up: boolean
-  down: boolean
-  left: boolean
-  right: boolean
-}
-
-function keysToDirection(keys: KeyState): { direction: number; intensity: number } {
-  const { up, down, left, right } = keys
-
-  // No keys pressed
-  if (!up && !down && !left && !right) {
-    return { direction: 0, intensity: 0 }
-  }
-
-  let dx = 0
-  let dy = 0
-
-  if (up) dy += 1
-  if (down) dy -= 1
-  if (right) dx += 1
-  if (left) dx -= 1
-
-  // Convert to compass degrees: 0=N, 90=E, 180=S, 270=W
-  // atan2 gives angle from positive x-axis counterclockwise
-  // We want clockwise from north (positive y)
-  const radians = Math.atan2(dx, dy)
-  let degrees = (radians * 180) / Math.PI
-  if (degrees < 0) degrees += 360
-
-  return { direction: Math.round(degrees), intensity: 1.0 }
-}
-
-const KEY_MAP: Record<string, keyof KeyState> = {
-  w: 'up',
-  arrowup: 'up',
-  s: 'down',
-  arrowdown: 'down',
-  a: 'left',
-  arrowleft: 'left',
-  d: 'right',
-  arrowright: 'right',
-}
+// 搖桿輸入節流：限制 WS 訊息發送頻率，避免 pointermove 每秒數十次的過度廣播。
+// 80ms ≈ 12.5 fps，足夠讓移動流暢，同時大幅降低後端處理壓力。
+const JOYSTICK_THROTTLE_MS = 80
 
 export function useJoystick(
   sendWsMessage: (type: string, data: any) => void,
@@ -50,17 +18,12 @@ export function useJoystick(
 ) {
   const [direction, setDirection] = useState(0)
   const [intensity, setIntensity] = useState(0)
-  const keysRef = useRef<KeyState>({ up: false, down: false, left: false, right: false })
-  const activeRef = useRef(active)
-  const sendRef = useRef(sendWsMessage)
+  const activeRef   = useRef(active)
+  const sendRef     = useRef(sendWsMessage)
+  const lastEmitRef = useRef(0)
 
-  // Keep refs in sync
-  useEffect(() => {
-    activeRef.current = active
-  }, [active])
-  useEffect(() => {
-    sendRef.current = sendWsMessage
-  }, [sendWsMessage])
+  useEffect(() => { activeRef.current = active }, [active])
+  useEffect(() => { sendRef.current  = sendWsMessage }, [sendWsMessage])
 
   const emitState = useCallback((dir: number, int: number) => {
     setDirection(dir)
@@ -68,58 +31,35 @@ export function useJoystick(
     sendRef.current('joystick_input', { direction: dir, intensity: int })
   }, [])
 
-  // Reset keys when deactivated
+  // Zero-out state when joystick deactivates
   useEffect(() => {
     if (!active) {
-      keysRef.current = { up: false, down: false, left: false, right: false }
       setDirection(0)
       setIntensity(0)
     }
   }, [active])
 
-  useEffect(() => {
-    const handleKeyDown = (e: KeyboardEvent) => {
-      if (!activeRef.current) return
-
-      const mapped = KEY_MAP[e.key.toLowerCase()]
-      if (!mapped) return
-
-      e.preventDefault()
-
-      const keys = keysRef.current
-      if (keys[mapped]) return // already pressed
-
-      keys[mapped] = true
-      const { direction: dir, intensity: int } = keysToDirection(keys)
-      emitState(dir, int)
-    }
-
-    const handleKeyUp = (e: KeyboardEvent) => {
-      if (!activeRef.current) return
-
-      const mapped = KEY_MAP[e.key.toLowerCase()]
-      if (!mapped) return
-
-      e.preventDefault()
-
-      const keys = keysRef.current
-      keys[mapped] = false
-      const { direction: dir, intensity: int } = keysToDirection(keys)
-      emitState(dir, int)
-    }
-
-    window.addEventListener('keydown', handleKeyDown)
-    window.addEventListener('keyup', handleKeyUp)
-
-    return () => {
-      window.removeEventListener('keydown', handleKeyDown)
-      window.removeEventListener('keyup', handleKeyUp)
-    }
-  }, [emitState])
-
-  // For the virtual joystick pad (mouse / touch)
+  /**
+   * Called by JoystickPad on every pointer-move or key change.
+   * Guards against sending when the session hasn't started yet.
+   * Throttled to JOYSTICK_THROTTLE_MS to avoid flooding the WebSocket.
+   *
+   * Stop signal (int=0) 永遠繞過節流：若在最後一次移動訊息的 80ms 內放開
+   * 搖桿，stop 訊號原本會被丟棄，造成角色繼續移動直到下一次訊息才停下。
+   */
   const updateFromPad = useCallback(
     (dir: number, int: number) => {
+      if (!activeRef.current) return
+      // Stop signal must always be delivered — bypass throttle and reset the
+      // window so the next directional input fires without extra delay.
+      if (int === 0) {
+        lastEmitRef.current = 0
+        emitState(0, 0)
+        return
+      }
+      const now = Date.now()
+      if (now - lastEmitRef.current < JOYSTICK_THROTTLE_MS) return
+      lastEmitRef.current = now
       emitState(dir, Math.min(1, Math.max(0, int)))
     },
     [emitState],

@@ -114,12 +114,14 @@ class RouteLooper:
                     })
                     try:
                         await asyncio.wait_for(engine._stop_event.wait(), timeout=lap_pause)
+                        # stop fired during the inter-lap pause — emit end before exiting
+                        await engine._emit("pause_countdown_end", {"source": "loop"})
                         break
                     except asyncio.TimeoutError:
                         pass
                     await engine._emit("pause_countdown_end", {"source": "loop"})
 
-        if engine.state == SimulationState.LOOPING:
+        if engine.state in (SimulationState.LOOPING, SimulationState.PAUSED):
             engine.state = SimulationState.IDLE
             await engine._emit("state_change", {"state": engine.state.value})
 
