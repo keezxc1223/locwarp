@@ -19,15 +19,17 @@ from fastapi.middleware.cors import CORSMiddleware
 from fastapi.staticfiles import StaticFiles
 from starlette.responses import FileResponse
 
-from config import API_HOST, API_PORT, DEFAULT_LOCATION, SETTINGS_FILE
+from config import API_HOST, API_PORT, SETTINGS_FILE
 from core.device_manager import DeviceManager
 from services.bookmarks import BookmarkManager
 from services.cooldown import CooldownTimer
 from services.coord_format import CoordinateFormatter
 from services.location_history import LocationHistory
 from services.multi_location_service import MultiLocationService
+from services.position_resolver import PositionResolver
 from services.reconnect import ReconnectManager
 from services.scheduler import ScheduledReturn
+from services.usb_watchdog import start_watchdog
 
 # Configure logging — console + rotating file in ~/.locwarp/logs/
 _log_fmt = "%(asctime)s [%(name)s] %(levelname)s: %(message)s"
@@ -50,7 +52,22 @@ logger = logging.getLogger("locwarp")
 
 
 class AppState:
-    """Central application state — shared across API endpoints."""
+    """Central application state — shared across API endpoints.
+
+    Not a god object: these attributes *do* all share the "device
+    connected" lifecycle. The class is kept as a service registry so
+    routers can reach subsystems via ``app_state.<name>``. The
+    orchestration methods (``create_engine_for_device``,
+    ``add_sync_device``) are decomposed into private helpers below so
+    the top-level flow reads like a table of contents.
+    """
+
+    # Number of retries when pushing the initial GPS position on device
+    # connect. 3× matches the pre-refactor behavior — usually succeeds
+    # on attempt 1; retries cover the window where the mounter has
+    # succeeded but the LocationService isn't quite ready.
+    _INITIAL_POSITION_RETRIES = 3
+    _INITIAL_POSITION_RETRY_DELAY_SECONDS = 1.0
 
     def __init__(self):
         self.device_manager = DeviceManager()
@@ -59,40 +76,66 @@ class AppState:
         self.bookmark_manager = BookmarkManager()
         self.coord_formatter = CoordinateFormatter()
         self.reconnect_manager = None
-        self._last_position = None
-        self._home_position: dict | None = None  # 手動設定的固定起始位置
         self.scheduled_return = ScheduledReturn()   # 定時回家
         self.location_history = LocationHistory()   # 地點歷史
         self.jitter_enabled = True                  # GPS 抖動偽裝
-        # Multi-device GPS sync
-        self._multi_loc = MultiLocationService()                 # fan-out service (reused across engine rebuilds)
-        self._sync_device_names: dict[str, str] = {}            # udid → display name
+        # Multi-device GPS sync — reused across engine rebuilds so that
+        # previously-registered sync devices stay active after the
+        # primary is swapped (e.g. on reconnect).
+        self._multi_loc = MultiLocationService()
+        self._sync_device_names: dict[str, str] = {}  # udid → display name
+        # Position state lives in a dedicated resolver. on_change wires
+        # through to save_settings so any change to home/last is
+        # persisted automatically.
+        self.position = PositionResolver(on_change=self.save_settings)
         self._load_settings()
 
+    # ── Back-compat shims ──────────────────────────────────────────────
+    # scheduler.py + api/location.py still read/write these attributes
+    # directly. Keeping them as properties means no caller change.
+
+    @property
+    def _last_position(self) -> dict | None:
+        return self.position.last
+
+    @property
+    def _home_position(self) -> dict | None:
+        return self.position.home
+
+    @_home_position.setter
+    def _home_position(self, value: dict | None) -> None:
+        self.position.home = value  # fires on_change → save_settings
+
+    def update_last_position(self, lat: float, lng: float) -> None:
+        self.position.update_last(lat, lng)
+
+    def get_initial_position(self) -> dict:
+        """Synchronous variant used by endpoints that can't await.
+        Skips IP geolocation by design."""
+        return self.position.get_initial_position_sync()
+
+    # ── Settings persistence ───────────────────────────────────────────
+
     def _load_settings(self):
-        if SETTINGS_FILE.exists():
-            try:
-                data = json.loads(SETTINGS_FILE.read_text(encoding="utf-8"))
-                pos = data.get("last_position")
-                if pos:
-                    self._last_position = pos
-                home = data.get("home_position")
-                if home:
-                    self._home_position = home
-                fmt = data.get("coord_format")
-                if fmt:
-                    from models.schemas import CoordinateFormat
-                    self.coord_formatter.format = CoordinateFormat(fmt)
-                cd = data.get("cooldown_enabled")
-                if cd is not None:
-                    self.cooldown_timer.enabled = cd
-            except (json.JSONDecodeError, OSError, ValueError, KeyError):
-                logger.warning("Settings file malformed or unreadable; using defaults", exc_info=True)
+        if not SETTINGS_FILE.exists():
+            return
+        try:
+            data = json.loads(SETTINGS_FILE.read_text(encoding="utf-8"))
+            self.position.load(last=data.get("last_position"), home=data.get("home_position"))
+            fmt = data.get("coord_format")
+            if fmt:
+                from models.schemas import CoordinateFormat
+                self.coord_formatter.format = CoordinateFormat(fmt)
+            cd = data.get("cooldown_enabled")
+            if cd is not None:
+                self.cooldown_timer.enabled = cd
+        except (json.JSONDecodeError, OSError, ValueError, KeyError):
+            logger.warning("Settings file malformed or unreadable; using defaults", exc_info=True)
 
     def save_settings(self):
         data = {
-            "last_position": self._last_position,
-            "home_position": self._home_position,
+            "last_position": self.position.last,
+            "home_position": self.position.home,
             "coord_format": self.coord_formatter.format.value,
             "cooldown_enabled": self.cooldown_timer.enabled,
         }
@@ -101,95 +144,51 @@ class AppState:
         except Exception as e:
             logger.warning("Failed to save settings: %s", e)
 
-    def get_initial_position(self) -> dict:
-        """Return last saved position, or DEFAULT_LOCATION as synchronous fallback."""
-        if self._last_position:
-            return self._last_position
-        return DEFAULT_LOCATION
+    # ── Engine lifecycle ───────────────────────────────────────────────
 
-    async def _fetch_ip_location(self) -> dict | None:
-        """Fetch approximate location via IP geolocation (ip-api.com, free, no key).
+    async def create_engine_for_device(self, udid: str) -> None:
+        """Build the SimulationEngine for ``udid`` and push the initial
+        GPS fix to the device.
 
-        Returns a ``{"lat": float, "lng": float}`` dict on success, or ``None``
-        if the request fails or the response is not actionable.
+        High-level flow (each step is a helper below):
+          1. Register the device as primary in the fan-out service.
+          2. Cache the device's display name (best-effort).
+          3. Create the engine with a broadcast+persist callback.
+          4. Resolve + set the initial position, with retry.
+          5. Wire up the reconnect manager.
         """
-        try:
-            import httpx
-            async with httpx.AsyncClient(timeout=5.0) as client:
-                resp = await client.get(
-                    "http://ip-api.com/json?fields=status,lat,lon,city,country"
-                )
-                data = resp.json()
-                if data.get("status") == "success":
-                    lat, lng = float(data["lat"]), float(data["lon"])
-                    city = data.get("city", "")
-                    country = data.get("country", "")
-                    logger.info(
-                        "IP geolocation: (%.4f, %.4f) — %s, %s",
-                        lat, lng, city, country,
-                    )
-                    return {"lat": lat, "lng": lng}
-                logger.debug("IP geolocation returned non-success status: %s", data)
-        except Exception as exc:
-            logger.debug("IP geolocation failed (%s: %s); using default", type(exc).__name__, exc)
-        return None
-
-    async def get_initial_position_async(self) -> dict:
-        """Return the best available initial position, in priority order:
-
-        1. Manually pinned home position (user-set via UI)
-        2. Last saved position from settings.json
-        3. IP geolocation (city-level, no API key required)
-        4. DEFAULT_LOCATION (Taipei City Hall hardcoded fallback)
-        """
-        if self._home_position:
-            logger.info(
-                "Using home position: (%.6f, %.6f)",
-                self._home_position["lat"], self._home_position["lng"],
-            )
-            return self._home_position
-        if self._last_position:
-            logger.info(
-                "Using last saved position: (%.6f, %.6f)",
-                self._last_position["lat"], self._last_position["lng"],
-            )
-            return self._last_position
-        ip_loc = await self._fetch_ip_location()
-        if ip_loc:
-            return ip_loc
-        logger.info("Falling back to DEFAULT_LOCATION")
-        return DEFAULT_LOCATION
-
-    def update_last_position(self, lat: float, lng: float):
-        self._last_position = {"lat": lat, "lng": lng}
-        # 每 10 次位置更新儲存一次，防止異常退出遺失資料
-        self._position_update_count = getattr(self, "_position_update_count", 0) + 1
-        if self._position_update_count % 10 == 0:
-            self.save_settings()
-
-    async def create_engine_for_device(self, udid: str):
-        """Create a SimulationEngine for the connected device.
-
-        Uses the persistent MultiLocationService (_multi_loc) so that any
-        previously registered sync devices remain active across engine rebuilds.
-        """
-        from api.websocket import broadcast
-        from core.simulation_engine import SimulationEngine
-
         loc_service = await self.device_manager.get_location_service(udid)
-
-        # Register as primary in the fan-out service (keeps existing sync devices)
         self._multi_loc.set_primary(udid, loc_service)
+        await self._cache_device_name(udid)
 
-        # Store device name for the sync list
+        self.simulation_engine = self._build_engine()
+        init = await self.position.get_initial_position()
+        await self._set_engine_position(init)
+
+        ok = await self._push_initial_position_with_retry(loc_service, init)
+        await self._broadcast_initial_position_result(udid, init, ok)
+
+        self.reconnect_manager = ReconnectManager(self.device_manager)
+        logger.info("Simulation engine created for device %s", udid)
+
+    async def _cache_device_name(self, udid: str) -> None:
+        """Remember ``device.name`` for the sync-device panel. Falls back
+        to the UDID if discovery fails — degraded but non-fatal."""
         try:
             devices = await self.device_manager.discover_devices()
             for d in devices:
                 if d.udid == udid:
                     self._sync_device_names[udid] = d.name
-                    break
+                    return
         except Exception:
-            self._sync_device_names[udid] = udid
+            pass
+        self._sync_device_names[udid] = udid
+
+    def _build_engine(self):
+        """Create the SimulationEngine wired to broadcast WS frames and
+        persist ``position_update`` events into last-position + history."""
+        from api.websocket import broadcast
+        from core.simulation_engine import SimulationEngine
 
         async def event_callback(event_type: str, data: dict):
             await broadcast(event_type, data)
@@ -198,41 +197,49 @@ class AppState:
                 self.update_last_position(lat, lng)
                 self.location_history.record(lat, lng)
 
-        # Engine always uses the multi-location service
-        self.simulation_engine = SimulationEngine(self._multi_loc, event_callback)
+        return SimulationEngine(self._multi_loc, event_callback)
 
-        # 決定起始位置（優先順序：home > last > IP > 預設）
-        init = await self.get_initial_position_async()
+    async def _set_engine_position(self, init: dict) -> None:
         from models.schemas import Coordinate
         self.simulation_engine.current_position = Coordinate(
-            lat=init["lat"], lng=init["lng"]
+            lat=init["lat"], lng=init["lng"],
         )
 
-        # 將起始位置注入手機 GPS（只推送給主要裝置，避免 fan-out 到尚未就緒的同步裝置）
-        _set_ok = False
-        for _attempt in range(3):
+    async def _push_initial_position_with_retry(self, loc_service, init: dict) -> bool:
+        """Try to push the initial fix to the device's LocationService up
+        to ``_INITIAL_POSITION_RETRIES`` times. Returns True on success.
+
+        Pushes only to the primary device (not via the fan-out service)
+        because sync devices may not be ready yet at this stage.
+        """
+        for attempt in range(1, self._INITIAL_POSITION_RETRIES + 1):
             try:
                 await loc_service.set(init["lat"], init["lng"])
-                _set_ok = True
                 logger.info(
                     "Initial position set on device: (%.6f, %.6f) [attempt %d]",
-                    init["lat"], init["lng"], _attempt + 1,
+                    init["lat"], init["lng"], attempt,
                 )
-                break
+                return True
             except Exception as exc:
                 logger.warning(
-                    "Initial position push failed (attempt %d/3): %s",
-                    _attempt + 1, exc,
+                    "Initial position push failed (attempt %d/%d): %s",
+                    attempt, self._INITIAL_POSITION_RETRIES, exc,
                 )
-                if _attempt < 2:
-                    await asyncio.sleep(1.0)
+                if attempt < self._INITIAL_POSITION_RETRIES:
+                    await asyncio.sleep(self._INITIAL_POSITION_RETRY_DELAY_SECONDS)
+        return False
 
-        if not _set_ok:
-            # 3 次均失敗：保留 engine（current_position 已設定，UI 仍可顯示位置）
-            # 讓使用者自行操作（如 Teleport）觸發下一次 set()
+    async def _broadcast_initial_position_result(self, udid: str, init: dict, ok: bool) -> None:
+        """On success, broadcast position_update so the map pins immediately.
+        On failure, broadcast device_error so the user gets a banner; the
+        engine stays alive (current_position is set) so the next user
+        action (e.g. Teleport) can retry the push."""
+        from api.websocket import broadcast
+        if not ok:
             logger.error(
-                "Could not push initial position to device after 3 attempts. "
-                "Engine kept alive; user action will trigger next push."
+                "Could not push initial position to device after %d attempts. "
+                "Engine kept alive; user action will trigger next push.",
+                self._INITIAL_POSITION_RETRIES,
             )
             try:
                 await broadcast("device_error", {
@@ -242,22 +249,16 @@ class AppState:
                 })
             except Exception:
                 pass
-        else:
-            # 成功後廣播 position_update 讓前端地圖立即定位
-            try:
-                await broadcast("position_update", {
-                    "lat": init["lat"],
-                    "lng": init["lng"],
-                    "bearing": 0.0,
-                    "speed_mps": 0.0,
-                })
-            except Exception:
-                pass
-
-        # Setup reconnect manager
-        self.reconnect_manager = ReconnectManager(self.device_manager)
-
-        logger.info("Simulation engine created for device %s", udid)
+            return
+        try:
+            await broadcast("position_update", {
+                "lat": init["lat"],
+                "lng": init["lng"],
+                "bearing": 0.0,
+                "speed_mps": 0.0,
+            })
+        except Exception:
+            pass
 
     async def add_sync_device(self, udid: str) -> None:
         """Connect a secondary iOS device and add it to the GPS fan-out group.
@@ -356,121 +357,8 @@ else:
 
 # ── Lifespan ─────────────────────────────────────────────
 
-async def _usbmux_presence_watchdog():
-    """Poll usbmuxd every 2 s for both directions:
-
-    * **Disappearance** — a UDID present in DeviceManager._connections that
-      drops off the usbmux list for 2 consecutive polls is treated as USB
-      unplug: disconnect, clear simulation_engine, broadcast device_disconnected.
-    * **Appearance** — a USB device showing up while we have no active
-      connection triggers an auto-connect + engine rebuild, broadcasting
-      device_reconnected when it succeeds. Failed attempts are throttled
-      (min 5 s between retries per UDID) so we don't spam connect() while
-      the device is still in the "Trust this computer?" dialog.
-
-    WiFi (Network) devices are skipped on both sides — those are covered by
-    the WiFi tunnel watchdog. Consecutive-miss debouncing protects against
-    usbmuxd re-enumeration hiccups.
-    """
-    import asyncio
-    import time
-
-    from pymobiledevice3.usbmux import list_devices
-
-    from api.websocket import broadcast
-
-    miss_counts: dict[str, int] = {}
-    miss_threshold = 2
-    last_reconnect_attempt: dict[str, float] = {}
-    reconnect_cooldown = 5.0  # seconds between retry attempts per UDID
-
-    while True:
-        await asyncio.sleep(2.0)
-        try:
-            dm = app_state.device_manager
-            connected = {
-                udid for udid, conn in dm._connections.items()
-                if getattr(conn, "connection_type", "USB") == "USB"
-            }
-
-            try:
-                raw = await list_devices()
-            except Exception:
-                logger.debug("usbmux list_devices failed in watchdog", exc_info=True)
-                continue
-            present_usb = {
-                r.serial for r in raw
-                if getattr(r, "connection_type", "USB") == "USB"
-            }
-
-            # --- Disappearance detection ---
-            lost_now: list[str] = []
-            for udid in connected:
-                if udid in present_usb:
-                    miss_counts.pop(udid, None)
-                else:
-                    miss_counts[udid] = miss_counts.get(udid, 0) + 1
-                    if miss_counts[udid] >= miss_threshold:
-                        lost_now.append(udid)
-
-            if lost_now:
-                logger.warning("usbmux watchdog: device(s) gone → %s", lost_now)
-                for udid in lost_now:
-                    miss_counts.pop(udid, None)
-                    try:
-                        await dm.disconnect(udid)
-                    except Exception:
-                        logger.exception("watchdog: disconnect failed for %s", udid)
-                app_state.simulation_engine = None
-                try:
-                    await broadcast("device_disconnected", {
-                        "udids": lost_now,
-                        "reason": "usb_unplugged",
-                    })
-                except Exception:
-                    logger.exception("watchdog: broadcast (disconnected) failed")
-                continue  # skip appearance logic this tick
-
-            # --- Appearance (auto-reconnect) ---
-            # If nothing is connected but a USB device shows up, connect it.
-            if connected or not present_usb:
-                continue
-            if app_state.simulation_engine is not None:
-                continue  # already got one somehow
-
-            now = time.monotonic()
-            for udid in present_usb:
-                last = last_reconnect_attempt.get(udid, 0.0)
-                if now - last < reconnect_cooldown:
-                    continue
-                last_reconnect_attempt[udid] = now
-                logger.info("usbmux watchdog: new USB device %s detected, auto-reconnecting", udid)
-                try:
-                    await dm.connect(udid)
-                    await app_state.create_engine_for_device(udid)
-                    # Only broadcast success when an engine was actually built
-                    if app_state.simulation_engine is not None:
-                        try:
-                            await broadcast("device_reconnected", {"udid": udid})
-                        except Exception:
-                            logger.exception("watchdog: broadcast (reconnected) failed")
-                        logger.info("Auto-reconnect succeeded for %s", udid)
-                        last_reconnect_attempt.pop(udid, None)
-                        break  # connected one device, done for this tick
-                except Exception:
-                    logger.warning(
-                        "Auto-reconnect for %s failed (will retry in %.0fs): likely Trust pending",
-                        udid, reconnect_cooldown, exc_info=True,
-                    )
-        except asyncio.CancelledError:
-            raise
-        except Exception:
-            logger.exception("usbmux watchdog iteration crashed; continuing")
-
-
 @asynccontextmanager
 async def lifespan(application: FastAPI):
-    import asyncio
     # ── Startup ──
     logger.info("LocWarp starting — scanning for devices…")
     try:
@@ -486,7 +374,7 @@ async def lifespan(application: FastAPI):
     except Exception:
         logger.exception("Auto-connect on startup failed (device may need manual connect)")
 
-    watchdog_task = asyncio.create_task(_usbmux_presence_watchdog())
+    watchdog_task = start_watchdog(app_state)
 
     yield
 
