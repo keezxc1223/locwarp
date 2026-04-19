@@ -186,8 +186,26 @@ const MapView: React.FC<MapViewProps> = ({
     mapRef.current = map;
 
     return () => {
+      // Leaflet's map.remove() drops all attached layers, but our refs still
+      // point to the now-detached layer objects. Without resetting them, a
+      // re-mount (React 18 StrictMode double-invocation, Vite HMR, or any
+      // future scenario where MapView unmounts) hits the `if (ref.current)`
+      // branch in each child effect and tries to setLatLng on a layer that's
+      // not on the map — silently no-ops, leaving markers invisible.
       map.remove();
       mapRef.current = null;
+      currentMarkerRef.current = null;
+      destMarkerRef.current = null;
+      waypointMarkersRef.current = [];
+      polylineRef.current = null;
+      clickMarkerRef.current = null;
+      radiusCircleRef.current = null;
+      cooldownCircleRef.current = null;
+      bookmarkMarkersRef.current = [];
+      // Reset signature caches so child effects re-render content on re-mount
+      destSigRef.current = null;
+      waypointSigRef.current = '';
+      prevPositionRef.current = null;
     };
   }, []); // eslint-disable-line react-hooks/exhaustive-deps
 
@@ -376,47 +394,68 @@ const MapView: React.FC<MapViewProps> = ({
     }
   }, [routePath]);
 
-  // Update random walk radius circle
+  // Update random walk radius circle.
+  // Re-uses the existing Circle (setLatLng/setRadius) instead of remove+recreate
+  // because currentPosition ticks every 1s during navigation — recreating a
+  // Leaflet layer per tick is wasteful and causes a brief redraw flash.
   useEffect(() => {
     const map = mapRef.current;
     if (!map) return;
 
-    // Remove old circle
-    if (radiusCircleRef.current) {
-      radiusCircleRef.current.remove();
-      radiusCircleRef.current = null;
+    const shouldShow = randomWalkRadius && randomWalkRadius > 0 && currentPosition;
+
+    if (!shouldShow) {
+      if (radiusCircleRef.current) {
+        radiusCircleRef.current.remove();
+        radiusCircleRef.current = null;
+      }
+      return;
     }
 
-    // Draw circle when radius is set and we have a position
-    if (randomWalkRadius && randomWalkRadius > 0 && currentPosition) {
-      const circle = L.circle(
-        [currentPosition.lat, currentPosition.lng],
-        {
-          radius: randomWalkRadius,
-          color: '#4285f4',
-          weight: 2,
-          opacity: 0.6,
-          fillColor: '#4285f4',
-          fillOpacity: 0.08,
-          dashArray: '6, 6',
-        }
-      ).addTo(map);
-      radiusCircleRef.current = circle;
+    const center: L.LatLngExpression = [currentPosition.lat, currentPosition.lng];
+    if (radiusCircleRef.current) {
+      radiusCircleRef.current.setLatLng(center);
+      radiusCircleRef.current.setRadius(randomWalkRadius);
+    } else {
+      radiusCircleRef.current = L.circle(center, {
+        radius: randomWalkRadius,
+        color: '#4285f4',
+        weight: 2,
+        opacity: 0.6,
+        fillColor: '#4285f4',
+        fillOpacity: 0.08,
+        dashArray: '6, 6',
+      }).addTo(map);
     }
   }, [randomWalkRadius, currentPosition]);
 
-  // Cooldown circle: shows jump distance as an orange dashed ring
+  // Cooldown circle: shows jump distance as an orange dashed ring.
+  // Same setLatLng/setRadius pattern — cooldownCircle.remainingSeconds ticks
+  // every 1s, so recreating the Circle per tick was 1 layer churn/sec for the
+  // entire cooldown duration (up to 2 hours).
   useEffect(() => {
     const map = mapRef.current;
     if (!map) return;
-    if (cooldownCircleRef.current) {
-      cooldownCircleRef.current.remove();
-      cooldownCircleRef.current = null;
+
+    if (!cooldownCircle || cooldownCircle.distanceKm <= 1) {
+      if (cooldownCircleRef.current) {
+        cooldownCircleRef.current.remove();
+        cooldownCircleRef.current = null;
+      }
+      return;
     }
-    if (cooldownCircle && cooldownCircle.distanceKm > 1) {
-      const radiusM = cooldownCircle.distanceKm * 1000;
-      const mins = Math.ceil(cooldownCircle.remainingSeconds / 60);
-      const circle = L.circle([cooldownCircle.lat, cooldownCircle.lng], {
+
+    const center: L.LatLngExpression = [cooldownCircle.lat, cooldownCircle.lng];
+    const radiusM = cooldownCircle.distanceKm * 1000;
+    const mins = Math.ceil(cooldownCircle.remainingSeconds / 60);
+    const tooltipHtml = `⏱ 跳點 ${cooldownCircle.distanceKm.toFixed(1)} km → 冷卻 ${mins} 分`;
+
+    if (cooldownCircleRef.current) {
+      cooldownCircleRef.current.setLatLng(center);
+      cooldownCircleRef.current.setRadius(radiusM);
+      cooldownCircleRef.current.setTooltipContent(tooltipHtml);
+    } else {
+      const circle = L.circle(center, {
         radius: radiusM,
         color: '#f59e0b',
         weight: 1.5,
@@ -425,10 +464,7 @@ const MapView: React.FC<MapViewProps> = ({
         fillOpacity: 0.04,
         dashArray: '8, 6',
       }).addTo(map);
-      circle.bindTooltip(
-        `⏱ 跳點 ${cooldownCircle.distanceKm.toFixed(1)} km → 冷卻 ${mins} 分`,
-        { direction: 'top', sticky: true }
-      );
+      circle.bindTooltip(tooltipHtml, { direction: 'top', sticky: true });
       cooldownCircleRef.current = circle;
     }
   }, [cooldownCircle]);
