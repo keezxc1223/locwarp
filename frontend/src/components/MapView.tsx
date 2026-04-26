@@ -2,6 +2,8 @@ import React, { useRef, useEffect, useLayoutEffect, useState, useCallback } from
 import { useT } from '../i18n';
 import { reverseGeocode } from '../services/api';
 import L from 'leaflet';
+import { cellsInBounds, approxCellSizeMeters } from '../services/s2grid';
+import type { S2CellPolygon } from '../services/s2grid';
 
 interface Position {
   lat: number;
@@ -161,6 +163,13 @@ const MapView: React.FC<MapViewProps> = ({
   // App-level callback that bumps `openLibraryToken`, triggering the
   // ControlPanel library panel to open.
   const openLibraryHandlerRef = useRef<() => void>(() => {});
+  // S2 cell grid overlay (Pokemon GO / Ingress style). Toggle button below
+  // the library button. Default level 17 (~80m cells, the canonical Niantic
+  // decor cell). Layer + level live in refs / state; visibility is mirrored
+  // on the button via background colour.
+  const s2GridBtnRef = useRef<HTMLButtonElement | null>(null);
+  const s2GridHandlerRef = useRef<() => void>(() => {});
+  const s2LayerRef = useRef<L.LayerGroup | null>(null);
   // followStateRef mirrors followMode so the dragstart handler (wired once
   // at map init) sees the latest value without a stale closure.
   const followStateRef = useRef(false);
@@ -173,6 +182,30 @@ const MapView: React.FC<MapViewProps> = ({
 
   const [followMode, setFollowMode] = useState(false);
   useEffect(() => { followStateRef.current = followMode; }, [followMode]);
+
+  // S2 cell grid state. Persisted in localStorage so the user's preferred
+  // level + on/off survives across launches (similar to tile-layer choice).
+  const [s2Enabled, setS2Enabled] = useState<boolean>(() => {
+    try { return localStorage.getItem('locwarp.s2_enabled') === '1'; }
+    catch { return false; }
+  });
+  const [s2Level, setS2Level] = useState<number>(() => {
+    try {
+      const raw = localStorage.getItem('locwarp.s2_level');
+      const n = raw ? parseInt(raw, 10) : 17;
+      if (Number.isFinite(n) && n >= 1 && n <= 30) return n;
+    } catch { /* fall through */ }
+    return 17;
+  });
+  const [s2PickerOpen, setS2PickerOpen] = useState(false);
+  useEffect(() => {
+    try { localStorage.setItem('locwarp.s2_enabled', s2Enabled ? '1' : '0'); }
+    catch { /* ignore */ }
+  }, [s2Enabled]);
+  useEffect(() => {
+    try { localStorage.setItem('locwarp.s2_level', String(s2Level)); }
+    catch { /* ignore */ }
+  }, [s2Level]);
 
   const [recentOpen, setRecentOpen] = useState(false);
   // Clear-button confirmation state. First click flips the single
@@ -385,6 +418,43 @@ const MapView: React.FC<MapViewProps> = ({
         openLibraryHandlerRef.current();
       });
       topLeftEl.appendChild(wrapper);
+    }
+
+    // S2 cell grid toggle — fifth leaflet-bar. Tap to overlay an Ingress /
+    // Pokemon GO style cell grid at the user-chosen level (default 17).
+    // Right-click (or long-press) opens the level picker popover.
+    if (topLeftEl) {
+      const wrapper = L.DomUtil.create('div', 'leaflet-bar leaflet-control');
+      const btn = L.DomUtil.create('button', 'locwarp-s2-btn', wrapper) as HTMLButtonElement;
+      btn.type = 'button';
+      btn.title = tRef.current('map.s2_toggle');
+      btn.setAttribute('role', 'button');
+      btn.setAttribute('aria-pressed', 'false');
+      btn.style.cssText = [
+        'width: 30px', 'height: 30px', 'display: flex',
+        'align-items: center', 'justify-content: center',
+        'padding: 0', 'margin: 0', 'cursor: pointer',
+        'background: var(--bg-surface, #2a2f3a)',
+        'color: #fff', 'border: none', 'border-radius: 0',
+      ].join(';');
+      btn.innerHTML = `<svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.6" stroke-linecap="round" stroke-linejoin="round">
+        <rect x="3" y="3" width="18" height="18" rx="1" />
+        <line x1="9" y1="3" x2="9" y2="21" />
+        <line x1="15" y1="3" x2="15" y2="21" />
+        <line x1="3" y1="9" x2="21" y2="9" />
+        <line x1="3" y1="15" x2="21" y2="15" />
+      </svg>`;
+      L.DomEvent.disableClickPropagation(wrapper);
+      L.DomEvent.on(btn, 'click', (e: Event) => {
+        e.preventDefault();
+        s2GridHandlerRef.current();
+      });
+      L.DomEvent.on(btn, 'contextmenu', (e: Event) => {
+        e.preventDefault();
+        setS2PickerOpen((o) => !o);
+      });
+      topLeftEl.appendChild(wrapper);
+      s2GridBtnRef.current = btn;
     }
 
     // User-initiated drag disables follow mode so they can pan freely. We
@@ -1267,6 +1337,99 @@ const MapView: React.FC<MapViewProps> = ({
     });
   }, [currentPosition, followMode]);
 
+  // ── S2 cell grid overlay ────────────────────────────────────────────
+  // Toggle handler is wired into the leaflet-bar button via a ref so the
+  // once-mounted button always sees the latest setter.
+  const toggleS2Grid = useCallback(() => {
+    setS2Enabled((prev) => !prev);
+  }, []);
+  useEffect(() => {
+    s2GridHandlerRef.current = toggleS2Grid;
+    const btn = s2GridBtnRef.current;
+    if (!btn) return;
+    btn.style.background = s2Enabled ? '#6c8cff' : 'var(--bg-surface, #2a2f3a)';
+    btn.title = t('map.s2_toggle');
+    btn.setAttribute('aria-pressed', s2Enabled ? 'true' : 'false');
+  }, [toggleS2Grid, s2Enabled, t]);
+
+  // Track whether the grid was suppressed because the user is too far zoomed
+  // out. The level picker uses this to tell them to zoom in instead of
+  // silently showing nothing.
+  const [s2Suppressed, setS2Suppressed] = useState(false);
+
+  // Recompute + paint S2 polygons whenever the layer is toggled, the level
+  // changes, or the user pans / zooms. Capped per zoom inside cellsInBounds
+  // so wide zooms with high levels don't lock the UI.
+  useEffect(() => {
+    const map = mapRef.current;
+    if (!map) return;
+    const draw = () => {
+      if (s2LayerRef.current) {
+        try { s2LayerRef.current.remove(); } catch { /* ignore */ }
+        s2LayerRef.current = null;
+      }
+      if (!s2Enabled) {
+        setS2Suppressed(false);
+        return;
+      }
+      // Suppress when the chosen level would render cells smaller than ~2 px:
+      // the BFS safety cap clips at a center cluster and the grid then looks
+      // like it 'wanders' with the cursor as you pan. Tell the user to zoom
+      // in (or pick a coarser level) instead of silently rendering garbage.
+      const zoom = map.getZoom();
+      const lat = map.getCenter().lat;
+      const cellMeters = approxCellSizeMeters(s2Level, lat);
+      // Web Mercator: world circumference at the equator is 40075016m, mapped
+      // to 256*2^zoom pixels. cos(lat) factor already baked into approxCellSizeMeters.
+      const cellPx = cellMeters * (256 * Math.pow(2, zoom)) / 40075016;
+      if (cellPx < 2) {
+        setS2Suppressed(true);
+        return;
+      }
+      setS2Suppressed(false);
+      const bounds = map.getBounds();
+      let cells: S2CellPolygon[];
+      try {
+        cells = cellsInBounds(bounds, s2Level);
+      } catch {
+        return;
+      }
+      if (!cells.length) return;
+      const layer = L.layerGroup();
+      // Solid colour, transparent fill — keeps the underlying map readable.
+      // Slightly thinner stroke at high levels (more cells, would otherwise
+      // blanket the screen).
+      const weight = s2Level >= 18 ? 0.6 : s2Level >= 16 ? 0.8 : 1.1;
+      for (const c of cells) {
+        L.polygon(c.corners, {
+          color: '#6c8cff',
+          weight,
+          opacity: 0.85,
+          fill: true,
+          fillColor: '#6c8cff',
+          fillOpacity: 0.04,
+          interactive: false,
+          // Sit below markers so cell lines never block clicks on bookmark
+          // pins / waypoint markers / context menu.
+          pane: 'overlayPane',
+        }).addTo(layer);
+      }
+      layer.addTo(map);
+      s2LayerRef.current = layer;
+    };
+    draw();
+    map.on('moveend', draw);
+    map.on('zoomend', draw);
+    return () => {
+      map.off('moveend', draw);
+      map.off('zoomend', draw);
+      if (s2LayerRef.current) {
+        try { s2LayerRef.current.remove(); } catch { /* ignore */ }
+        s2LayerRef.current = null;
+      }
+    };
+  }, [s2Enabled, s2Level]);
+
   // Track the last avatar HTML we painted so the position-update effect
   // below can detect "avatar changed, need to rebuild marker even though
   // the position didn't change". Without this the new avatar only shows
@@ -1307,6 +1470,103 @@ const MapView: React.FC<MapViewProps> = ({
   return (
     <div className="map-container" style={{ position: 'relative', flex: 1 }}>
       <div ref={mapContainerRef} style={{ width: '100%', height: '100%' }} />
+
+      {/* S2 cell grid level picker — opens via right-click on the S2 toggle
+          button OR via the small chip beside the legend below. Snaps to
+          discrete levels 8..22, default 17 (Niantic decor cell). */}
+      {s2PickerOpen && (
+        <div
+          onContextMenu={(e) => e.stopPropagation()}
+          onMouseDown={(e) => e.stopPropagation()}
+          onClick={(e) => e.stopPropagation()}
+          className="anim-fade-slide-up"
+          style={{
+            position: 'absolute',
+            left: 56, top: 196, zIndex: 851,
+            background: 'rgba(26, 29, 39, 0.94)',
+            backdropFilter: 'blur(14px) saturate(160%)',
+            WebkitBackdropFilter: 'blur(14px) saturate(160%)',
+            border: '1px solid rgba(108, 140, 255, 0.28)',
+            borderRadius: 10,
+            padding: '10px 12px',
+            minWidth: 220,
+            boxShadow: '0 12px 32px rgba(12, 18, 40, 0.55)',
+            color: '#e8eaf0',
+            fontSize: 12,
+          }}
+        >
+          <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: 8 }}>
+            <span style={{ fontWeight: 600 }}>{tRef.current('map.s2_level_label')}</span>
+            <button
+              onClick={() => setS2PickerOpen(false)}
+              style={{ background: 'transparent', border: 'none', color: '#9499ac', cursor: 'pointer', fontSize: 14, padding: '0 4px' }}
+              aria-label="close"
+            >×</button>
+          </div>
+          <div style={{ display: 'flex', alignItems: 'center', gap: 8, marginBottom: 6 }}>
+            <input
+              type="range"
+              min={8}
+              max={22}
+              step={1}
+              value={s2Level}
+              onChange={(e) => setS2Level(parseInt(e.target.value, 10))}
+              style={{ flex: 1 }}
+            />
+            <span style={{ fontFamily: 'monospace', fontWeight: 700, color: '#9ac0ff', minWidth: 22, textAlign: 'right' }}>
+              L{s2Level}
+            </span>
+          </div>
+          <div style={{ fontSize: 11, color: '#9499ac' }}>
+            {(() => {
+              const map = mapRef.current;
+              const lat = map ? map.getCenter().lat : 0;
+              const m = approxCellSizeMeters(s2Level, lat);
+              const label = m >= 1000 ? `${(m / 1000).toFixed(1)} km` : `${Math.round(m)} m`;
+              return tRef.current('map.s2_size_hint', { size: label });
+            })()}
+          </div>
+          {s2Enabled && s2Suppressed && (
+            <div style={{
+              marginTop: 6, padding: '6px 8px',
+              background: 'rgba(255,193,7,0.12)',
+              border: '1px solid rgba(255,193,7,0.45)',
+              borderRadius: 4,
+              fontSize: 11, color: '#ffd54f', lineHeight: 1.4,
+            }}>
+              {tRef.current('map.s2_zoom_in_hint')}
+            </div>
+          )}
+          <div style={{ display: 'flex', gap: 6, marginTop: 8, flexWrap: 'wrap' }}>
+            {[13, 14, 15, 16, 17, 18, 19].map((lv) => (
+              <button
+                key={lv}
+                onClick={() => setS2Level(lv)}
+                style={{
+                  background: s2Level === lv ? 'rgba(108,140,255,0.35)' : 'rgba(255,255,255,0.06)',
+                  border: `1px solid ${s2Level === lv ? 'rgba(108,140,255,0.6)' : 'rgba(255,255,255,0.12)'}`,
+                  color: s2Level === lv ? '#fff' : '#c7d0e4',
+                  fontSize: 11, fontWeight: 600,
+                  padding: '3px 8px', borderRadius: 4, cursor: 'pointer',
+                }}
+              >L{lv}</button>
+            ))}
+          </div>
+          <div style={{ marginTop: 10, display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
+            <button
+              onClick={() => setS2Enabled((v) => !v)}
+              style={{
+                background: s2Enabled ? '#6c8cff' : 'transparent',
+                border: `1px solid ${s2Enabled ? '#6c8cff' : 'rgba(255,255,255,0.18)'}`,
+                color: s2Enabled ? '#fff' : '#c7d0e4',
+                fontSize: 11, fontWeight: 600,
+                padding: '4px 10px', borderRadius: 4, cursor: 'pointer',
+              }}
+            >{s2Enabled ? tRef.current('map.s2_on') : tRef.current('map.s2_off')}</button>
+            <span style={{ fontSize: 10, color: '#666c80' }}>{tRef.current('map.s2_picker_hint')}</span>
+          </div>
+        </div>
+      )}
 
       {/* Coord input overlay — bottom-left, above the map's status footer.
           Takes a single "lat, lng" string; Enter or the teleport button goes.

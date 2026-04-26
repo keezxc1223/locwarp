@@ -126,19 +126,32 @@ async def photon_reverse(lat: float, lng: float) -> GeocodingResult | None:
 
 # ── Overpass 'nearby POI' ──────────────────────────────────
 
+# Multiple mirrors so we degrade gracefully when the main server is rate-
+# limiting / busy. Tried in order; first one that returns 200 wins. Mirrors
+# pulled from the official Overpass server list (Kumi Systems is the most
+# reliable third-party mirror as of 2025/2026).
 OVERPASS_URL = "https://overpass-api.de/api/interpreter"
+OVERPASS_MIRRORS: list[str] = [
+    "https://overpass-api.de/api/interpreter",
+    "https://overpass.kumi.systems/api/interpreter",
+    "https://overpass.private.coffee/api/interpreter",
+    "https://overpass.osm.ch/api/interpreter",
+]
 
-# Categories worth showing to the user (amenity, shop, tourism, public_transport).
-# Each maps to a tag filter used inside the Overpass query.
+# Categories worth showing to the user (amenity, shop, tourism, public_transport,
+# leisure). Each maps to a tag filter used inside the Overpass query.
 POI_CATEGORIES = {
-    "amenity": "restaurant|cafe|fast_food|bar|pub|bank|atm|pharmacy|hospital|clinic|police|fuel|parking|toilets|school|library",
-    "shop": "convenience|supermarket|mall|department_store",
-    "tourism": "attraction|museum|viewpoint|hotel|hostel|guest_house",
+    "amenity": "restaurant|cafe|fast_food|bar|pub|food_court|ice_cream|bank|atm|pharmacy|hospital|clinic|dentist|police|fire_station|fuel|parking|toilets|school|university|kindergarten|library|place_of_worship|theatre|cinema|nightclub|post_office|townhall",
+    "shop": "convenience|supermarket|mall|department_store|bakery|butcher|clothes|shoes|electronics|hardware|jewelry|books|gift|hairdresser|beauty|optician",
+    "tourism": "attraction|museum|viewpoint|hotel|hostel|guest_house|motel|artwork|gallery|theme_park|zoo|aquarium|information",
+    "leisure": "park|playground|garden|sports_centre|pitch|stadium|nature_reserve|fitness_centre|swimming_pool|track|water_park|dog_park|marina",
     "public_transport": "station|stop_position|platform",
-    "railway": "station|halt|subway_entrance",
+    "railway": "station|halt|subway_entrance|tram_stop",
     "highway": "bus_stop",
+    "aeroway": "aerodrome|terminal|gate",
+    "natural": "beach|peak|spring|cave_entrance",
+    "historic": "monument|memorial|castle|ruins|archaeological_site|wayside_shrine",
 }
-
 
 def _haversine_m(lat1: float, lng1: float, lat2: float, lng2: float) -> float:
     R = 6371000.0
@@ -150,18 +163,52 @@ def _haversine_m(lat1: float, lng1: float, lat2: float, lng2: float) -> float:
     return 2 * R * math.asin(math.sqrt(a))
 
 
+_OVERPASS_HEADERS = {
+    # Overpass enforces User-Agent identification; some mirrors return 406
+    # to anonymous clients (the python-httpx default UA gets caught up in
+    # bot filters). Mirror what other OSM clients send.
+    "User-Agent": "LocWarp/0.2.77 (https://github.com/keezxc1223/locwarp)",
+    "Accept": "application/json",
+}
+
+
+async def _overpass_post(query: str) -> dict | None:
+    """POST a query to Overpass with mirror fallback. Returns parsed JSON or None.
+
+    Tries each mirror in order; on any HTTPError (timeout, 429, 5xx, network)
+    it logs the failure and moves to the next. Stops as soon as one returns
+    valid JSON. Logs the final-mirror error so callers can surface it.
+    """
+    last_err: Exception | None = None
+    for mirror in OVERPASS_MIRRORS:
+        try:
+            async with httpx.AsyncClient(
+                timeout=httpx.Timeout(25.0, connect=6.0),
+                headers=_OVERPASS_HEADERS,
+            ) as client:
+                resp = await client.post(mirror, data={"data": query})
+                resp.raise_for_status()
+                return resp.json()
+        except httpx.HTTPError as e:
+            last_err = e
+            logger.info("Overpass mirror %s failed: %s", mirror, e)
+            continue
+        except ValueError as e:  # JSON decode
+            last_err = e
+            logger.info("Overpass mirror %s returned non-JSON: %s", mirror, e)
+            continue
+    if last_err:
+        logger.warning("All Overpass mirrors failed; last error: %s", last_err)
+    return None
+
+
 async def nearby_pois(lat: float, lng: float, radius_m: int = 200, limit: int = 40) -> list[NearbyPoi]:
     filters = []
     for tag, values in POI_CATEGORIES.items():
         filters.append(f'node(around:{radius_m},{lat},{lng})["{tag}"~"^({values})$"];')
     query = "[out:json][timeout:15];\n(\n" + "\n".join(filters) + "\n);\nout body center;"
-    try:
-        async with httpx.AsyncClient(timeout=httpx.Timeout(20.0, connect=5.0)) as client:
-            resp = await client.post(OVERPASS_URL, data={"data": query})
-            resp.raise_for_status()
-            data = resp.json()
-    except httpx.HTTPError as e:
-        logger.warning("Overpass query failed: %s", e)
+    data = await _overpass_post(query)
+    if data is None:
         return []
 
     results: list[NearbyPoi] = []
