@@ -9,6 +9,7 @@ import { useBookmarks } from './hooks/useBookmarks'
 import UserAvatarPicker from './components/UserAvatarPicker'
 import { UserAvatar, avatarToHtml, loadAvatar, saveAvatar, loadCustomPng, saveCustomPng } from './userAvatars'
 import * as api from './services/api'
+import { parseCoord } from './utils/coords'
 
 import MapView from './components/MapView'
 import ControlPanel from './components/ControlPanel'
@@ -539,28 +540,22 @@ const App: React.FC = () => {
     setAddBmDialog(null)
   }, [addBmDialog, bm])
 
-  // Bulk-paste bookmark dialog state. Input is a textarea of one-per-line
-  // "lat lng [optional name]" rows; separator is any run of whitespace
-  // or commas so pasting from most sources (Excel, Notepad, Google Maps
-  // copy-coords) lands cleanly.
+  // Bulk-paste bookmark dialog state. Per-line parser scrapes the first
+  // valid lat/lng out of each line via parseCoord — extra label text on
+  // the same line ("OK", "#3", "一般火", "(...)" brackets, etc.) is
+  // dropped, lines without a coord pair count as invalid.
   const [bulkPasteOpen, setBulkPasteOpen] = useState(false)
   const [bulkPasteText, setBulkPasteText] = useState('')
   const [bulkPasteCategory, setBulkPasteCategory] = useState<string>(() => bm.categories[0]?.name || '預設')
   const [bulkPasteBusy, setBulkPasteBusy] = useState(false)
-  const parseBulkPaste = useCallback((raw: string): { valid: Array<{ lat: number; lng: number; name: string }>; invalidCount: number; totalLines: number } => {
+  const parseBulkPaste = useCallback((raw: string): { valid: Array<{ lat: number; lng: number }>; invalidCount: number; totalLines: number } => {
     const lines = raw.split(/\r?\n/).map((l) => l.trim()).filter((l) => l.length > 0)
-    const valid: Array<{ lat: number; lng: number; name: string }> = []
+    const valid: Array<{ lat: number; lng: number }> = []
     let invalidCount = 0
     for (const line of lines) {
-      const tokens = line.split(/[\s,]+/).filter(Boolean)
-      if (tokens.length < 2) { invalidCount++; continue }
-      const lat = parseFloat(tokens[0])
-      const lng = parseFloat(tokens[1])
-      if (!Number.isFinite(lat) || !Number.isFinite(lng) || lat < -90 || lat > 90 || lng < -180 || lng > 180) {
-        invalidCount++; continue
-      }
-      const name = tokens.slice(2).join(' ').trim()
-      valid.push({ lat, lng, name })
+      const c = parseCoord(line)
+      if (!c) { invalidCount++; continue }
+      valid.push({ lat: c.lat, lng: c.lng })
     }
     return { valid, invalidCount, totalLines: lines.length }
   }, [])
@@ -577,7 +572,7 @@ const App: React.FC = () => {
     for (const entry of valid) {
       try {
         await bm.createBookmark({
-          name: entry.name || `${entry.lat.toFixed(5)}, ${entry.lng.toFixed(5)}`,
+          name: `${entry.lat.toFixed(5)}, ${entry.lng.toFixed(5)}`,
           lat: entry.lat,
           lng: entry.lng,
           category_id: catId,
@@ -650,14 +645,9 @@ const App: React.FC = () => {
     const valid: Array<{ lat: number; lng: number }> = []
     let invalidCount = 0
     for (const line of lines) {
-      const tokens = line.split(/[\s,]+/).filter(Boolean)
-      if (tokens.length < 2) { invalidCount++; continue }
-      const lat = parseFloat(tokens[0])
-      const lng = parseFloat(tokens[1])
-      if (!Number.isFinite(lat) || !Number.isFinite(lng) || lat < -90 || lat > 90 || lng < -180 || lng > 180) {
-        invalidCount++; continue
-      }
-      valid.push({ lat: clampLat(lat), lng: normalizeLng(lng) })
+      const c = parseCoord(line)
+      if (!c) { invalidCount++; continue }
+      valid.push({ lat: clampLat(c.lat), lng: normalizeLng(c.lng) })
     }
     return { valid, invalidCount, totalLines: lines.length }
   }, [])

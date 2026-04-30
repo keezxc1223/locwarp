@@ -4,6 +4,7 @@ import { reverseGeocode } from '../services/api';
 import L from 'leaflet';
 import { cellsInBounds, approxCellSizeMeters } from '../services/s2grid';
 import type { S2CellPolygon } from '../services/s2grid';
+import { parseCoord } from '../utils/coords';
 
 interface Position {
   lat: number;
@@ -1510,26 +1511,13 @@ const MapView: React.FC<MapViewProps> = ({
 
 
   // Coordinate-input overlay (replaces the sidebar's two-field coord input).
-  // Accepts any of: "25.04, 121.51", "25.04,121.51", or "25.04 121.51".
+  // parseCoord scrapes the first valid lat/lng out of arbitrary pasted
+  // text — bracket decoration, trailing notes ("一般火"), and label
+  // prefixes are all discarded so users don't have to hand-clean copies
+  // from Google Maps / chat / spreadsheets.
   const [coordInput, setCoordInput] = useState('');
-  const parseCoordInput = (raw: string): { lat: number; lng: number } | null => {
-    // Strip decorations that commonly come with pasted coordinates:
-    // parentheses / brackets (both ASCII and CJK), degree symbols,
-    // quotes, and stray semicolons. Lets e.g. "(35.2643, 126.9584)"
-    // pasted straight from Google Maps work without manual cleanup.
-    const cleaned = raw.trim()
-      .replace(/[()\[\]{}（）【】「」『』"'`°]/g, '')
-      .trim();
-    const m = cleaned.match(/^(-?\d+(?:\.\d+)?)[\s,;]+(-?\d+(?:\.\d+)?)$/);
-    if (!m) return null;
-    const lat = parseFloat(m[1]);
-    const lng = parseFloat(m[2]);
-    if (!Number.isFinite(lat) || lat < -90 || lat > 90) return null;
-    if (!Number.isFinite(lng) || lng < -180 || lng > 180) return null;
-    return { lat, lng };
-  };
   const submitCoordGo = (kind: 'teleport' | 'navigate' = 'teleport') => {
-    const parsed = parseCoordInput(coordInput);
+    const parsed = parseCoord(coordInput);
     if (!parsed) {
       if (onShowToast) onShowToast(tRef.current('panel.coord_invalid'));
       return;
@@ -1543,7 +1531,7 @@ const MapView: React.FC<MapViewProps> = ({
   // deciding to teleport. Keeps the input populated so the next click
   // can promote it to a real teleport / navigate.
   const submitCoordPreview = () => {
-    const parsed = parseCoordInput(coordInput);
+    const parsed = parseCoord(coordInput);
     if (!parsed) {
       if (onShowToast) onShowToast(tRef.current('panel.coord_invalid'));
       return;
