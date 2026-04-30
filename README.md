@@ -109,9 +109,17 @@ TB1i7pEcifAeh8oDLLZFqiRVrpUaZmmDAn
 - **自動連線**:USB 偵測到新裝置 1 秒內自動配對,直到 2 台上限,**第三台插上完全不理**
 - 地圖維持單一視覺 (兩台已永遠重疊,雙 marker 反而是雜訊),裝置狀態靠 chip 與 StatusBar pill 呈現
 
-### OSRM 區域智慧 fallback (v0.2.0+)
+### 路徑來源選擇 (v0.2.90+)
 
-把世界切成 1° × 1° 網格快取 OSRM 覆蓋狀態:首次到新區域用 2.5 秒 short-timeout 試打 OSRM,通了標 ok、不通標 down。下次同區直接看快取,**沒覆蓋的區域 (例如部分南美 / 非洲偏遠地帶) 不再每段都白等 8 秒 timeout**,直接走密化直線。10 分鐘 TTL 過期會重 probe 一次。
+模式區塊「使用直線路徑」下方多一顆「**路徑來源**」按鈕,點開彈窗可在三家免費路徑生成服務之間切換:
+
+| 引擎 | Endpoint | 說明 |
+| --- | --- | --- |
+| **OSRM 公用 demo**(預設) | `router.project-osrm.org` | 全球涵蓋,無需金鑰,有時整個服務會掛 |
+| **OSRM FOSSGIS** | `routing.openstreetmap.de` | 同樣是 OSRM 引擎,改由 FOSSGIS 託管的鏡像 |
+| **Valhalla** | `valhalla1.openstreetmap.de` | 完全不同的路徑引擎,當 OSRM 兩個節點都掛時最有用 |
+
+選擇記在 localStorage,下次自動套用。任何引擎失敗(502 / timeout / NoRoute)時這一段自動退回密化直線,下一段繼續打引擎,不會卡死。勾「使用直線路徑」時整個選擇器會 disable,因為連引擎都不打。
 
 ### 速度控制
 
@@ -172,6 +180,7 @@ TB1i7pEcifAeh8oDLLZFqiRVrpUaZmmDAn
 
 - 啟動時 backend race condition 自動重試(最多 ~20 秒緩衝),無需手動重開
 - WebSocket 即時推播位置、進度、ETA、剩餘距離、裝置連線狀態
+- 模擬進行中切換模式 tab 不再清空地圖上的終點 / 路徑 / 路徑點(v0.2.90+),閒置時切換才會重置
 - 斷線自動重連 + banner 自動清除
 - **更新檢查**:啟動時從 GitHub Releases 比對版本,有新版時在底部狀態列版本號旁顯示彩色 `NEW` 膠囊提示(不再彈出對話框打斷操作),點擊版本號即跳轉到下載頁
 - **Log 資料夾**按鈕(狀態列):一鍵開啟 `~/.locwarp/logs/` 資料夾,方便將 backend.log 附到 Issue
@@ -219,7 +228,7 @@ TB1i7pEcifAeh8oDLLZFqiRVrpUaZmmDAn
 | [websockets](https://websockets.readthedocs.io/) | 12+ | 即時位置/狀態推播給前端 |
 | [pymobiledevice3](https://github.com/doronz88/pymobiledevice3) | 9.9+ | iOS 裝置協議(DVT / RemoteServices / lockdown / LegacyLocationService) |
 | [pydantic](https://docs.pydantic.dev/) | 2+ | 資料驗證(schemas) |
-| [httpx](https://www.python-httpx.org/) | 0.27+ | OSRM / Nominatim / TimezoneDB HTTP 呼叫 |
+| [httpx](https://www.python-httpx.org/) | 0.27+ | OSRM / OSRM FOSSGIS / Valhalla / Nominatim / TimezoneDB HTTP 呼叫 |
 | [gpxpy](https://github.com/tkrajina/gpxpy) | 1.6+ | GPX 路線解析 |
 
 ### WiFi Tunnel(整合於 backend,v0.2.3+,iOS 17+ only)
@@ -233,7 +242,9 @@ TB1i7pEcifAeh8oDLLZFqiRVrpUaZmmDAn
 
 | 服務 | 呼叫端 | 用途 | 需要 API Key |
 | --- | --- | --- | --- |
-| [OSRM](https://project-osrm.org/) | backend | 路線規劃 + `/table` 多點優化(walking / driving profile) | 否 |
+| [OSRM 公用 demo](https://project-osrm.org/) | backend | 路線規劃 + `/table` 多點優化(walking / driving profile),預設來源 | 否 |
+| [OSRM FOSSGIS 鏡像](https://routing.openstreetmap.de/) | backend | 同 OSRM 引擎,可在「路徑來源」切換為備援 | 否 |
+| [Valhalla(FOSSGIS)](https://valhalla1.openstreetmap.de/) | backend | 不同的路徑引擎,「路徑來源」第三個選項,OSRM 全掛時可用 | 否 |
 | [Nominatim](https://nominatim.openstreetmap.org/) | backend | 正向 / 反向地理編碼、地名查詢(含 POI 智慧 short_name 選擇,預設地址搜尋來源) | 否 |
 | [Google Geocoding API](https://developers.google.com/maps/documentation/geocoding) | backend | 地址搜尋備援來源(可選,免費 10K req/月);使用者於設定輸入自己的 API Key | 是(使用者自備) |
 | [Open-Meteo](https://open-meteo.com/) | **frontend(直連)** | 虛擬位置當地天氣(氣溫 + WMO weather_code);每個用戶自己 IP 各自 10000 req/day | 否 |

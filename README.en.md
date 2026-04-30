@@ -110,9 +110,17 @@ Connect **two iPhones at once**. Every action (teleport, navigate, loop, multi-s
 - **Auto-connect**: USB watchdog polls every 1 s and auto-connects new devices up to the cap of 2. **A third plugged-in iPhone is completely ignored** (no Trust prompt, no connect attempt).
 - The map keeps the single-device view (both devices overlap perfectly after pre-sync, so dual markers were just visual noise). Device identity stays visible via chips and status pills.
 
-### OSRM Regional Smart Fallback (v0.2.0+)
+### Routing Source Picker (v0.2.90+)
 
-The world is bucketed into 1° x 1° grid cells with a per-region OSRM-coverage cache. The first request to a new cell uses a 2.5 s short timeout; if it succeeds the cell is marked ok, if it fails the cell is marked down. **Uncovered regions (e.g. parts of South America or remote Africa) no longer wait 8 s per leg**, they go straight to a densified straight-line route in 0 s. Cache TTL is 10 minutes (auto re-probe in case OSRM coverage changes).
+Below the "Use straight-line path" toggle in the mode panel, a "**Routing source**" button opens a popup that lets you switch between three free routing engines:
+
+| Engine | Endpoint | Notes |
+| --- | --- | --- |
+| **OSRM public demo** (default) | `router.project-osrm.org` | Global coverage, no key required, sometimes the whole service is down |
+| **OSRM FOSSGIS** | `routing.openstreetmap.de` | Same OSRM software, different host (FOSSGIS-operated mirror) |
+| **Valhalla** | `valhalla1.openstreetmap.de` | A different routing engine entirely; useful when both OSRM nodes are down |
+
+The choice is persisted in localStorage. When any engine fails (502 / timeout / NoRoute), the current leg falls back to a densified straight-line and the next leg retries the engine, so a transient blip never wedges the sim. The picker is disabled when "Use straight-line path" is on (no engine call is made anyway).
 
 ### Speed Control
 
@@ -173,6 +181,7 @@ The world is bucketed into 1° x 1° grid cells with a per-region OSRM-coverage 
 
 - Auto-retry on startup races (up to ~20 s window), no manual relaunch required
 - Real-time WebSocket push for position, progress, ETA, remaining distance, device connection state
+- Tapping a different mode tab during an active sim no longer wipes the live destination / route / waypoints from the map (v0.2.90+); switching while idle still resets to a clean slate
 - Auto-reconnect on disconnect + banner auto-dismiss
 - **Update check**: at startup, compares against the latest GitHub Release. When a newer version exists, a colourful animated `NEW` pill appears next to the version number in the bottom status bar (no popup interrupting your workflow); clicking the version takes you to the download page
 - **Open Log Folder** button (status bar): opens `~/.locwarp/logs/` so you can attach `backend.log` to bug reports
@@ -219,7 +228,7 @@ The world is bucketed into 1° x 1° grid cells with a per-region OSRM-coverage 
 | [websockets](https://websockets.readthedocs.io/) | 12+ | Real-time position / status push to frontend |
 | [pymobiledevice3](https://github.com/doronz88/pymobiledevice3) | 9.9+ | iOS device protocols (DVT / RemoteServices / lockdown / LegacyLocationService) |
 | [pydantic](https://docs.pydantic.dev/) | 2+ | Request / response validation (schemas) |
-| [httpx](https://www.python-httpx.org/) | 0.27+ | OSRM / Nominatim / TimezoneDB HTTP calls |
+| [httpx](https://www.python-httpx.org/) | 0.27+ | OSRM / OSRM FOSSGIS / Valhalla / Nominatim / TimezoneDB HTTP calls |
 | [gpxpy](https://github.com/tkrajina/gpxpy) | 1.6+ | GPX route parsing |
 
 ### Wi-Fi Tunnel (integrated into backend, v0.2.3+, iOS 17+ only)
@@ -233,7 +242,9 @@ The world is bucketed into 1° x 1° grid cells with a per-region OSRM-coverage 
 
 | Service | Caller | Purpose | Key required |
 | --- | --- | --- | --- |
-| [OSRM](https://project-osrm.org/) | backend | Routing + `/table` multi-stop optimization (walking / driving profiles) | No |
+| [OSRM public demo](https://project-osrm.org/) | backend | Routing + `/table` multi-stop optimization (walking / driving profiles), default routing source | No |
+| [OSRM FOSSGIS mirror](https://routing.openstreetmap.de/) | backend | Same OSRM engine, selectable as an alternative routing source | No |
+| [Valhalla (FOSSGIS)](https://valhalla1.openstreetmap.de/) | backend | Different routing engine, third option in the routing-source picker; useful when OSRM is down | No |
 | [Nominatim](https://nominatim.openstreetmap.org/) | backend | Default forward / reverse geocoding, place-name lookup (with POI-aware short_name picker) | No |
 | [Google Geocoding API](https://developers.google.com/maps/documentation/geocoding) | backend | Optional secondary geocoding source (10K req/month free); user supplies their own API key in settings | Yes (user-supplied) |
 | [Open-Meteo](https://open-meteo.com/) | **frontend (direct)** | Current weather at virtual location (temp + WMO weather_code); each user has their own 10,000 req/day per IP | No |
