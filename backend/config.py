@@ -24,11 +24,15 @@ class SpeedProfile(TypedDict):
     update_interval: float  # tick period (seconds)
 
 
-# Speed profiles (m/s)
+# Speed profiles (m/s). Defaults align with the frontend ControlPanel
+# preset chips (10.8 / 19.8 / 60 km/h). v0.2.84 lifted these from the
+# v0.1.0 numbers (1.4 / 2.8 / 11.1) which dated from when "running" still
+# meant actual running; the i18n label was later renamed to 腳踏車 and
+# the chip value bumped to bike speed without touching the backend.
 SPEED_PROFILES: dict[str, SpeedProfile] = {
-    "walking": {"speed_mps": 1.4, "jitter": 0.3, "update_interval": 1.0},
-    "running": {"speed_mps": 2.8, "jitter": 0.5, "update_interval": 1.0},
-    "driving": {"speed_mps": 11.1, "jitter": 1.0, "update_interval": 0.5},
+    "walking": {"speed_mps": 3.0, "jitter": 0.5, "update_interval": 1.0},
+    "running": {"speed_mps": 5.5, "jitter": 0.7, "update_interval": 0.5},
+    "driving": {"speed_mps": 16.7, "jitter": 1.2, "update_interval": 0.5},
 }
 
 
