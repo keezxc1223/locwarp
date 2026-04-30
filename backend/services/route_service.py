@@ -7,9 +7,11 @@ import logging
 import httpx
 
 from config import (
+    BROUTER_BASE_URL,
     DEFAULT_ROUTE_ENGINE,
     OSRM_BASE_URL,
     OSRM_FOSSGIS_BASE_URL,
+    ROUTE_ENGINE_BROUTER,
     ROUTE_ENGINE_OSRM,
     ROUTE_ENGINE_OSRM_FOSSGIS,
     ROUTE_ENGINE_VALHALLA,
@@ -54,6 +56,20 @@ _VALHALLA_COSTING = {
     "car": "auto",
     "bike": "bicycle",
     "bicycle": "bicycle",
+}
+
+# BRouter ships ~20 named profiles compiled from its DSL. We expose
+# the well-known ones; "shortest" is the safest pedestrian default
+# (no highway preference, follows any traversable way), "trekking"
+# is the standard touring-bike profile.
+_BROUTER_PROFILE = {
+    "walking": "shortest",
+    "running": "shortest",
+    "driving": "car-fast",
+    "foot": "shortest",
+    "car": "car-fast",
+    "bike": "trekking",
+    "bicycle": "trekking",
 }
 
 _TIMEOUT = httpx.Timeout(8.0, connect=4.0)
@@ -221,6 +237,8 @@ class RouteService:
         try:
             if engine == ROUTE_ENGINE_VALHALLA:
                 return await self._fetch_valhalla(waypoints, profile)
+            if engine == ROUTE_ENGINE_BROUTER:
+                return await self._fetch_brouter(waypoints, profile)
             return await self._fetch_osrm(waypoints, profile, engine)
         except (httpx.HTTPError, httpx.TimeoutException, RuntimeError) as e:
             logger.warning(
@@ -345,4 +363,58 @@ class RouteService:
             "duration": total_time_s,
             "distance": total_distance_km * 1000.0,  # km → m
             "leg_durations": leg_durations,
+        }
+
+    # ------------------------------------------------------------------
+    # BRouter (brouter.de)
+    # ------------------------------------------------------------------
+
+    async def _fetch_brouter(
+        self,
+        waypoints: list[tuple[float, float]],
+        profile: str,
+    ) -> dict:
+        brouter_profile = _BROUTER_PROFILE.get(profile, "shortest")
+        # BRouter expects lon,lat pairs separated by '|'.
+        lonlats = "|".join(f"{lng},{lat}" for lat, lng in waypoints)
+        url = (
+            f"{BROUTER_BASE_URL}/brouter"
+            f"?lonlats={lonlats}"
+            f"&profile={brouter_profile}"
+            "&alternativeidx=0&format=geojson"
+        )
+        logger.debug("BRouter request: %s", url)
+
+        async with httpx.AsyncClient(timeout=_TIMEOUT) as client:
+            resp = await client.get(url)
+            resp.raise_for_status()
+            data = resp.json()
+
+        feats = data.get("features") or []
+        if not feats:
+            raise RuntimeError("BRouter returned no features")
+        feat = feats[0]
+        geom = feat.get("geometry") or {}
+        raw_coords = geom.get("coordinates") or []
+        if not raw_coords:
+            raise RuntimeError("BRouter returned empty geometry")
+        # BRouter coords are [lon, lat, elevation_m]; drop elevation and
+        # swap to [lat, lng] for our interpolator.
+        coords = [[pt[1], pt[0]] for pt in raw_coords]
+
+        props = feat.get("properties") or {}
+        try:
+            distance_m = float(props.get("track-length") or 0.0)
+        except (TypeError, ValueError):
+            distance_m = 0.0
+        try:
+            duration_s = float(props.get("total-time") or 0.0)
+        except (TypeError, ValueError):
+            duration_s = 0.0
+
+        return {
+            "coords": coords,
+            "duration": duration_s,
+            "distance": distance_m,
+            "leg_durations": [duration_s],
         }

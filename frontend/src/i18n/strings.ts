@@ -384,6 +384,7 @@ export const STRINGS = {
   'panel.route_engine_osrm_desc': { zh: 'OSRM 公用 demo (router.project-osrm.org)。預設選項,涵蓋全球但有時會不穩定。', en: 'OSRM public demo (router.project-osrm.org). The default; covers the globe but can be flaky.' },
   'panel.route_engine_osrm_fossgis_desc': { zh: 'OSRM FOSSGIS 鏡像。同樣是 OSRM,改由德國 FOSSGIS 託管。', en: 'OSRM FOSSGIS mirror. Same OSRM software, hosted by FOSSGIS in Germany.' },
   'panel.route_engine_valhalla_desc': { zh: 'Valhalla(FOSSGIS)。完全不同的路徑引擎,當 OSRM 兩個節點都掛掉時最有保險。', en: 'Valhalla (FOSSGIS). A different routing engine entirely, useful when both OSRM nodes are down.' },
+  'panel.route_engine_brouter_desc': { zh: 'BRouter(brouter.de)。第四個獨立引擎,個人營運多年穩定,涵蓋全球,單車 / 健行 / 開車 profile 齊全。', en: 'BRouter (brouter.de). A fourth independent engine, run by a single maintainer for years, global coverage, with full bike / hike / car profiles.' },
   'panel.click_waypoint': { zh: '左鍵設置路徑點', en: 'Left-click to add waypoints' },
   'panel.click_waypoint_tooltip': { zh: '打開後在地圖上點左鍵即新增路徑點', en: 'When on, left-click the map to append a waypoint' },
   'panel.address_search': { zh: '地址搜尋', en: 'Address Search' },

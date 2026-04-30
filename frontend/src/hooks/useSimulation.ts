@@ -142,7 +142,7 @@ export function useSimulation(subscribe?: WsSubscribe, primaryUdid?: string | nu
 
   // Routing engine selection. Persisted in localStorage; backend default is
   // 'osrm' so omitting the field is equivalent to picking it explicitly.
-  const ROUTE_ENGINES = ['osrm', 'osrm_fossgis', 'valhalla'] as const
+  const ROUTE_ENGINES = ['osrm', 'osrm_fossgis', 'valhalla', 'brouter'] as const
   type RouteEngine = typeof ROUTE_ENGINES[number]
   const [routeEngine, setRouteEngineRaw] = useState<RouteEngine>(() => {
     try {

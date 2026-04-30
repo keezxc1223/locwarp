@@ -20,14 +20,17 @@ OSRM_BASE_URL = "https://router.project-osrm.org"
 ROUTE_ENGINE_OSRM = "osrm"
 ROUTE_ENGINE_OSRM_FOSSGIS = "osrm_fossgis"
 ROUTE_ENGINE_VALHALLA = "valhalla"
+ROUTE_ENGINE_BROUTER = "brouter"
 ROUTE_ENGINES_ALLOWED = (
     ROUTE_ENGINE_OSRM,
     ROUTE_ENGINE_OSRM_FOSSGIS,
     ROUTE_ENGINE_VALHALLA,
+    ROUTE_ENGINE_BROUTER,
 )
 DEFAULT_ROUTE_ENGINE = ROUTE_ENGINE_OSRM
 OSRM_FOSSGIS_BASE_URL = "https://routing.openstreetmap.de"
 VALHALLA_BASE_URL = "https://valhalla1.openstreetmap.de"
+BROUTER_BASE_URL = "https://brouter.de"
 
 # Nominatim
 NOMINATIM_BASE_URL = "https://nominatim.openstreetmap.org"

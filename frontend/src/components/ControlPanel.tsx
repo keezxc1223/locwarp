@@ -120,8 +120,8 @@ interface ControlPanelProps {
   currentWaypointsCount?: number;
   straightLine?: boolean;
   onStraightLineChange?: (v: boolean) => void;
-  routeEngine?: 'osrm' | 'osrm_fossgis' | 'valhalla';
-  onRouteEngineChange?: (v: 'osrm' | 'osrm_fossgis' | 'valhalla') => void;
+  routeEngine?: 'osrm' | 'osrm_fossgis' | 'valhalla' | 'brouter';
+  onRouteEngineChange?: (v: 'osrm' | 'osrm_fossgis' | 'valhalla' | 'brouter') => void;
   clickToAddWaypoint?: boolean;
   onClickToAddWaypointChange?: (v: boolean) => void;
   // Incremented by any external source (e.g. map top-left library

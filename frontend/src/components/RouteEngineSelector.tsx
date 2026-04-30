@@ -2,7 +2,7 @@ import React, { useState } from 'react';
 import { createPortal } from 'react-dom';
 import { useT } from '../i18n';
 
-export type RouteEngine = 'osrm' | 'osrm_fossgis' | 'valhalla';
+export type RouteEngine = 'osrm' | 'osrm_fossgis' | 'valhalla' | 'brouter';
 
 interface Props {
   value: RouteEngine;
@@ -14,6 +14,7 @@ const ENGINE_META: Record<RouteEngine, { color: string; dot: string; label: stri
   osrm:         { color: 'rgba(108, 140, 255, 0.18)', dot: '#6c8cff', label: 'OSRM demo' },
   osrm_fossgis: { color: 'rgba(108, 140, 255, 0.18)', dot: '#9ac0ff', label: 'OSRM FOSSGIS' },
   valhalla:     { color: 'rgba(255, 186, 107, 0.20)', dot: '#ffba6b', label: 'Valhalla' },
+  brouter:      { color: 'rgba(140, 220, 140, 0.18)', dot: '#7fd17f', label: 'BRouter' },
 };
 
 const RouteEngineSelector: React.FC<Props> = ({ value, onChange, disabled }) => {
@@ -109,7 +110,7 @@ const RouteEngineSelector: React.FC<Props> = ({ value, onChange, disabled }) => 
               >×</button>
             </div>
 
-            {(['osrm', 'osrm_fossgis', 'valhalla'] as RouteEngine[]).map((eng) => {
+            {(['osrm', 'osrm_fossgis', 'valhalla', 'brouter'] as RouteEngine[]).map((eng) => {
               const m = ENGINE_META[eng];
               const active = value === eng;
               return (
