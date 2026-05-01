@@ -1524,7 +1524,7 @@ const MapView: React.FC<MapViewProps> = ({
     const map = mapRef.current;
     if (!map) return;
 
-    // If a simulated position exists, snap to it immediately.
+    // ── Case 1: simulated position active — snap to it immediately ──
     if (currentPosition) {
       map.setView([currentPosition.lat, currentPosition.lng], Math.max(map.getZoom(), 16), {
         animate: true,
@@ -1532,66 +1532,66 @@ const MapView: React.FC<MapViewProps> = ({
       return;
     }
 
-    // No simulated position (before first teleport or after restore).
-    // Locate the phone itself using three methods in order of accuracy:
-    //   1. Device GPS via Safari Web Inspector — reads the phone's real CoreLocation
-    //      (requires Safari open + Settings > Safari > Advanced > Web Inspector = ON)
-    //   2. Electron native geolocation (macOS CoreLocation on the Mac, ~50 m)
-    //   3. Backend IP geolocation fallback (~5 km)
+    // ── Case 2: no simulated position (before first teleport or after restore) ──
+    // Show a spinner-like feedback immediately so the user knows the click registered.
     const btn = recenterBtnRef.current;
     if (btn) { btn.disabled = true; btn.style.opacity = '0.55'; }
-    try {
-      const base = window.location.protocol === 'file:' ? 'http://127.0.0.1:8777' : '';
+    onShowToast?.('🔍 正在定位…');
 
-      // Attempt 1: phone's own GPS via Safari Web Inspector
+    const base = window.location.protocol === 'file:' ? 'http://127.0.0.1:8777' : '';
+
+    const applyFix = (lat: number, lng: number, accuracy: number, label: string) => {
+      const zoom = accuracy < 200  ? Math.max(map.getZoom(), 17)
+                 : accuracy < 2000 ? Math.max(map.getZoom(), 15)
+                 : Math.max(map.getZoom(), 12);
+      map.setView([lat, lng], zoom, { animate: true });
+      onShowToast?.(`📍 ${label}：${lat.toFixed(5)}, ${lng.toFixed(5)}`);
+    };
+
+    try {
+      // ── Method A: phone's own GPS via Safari Web Inspector ──────────────────
+      // Hard limit: 5 s total.  If Web Inspector isn't enabled or Safari has no
+      // pages the AbortController fires first and we fall through immediately.
       const primaryUdid = devices && devices.length > 0 ? devices[0].udid : null;
       if (primaryUdid) {
+        const ctrl = new AbortController();
+        const gpsTimer = setTimeout(() => ctrl.abort(), 5000);
         try {
-          const resp = await fetch(`${base}/api/device/${encodeURIComponent(primaryUdid)}/gps`);
+          const resp = await fetch(
+            `${base}/api/device/${encodeURIComponent(primaryUdid)}/gps`,
+            { signal: ctrl.signal },
+          );
           if (resp.ok) {
             const d = await resp.json();
             if (d.ok && d.lat != null && d.lng != null) {
-              const acc: number = d.accuracy ?? 5000;
-              const zoom = acc < 100 ? Math.max(map.getZoom(), 17)
-                         : acc < 1000 ? Math.max(map.getZoom(), 15)
-                         : Math.max(map.getZoom(), 13);
-              map.setView([d.lat, d.lng], zoom, { animate: true });
+              applyFix(d.lat, d.lng, d.accuracy ?? 10, '手機 GPS');
               return;
             }
           }
-        } catch { /* Web Inspector unavailable — continue */ }
+        } catch { /* timeout / Web Inspector unavailable */ }
+        finally { clearTimeout(gpsTimer); }
       }
 
-      // Attempt 2: Electron native geolocation (Mac's CoreLocation, ~50 m)
-      const electronApi = typeof window !== 'undefined' ? (window as any).electronAPI : undefined;
-      if (electronApi?.locateMac) {
-        try {
-          const r = await electronApi.locateMac();
-          if (r?.ok && r.lat != null && r.lng != null) {
-            const zoom = r.accuracy < 500 ? Math.max(map.getZoom(), 16)
-                       : r.accuracy < 5000 ? Math.max(map.getZoom(), 14)
-                       : Math.max(map.getZoom(), 12);
-            map.setView([r.lat, r.lng], zoom, { animate: true });
-            return;
-          }
-        } catch { /* locateMac unavailable — continue */ }
-      }
-
-      // Attempt 3: backend IP geolocation (always works, city-level ~5 km)
+      // ── Method B: backend IP geolocation (city-level ~5 km, always works) ──
       try {
         const resp = await fetch(`${base}/api/system/locate-pc`);
         if (resp.ok) {
           const d = await resp.json();
           if (d.ok && d.lat != null && d.lng != null) {
-            map.setView([d.lat, d.lng], Math.max(map.getZoom(), 12), { animate: true });
+            applyFix(d.lat, d.lng, 5000, 'IP 定位（約 5km 精度）');
             return;
           }
         }
       } catch { /* network unavailable */ }
+
+      // All methods failed.
+      onShowToast?.('⚠️ 定位失敗：請確認網路連線');
+    } catch (err) {
+      onShowToast?.(`⚠️ 定位失敗：${String(err)}`);
     } finally {
       if (btn) { btn.disabled = false; btn.style.opacity = '1'; }
     }
-  }, [currentPosition, devices]);
+  }, [currentPosition, devices, onShowToast]);
 
   // Keep the DOM recenter button's handler + disabled state in sync with
   // React state without re-creating the button on every render.

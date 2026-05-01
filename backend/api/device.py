@@ -1066,16 +1066,17 @@ async def _read_gps_via_webinspector(lockdown, gps_timeout: float = 10.0) -> dic
     inspector = WebinspectorService(lockdown)
     try:
         # Attempt connection; WebInspectorNotEnabledError means the toggle is off.
-        await asyncio.wait_for(inspector.connect(timeout=4.0), timeout=6.0)
+        # Use a 2-second inner timeout so we fail fast when Web Inspector is disabled.
+        await asyncio.wait_for(inspector.connect(timeout=2.0), timeout=3.0)
     except (asyncio.TimeoutError, WebInspectorNotEnabledError, Exception) as exc:
         logger.debug("WebInspector connect failed: %s", exc)
         return None
 
     try:
-        # Collect open page listings (wait 1.5 s for webinspectord to reply).
+        # Collect open page listings (wait 1 s for webinspectord to reply).
         try:
             ap_list = await asyncio.wait_for(
-                inspector.get_open_application_pages(timeout=1.5), timeout=4.0
+                inspector.get_open_application_pages(timeout=1.0), timeout=3.0
             )
         except asyncio.TimeoutError:
             ap_list = []
@@ -1112,7 +1113,15 @@ async def _read_gps_via_webinspector(lockdown, gps_timeout: float = 10.0) -> dic
             "{timeout:" + str(int(gps_timeout * 1000)) + ",enableHighAccuracy:true,maximumAge:300000}"
             ");return 'started';})()"
         )
-        await session.runtime_evaluate(init_js, return_by_value=True)
+        # Timeout the JS evaluation itself to prevent infinite hang if WebKit
+        # accepts the session but never responds to Runtime.evaluate messages.
+        try:
+            await asyncio.wait_for(
+                session.runtime_evaluate(init_js, return_by_value=True), timeout=4.0
+            )
+        except asyncio.TimeoutError:
+            logger.debug("WebInspector: runtime_evaluate(init) timed out")
+            return None
 
         # Poll until done or timeout.
         poll_js = "window._lw_done?JSON.stringify(window._lw_loc):null"
