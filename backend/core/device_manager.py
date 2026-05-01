@@ -594,7 +594,11 @@ class DeviceManager:
                 # Prefer the original usbmux/TCP lockdown for DtSimulateLocation;
                 # fall back to whatever we have stored if not available.
                 legacy_lockdown = conn.usbmux_lockdown or conn.lockdown
-                legacy = LegacyLocationService(legacy_lockdown)
+                # Pass the RSD lockdown separately so clear() can attempt
+                # DVT LocationSimulation (more reliable on iOS 17+) and
+                # the raw 8-byte stop command via the RSD channel.
+                rsd_lockdown = conn.lockdown if conn.usbmux_lockdown else None
+                legacy = LegacyLocationService(legacy_lockdown, rsd_lockdown=rsd_lockdown)
                 logger.info("Using LegacyLocationService fallback for %s", conn.udid)
                 return legacy
             except Exception:

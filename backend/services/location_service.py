@@ -180,14 +180,27 @@ class LegacyLocationService(LocationService):
     """
     Location simulation for iOS < 17 devices via DtSimulateLocation.
 
+    Also used as a fallback on iOS 17+ when DVT is unavailable (e.g. DDI
+    not mounted).  When created as a DVT fallback, pass the RSD lockdown
+    as ``rsd_lockdown`` so that clear() can retry via DVT before falling
+    back to the DtSimulateLocation protocol.
+
     Parameters
     ----------
     lockdown_client
-        A lockdown service provider (LockdownClient) for the target device.
+        Primary lockdown service provider (usbmux/TCP on iOS 17+ fallback,
+        plain lockdown on iOS < 17).
+    rsd_lockdown
+        Optional RSD (Remote Service Discovery) lockdown for iOS 17+.
+        When provided, clear() tries DVT LocationSimulation first since it
+        is the most reliable path to restore real GPS on newer firmware.
     """
 
-    def __init__(self, lockdown_client) -> None:
+    SERVICE_NAME = "com.apple.dt.simulatelocation"
+
+    def __init__(self, lockdown_client, rsd_lockdown=None) -> None:
         self._lockdown = lockdown_client
+        self._rsd_lockdown = rsd_lockdown  # RSD lockdown for DVT fallback on iOS 17+
         self._service: DtSimulateLocation | None = None
         self._active = False
 
@@ -211,6 +224,63 @@ class LegacyLocationService(LocationService):
         except Exception:
             logger.debug("Error closing stale DtSimulateLocation", exc_info=True)
         self._service = None
+
+    async def _send_raw_clear(self, lockdown) -> bool:
+        """Send a stop-simulation command directly over *lockdown*.
+
+        Tries the 8-byte format first (``type=1`` + ``length=0``), which is
+        what older pymobiledevice3 versions sent and what iOS consistently
+        understands.  Current pymobiledevice3 ``DtSimulateLocation.clear()``
+        only sends 4 bytes; iOS 17+ may silently ignore this incomplete frame
+        because it is still waiting for the ``length`` field.
+
+        Returns True on success.
+        """
+        import struct
+        # Try 8-byte format: [type=1 uint32][length=0 uint32]
+        for fmt, label in [(">II", "8-byte"), (">I", "4-byte")]:
+            try:
+                svc = await lockdown.start_lockdown_developer_service(self.SERVICE_NAME)
+                payload = struct.pack(fmt, 1, 0) if fmt == ">II" else struct.pack(fmt, 1)
+                await svc.sendall(payload)
+                logger.info("DtSimulateLocation clear (%s) sent via %s",
+                            label, type(lockdown).__name__)
+                return True
+            except Exception as exc:
+                logger.debug("DtSimulateLocation clear (%s) via %s failed: %s",
+                             label, type(lockdown).__name__, exc)
+        return False
+
+    async def _dvt_clear(self) -> bool:
+        """Attempt DVT LocationSimulation.clear() via the RSD lockdown.
+
+        This is the most reliable clear path on iOS 17+.  Requires the RSD
+        lockdown (stored as ``_rsd_lockdown``) and ideally a mounted DDI,
+        though some iOS versions work without it.
+
+        Returns True on success.
+        """
+        if self._rsd_lockdown is None:
+            return False
+        try:
+            from pymobiledevice3.services.dvt.instruments.dvt_provider import DvtProvider
+            from pymobiledevice3.services.dvt.instruments.location_simulation import LocationSimulation
+            dvt = DvtProvider(self._rsd_lockdown)
+            await dvt.__aenter__()
+            try:
+                sim = LocationSimulation(dvt)
+                await sim.connect()
+                await sim.clear()
+                logger.info("DVT LocationSimulation.clear() succeeded (RSD lockdown)")
+                return True
+            finally:
+                try:
+                    await dvt.__aexit__(None, None, None)
+                except Exception:
+                    pass
+        except Exception as exc:
+            logger.debug("DVT clear via RSD lockdown failed: %s", exc)
+            return False
 
     async def set(self, lat: float, lng: float) -> None:
         """Simulate the device location using the legacy service."""
@@ -236,27 +306,44 @@ class LegacyLocationService(LocationService):
             raise
 
     async def clear(self) -> None:
-        """Clear the simulated location using the legacy service.
+        """Restore real GPS by stopping location simulation.
+
+        Tries three strategies in order, stopping at the first success:
+
+        1. DVT LocationSimulation.clear() via the RSD lockdown — the same
+           path Xcode uses; most reliable on iOS 17+.
+        2. Raw 8-byte stop command via the primary lockdown — fixes the
+           known bug where current pymobiledevice3 only sends 4 bytes and
+           iOS 17+ silently ignores the incomplete frame.
+        3. Raw 8-byte stop command via the RSD lockdown (second attempt).
 
         Always attempts to clear regardless of whether set() was called in
         this session — the device may carry a simulated location from a
-        previous run that must be removed.
+        previous app run that must be removed.
         """
+        # Strategy 1: DVT (Xcode path, most reliable on iOS 17+)
+        if await self._dvt_clear():
+            self._active = False
+            return
+
+        # Strategy 2 & 3: raw stop command — 8-byte format on both lockdowns
+        cleared = False
+        for lockdown in filter(None, [self._lockdown, self._rsd_lockdown]):
+            if await self._send_raw_clear(lockdown):
+                cleared = True
+                break
+
+        if cleared:
+            self._active = False
+            return
+
+        # Last resort: fall through to pymobiledevice3's own clear() which
+        # sends the 4-byte format — may work on older iOS.
         try:
             svc = self._ensure_service()
             await self._maybe_await(svc.clear())
             self._active = False
-            logger.info("Legacy simulated location cleared")
-        except (OSError, EOFError, BrokenPipeError, ConnectionResetError) as exc:
-            logger.warning("Legacy clear channel dropped (%s: %s); reconnecting",
-                           type(exc).__name__, exc)
-            self._reset_service()
-            try:
-                svc = self._ensure_service()
-                await self._maybe_await(svc.clear())
-                self._active = False
-            except Exception:
-                logger.exception("Legacy clear failed after reconnect")
+            logger.info("Legacy simulated location cleared (pymobiledevice3 fallback)")
         except Exception:
-            logger.exception("Failed to clear legacy simulated location")
+            logger.exception("All clear strategies failed for legacy location service")
             raise
