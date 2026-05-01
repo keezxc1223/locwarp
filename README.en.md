@@ -97,6 +97,9 @@ TB1i7pEcifAeh8oDLLZFqiRVrpUaZmmDAn
 | **Random Walk** | Wander randomly within a radius, with configurable pause between legs |
 | **Joystick** | Realtime direction + intensity control; supports **WASD / arrow keys** |
 
+#### Point-to-point Jump (v0.2.96+)
+
+Loop and Multi-stop modes have a **Point-to-point jump** checkbox. When enabled the device teleports stop-to-stop and dwells at each waypoint for a configurable interval (default 6 seconds, freely editable) instead of walking the routed path. Useful when you only need the iPhone to dwell at each waypoint in order. The setting is remembered in localStorage.
 
 ### Dual-device Group Mode (v0.2.0+)
 
@@ -131,6 +134,22 @@ The choice is persisted in localStorage. When any engine fails (502 / timeout / 
 - **Apply new speed mid-route**: change speed during navigate / loop / multi-stop / random-walk / joystick and press **Apply**, backend re-interpolates the remaining route from the device's current position with the new speed and continues, **no stop+restart needed**
 - Status bar shows the **backend-reported active speed** (typed-but-not-applied values don't lie about what's running)
 - Orange countdown banner shows on top of the map during pauses
+
+### Phone Web Control (v0.2.96+)
+
+Operate LocWarp from your phone without walking back to the computer. The "**Phone control**" button in the bottom status bar opens a modal showing a LAN URL and a 6-digit PIN. Open the URL in any phone browser on the same Wi-Fi, enter the PIN, and the phone gets a mobile-friendly map with seven actions:
+
+| Action | Behaviour |
+| --- | --- |
+| **Teleport** | Tap the map to jump there instantly |
+| **Navigate-to-here** | Walk / bike / drive from the current virtual position, or set a custom km/h |
+| **Search address** | Query Nominatim by name; tap a result to teleport |
+| **Coord-fly** | One-line input that auto-extracts the first valid lat/lng from any pasted text (uses the same parser as the desktop) |
+| **Stop / Restore** | Same semantics as the desktop buttons |
+
+- The phone map mirrors the desktop's live blue route polyline (HTTP polling).
+- Token is a random 32-hex string that's only shown in the desktop modal; PIN is 6 digits, wrong attempts get 401.
+- "Regenerate" rotates the PIN + token immediately, invalidating any previously paired phone.
 
 ### Connection (iOS 16+)
 
