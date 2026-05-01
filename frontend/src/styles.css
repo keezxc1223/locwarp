@@ -874,6 +874,83 @@ textarea:focus {
 }
 
 /* ---------- Map Container ---------- */
+/* ── Bookmark left panel ── */
+.bookmark-panel {
+  width: 260px;
+  min-width: 260px;
+  height: 100%;
+  display: flex;
+  flex-direction: column;
+  background: rgba(13, 15, 22, 0.6);
+  border-right: 1px solid rgba(108, 140, 255, 0.12);
+  overflow: hidden;
+}
+
+.bookmark-panel-header {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  padding: 10px 14px;
+  font-size: 13px;
+  font-weight: 600;
+  color: #9ac0ff;
+  background: rgba(108, 140, 255, 0.08);
+  border-bottom: 1px solid rgba(108, 140, 255, 0.15);
+  flex-shrink: 0;
+}
+
+.bookmark-panel-close {
+  background: none;
+  border: none;
+  color: #555;
+  cursor: pointer;
+  font-size: 13px;
+  line-height: 1;
+  padding: 2px 4px;
+  border-radius: 4px;
+}
+.bookmark-panel-close:hover { color: #aaa; background: rgba(255,255,255,0.06); }
+
+.bookmark-panel-body {
+  flex: 1;
+  overflow-y: auto;
+  overflow-x: hidden;
+}
+
+/* ── Panel toggle toolbar ── */
+.panel-toggles {
+  position: fixed;
+  top: 12px;
+  right: 52px;
+  display: flex;
+  gap: 6px;
+  z-index: 5000;
+}
+
+.panel-toggle-btn {
+  display: flex;
+  align-items: center;
+  gap: 5px;
+  padding: 6px 12px;
+  font-size: 11px;
+  font-weight: 600;
+  border-radius: 20px;
+  border: 1px solid rgba(108, 140, 255, 0.25);
+  background: rgba(15, 17, 25, 0.92);
+  color: #888;
+  cursor: pointer;
+  backdrop-filter: blur(12px);
+  box-shadow: 0 4px 16px rgba(0,0,0,0.4);
+  transition: all 0.15s;
+}
+.panel-toggle-btn:hover { color: #ccc; border-color: rgba(108,140,255,0.45); }
+.panel-toggle-btn.active {
+  color: #9ac0ff;
+  border-color: rgba(108, 140, 255, 0.6);
+  background: rgba(108, 140, 255, 0.15);
+}
+
+/* ── Map container ── */
 .map-container {
   flex: 1;
   position: relative;

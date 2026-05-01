@@ -151,10 +151,12 @@ class DvtLocationService(LocationService):
             raise
 
     async def clear(self) -> None:
-        """Clear the simulated location via the DVT instrument channel."""
-        if not self._active:
-            logger.debug("DVT clear called but no simulation is active")
-            return
+        """Clear the simulated location via the DVT instrument channel.
+
+        Always attempts to clear regardless of whether set() was called in
+        this session — the device may carry a simulated location from a
+        previous run that must be removed.
+        """
         try:
             sim = await self._ensure_instrument()
             await sim.clear()
@@ -234,10 +236,12 @@ class LegacyLocationService(LocationService):
             raise
 
     async def clear(self) -> None:
-        """Clear the simulated location using the legacy service."""
-        if not self._active:
-            logger.debug("Legacy clear called but no simulation is active")
-            return
+        """Clear the simulated location using the legacy service.
+
+        Always attempts to clear regardless of whether set() was called in
+        this session — the device may carry a simulated location from a
+        previous run that must be removed.
+        """
         try:
             svc = self._ensure_service()
             await self._maybe_await(svc.clear())

@@ -9,7 +9,8 @@
     "build": "tsc && vite build",
     "electron": "electron .",
     "start": "concurrently \"vite\" \"wait-on http://localhost:5173 && electron .\"",
-    "dist": "electron-builder --win nsis"
+    "dist": "electron-builder --win nsis",
+    "dist:mac": "electron-builder --mac dmg"
   },
   "dependencies": {
     "@maplibre/maplibre-gl-leaflet": "^0.1.3",
@@ -72,6 +73,27 @@
       "installerIcon": "build/icon.ico",
       "uninstallerIcon": "build/icon.ico",
       "installerHeaderIcon": "build/icon.ico"
+    },
+    "mac": {
+      "target": [
+        {
+          "target": "dmg",
+          "arch": ["arm64"]
+        }
+      ],
+      "icon": "build/icon.png",
+      "category": "public.app-category.utilities",
+      "extraResources": [
+        {
+          "from": "../dist-py/locwarp-backend",
+          "to": "backend",
+          "filter": ["**/*"]
+        }
+      ]
+    },
+    "dmg": {
+      "title": "LocWarp",
+      "icon": "build/icon.png"
     }
   }
 }

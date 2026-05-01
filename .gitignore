@@ -16,6 +16,8 @@ frontend/.vite/
 # ── PyInstaller / electron-builder build artifacts ──
 dist-py/
 build-py/
+backend/dist/
+backend/build/
 frontend/release/
 frontend/release-tmp/
 frontend/release-tmp*/

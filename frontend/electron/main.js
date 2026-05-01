@@ -115,21 +115,31 @@ const tryWindowsLocation = () => {
 }
 
 ipcMain.handle('locate-pc', async () => {
-  const win = await tryWindowsLocation()
-  if (win.ok) return { ...win, via: 'windows' }
-  if (win.code === 'DENIED') return win
-  // Windows Location returned NODATA / TIMEOUT / ERROR / UNKNOWN. Fall
-  // back to IP geolocation from the main process so the request is
-  // free of any renderer CORS / CSP restrictions.
+  // On macOS/Linux there is no PowerShell — skip straight to IP fallback.
+  // On Windows we try the native Location API first (better accuracy),
+  // then fall back to IP geolocation if it fails or is denied.
+  if (process.platform === 'win32') {
+    const win = await tryWindowsLocation()
+    if (win.ok) return { ...win, via: 'windows' }
+    if (win.code === 'DENIED') return win
+    // Windows Location returned NODATA / TIMEOUT / ERROR / UNKNOWN.
+    // Fall back to IP geolocation.
+    const ip = await ipFallback()
+    if (ip) return ip
+    return {
+      ok: false,
+      code: 'ALL_FAILED',
+      message: `Windows Location: ${win.code}${win.message ? ' (' + win.message + ')' : ''} | IP fallback: all 3 services unreachable`,
+    }
+  }
+
+  // macOS / Linux: IP-geolocation only (city-level, ~5 km accuracy).
   const ip = await ipFallback()
   if (ip) return ip
-  // Both layers failed — surface the original Windows error so the
-  // dialog can show the user something diagnostic instead of just
-  // "everything failed".
   return {
     ok: false,
     code: 'ALL_FAILED',
-    message: `Windows Location: ${win.code}${win.message ? ' (' + win.message + ')' : ''} | IP fallback: all 3 services unreachable`,
+    message: 'IP geolocation: all 3 services unreachable — check network connection',
   }
 })
 
@@ -141,11 +151,11 @@ let mainWindow
 let backendProc = null
 
 function resolveBackendExe() {
-  // In a packaged build, extraResources places files under process.resourcesPath
-  // (e.g.  .../resources/backend/locwarp-backend.exe).  In dev, we don't spawn;
-  // the developer runs `python main.py` manually.
+  // In a packaged build, extraResources places files under process.resourcesPath.
+  // In dev, we don't spawn; the developer runs `python main.py` manually.
   if (app.isPackaged) {
-    return path.join(process.resourcesPath, 'backend', 'locwarp-backend.exe')
+    const binaryName = process.platform === 'win32' ? 'locwarp-backend.exe' : 'locwarp-backend'
+    return path.join(process.resourcesPath, 'backend', binaryName)
   }
   return null
 }
@@ -154,11 +164,23 @@ function startBackend() {
   const exe = resolveBackendExe()
   if (!exe) return
   console.log('[electron] spawning backend:', exe)
-  backendProc = spawn(exe, [], {
-    cwd: path.dirname(exe),
-    stdio: ['ignore', 'pipe', 'pipe'],
-    windowsHide: true,
-  })
+
+  if (process.platform === 'darwin') {
+    // iOS 17+ requires root to create utun interfaces — request elevation
+    // via osascript so macOS shows the standard password dialog.
+    const script = `do shell script "${exe.replace(/"/g, '\\"')}" with administrator privileges`
+    backendProc = spawn('osascript', ['-e', script], {
+      cwd: path.dirname(exe),
+      stdio: ['ignore', 'pipe', 'pipe'],
+    })
+  } else {
+    backendProc = spawn(exe, [], {
+      cwd: path.dirname(exe),
+      stdio: ['ignore', 'pipe', 'pipe'],
+      windowsHide: true,
+    })
+  }
+
   backendProc.stdout.on('data', (d) => process.stdout.write(`[backend] ${d}`))
   backendProc.stderr.on('data', (d) => process.stderr.write(`[backend] ${d}`))
   backendProc.on('exit', (code) => {

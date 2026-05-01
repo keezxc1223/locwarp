@@ -19,6 +19,7 @@ import EtaBar from './components/EtaBar'
 import PauseControl from './components/PauseControl'
 import StatusBar from './components/StatusBar'
 import { DeviceChipRow } from './components/DeviceChipRow'
+import BookmarkList from './components/BookmarkList'
 import type { FanoutOutcome } from './hooks/useSimulation'
 
 // Summarise a group fan-out result into a single toast string.
@@ -79,6 +80,7 @@ const App: React.FC = () => {
     try { localStorage.setItem('locwarp.show_bookmark_pins', v ? '1' : '0') } catch { /* ignore */ }
   }
   const [toastMsg, setToastMsg] = useState<string | null>(null)
+  const [showBookmarkPanel, setShowBookmarkPanel] = useState(true)
   // Active avatar selection + persistent custom-PNG slot. Stored in two
   // separate localStorage keys so picking a preset doesn't drop the user's
   // uploaded image.
@@ -1388,6 +1390,106 @@ const App: React.FC = () => {
 
         </div>
       </div>
+
+      {/* ── Bookmark left panel ── */}
+      {showBookmarkPanel && (
+        <div className="bookmark-panel">
+          <div className="bookmark-panel-header">
+            <span>收藏座標</span>
+            <button
+              className="bookmark-panel-close"
+              onClick={() => setShowBookmarkPanel(false)}
+              title="關閉"
+            >✕</button>
+          </div>
+          <div className="bookmark-panel-body">
+            <BookmarkList
+              bookmarks={bm.bookmarks.map((b: any) => ({
+                id: b.id,
+                name: b.name,
+                lat: b.lat,
+                lng: b.lng,
+                category: bm.categories.find((c: any) => c.id === b.category_id)?.name || t('bm.default'),
+                country_code: b.country_code || '',
+                created_at: b.created_at || '',
+                last_used_at: b.last_used_at || '',
+              }))}
+              categories={bm.categories.map((c: any) => c.name)}
+              categoryColors={Object.fromEntries(bm.categories.map((c: any) => [c.name, c.color || '']))}
+              currentPosition={currentPos}
+              onBookmarkClick={(b: any) => handleTeleport(b.lat, b.lng)}
+              onBookmarkPreview={(b: any) => handleMapPanOnly(b.lat, b.lng)}
+              onBookmarkAdd={(b: any) => {
+                const cat = bm.categories.find((c: any) => c.name === b.category)
+                ;(async () => {
+                  let cc = ''
+                  try {
+                    const geo = await Promise.race([
+                      api.reverseGeocode(b.lat, b.lng),
+                      new Promise<null>((resolve) => setTimeout(() => resolve(null), 4000)),
+                    ])
+                    if (geo && (geo as any).country_code) cc = String((geo as any).country_code).toLowerCase()
+                  } catch { /* ignore */ }
+                  bm.createBookmark({ name: b.name, lat: b.lat, lng: b.lng, category_id: cat?.id || 'default', country_code: cc } as any)
+                })()
+              }}
+              onBookmarkDelete={(id: string) => bm.deleteBookmark(id)}
+              onBookmarkEdit={(id: string, data: any) => {
+                const orig = bm.bookmarks.find((b: any) => b.id === id)
+                const base: any = orig ? { ...orig } : { ...data, id }
+                const patch: any = { ...base }
+                if (data.name != null) patch.name = data.name
+                if (data.lat != null) patch.lat = data.lat
+                if (data.lng != null) patch.lng = data.lng
+                if (data.category != null) {
+                  const cat = bm.categories.find((c: any) => c.name === data.category)
+                  if (cat) patch.category_id = cat.id
+                }
+                bm.updateBookmark(id, patch)
+              }}
+              onCategoryAdd={(name: string) => {
+                const palette = ['#ef4444', '#f97316', '#eab308', '#22c55e', '#14b8a6', '#3b82f6', '#6366f1', '#a855f7', '#ec4899', '#64748b']
+                const color = palette[Math.floor(Math.random() * palette.length)]
+                bm.createCategory({ name, color })
+              }}
+              onCategoryDelete={(name: string) => {
+                const cat = bm.categories.find((c: any) => c.name === name)
+                if (cat) bm.deleteCategory(cat.id)
+              }}
+              onCategoryRename={(oldName: string, newName: string) => {
+                const cat = bm.categories.find((c: any) => c.name === oldName)
+                if (!cat || cat.id === 'default') return
+                bm.updateCategory(cat.id, { ...cat, name: newName })
+              }}
+              onCategoryRecolor={(name: string, color: string) => {
+                const cat = bm.categories.find((c: any) => c.name === name)
+                if (!cat) return
+                bm.updateCategory(cat.id, { ...cat, color })
+              }}
+              showOnMap={showBookmarkPins}
+              onShowOnMapChange={setShowBookmarkPins}
+              onImport={handleBookmarkImport}
+              onBulkPaste={() => { setBulkPasteText(''); setBulkPasteCategory(bm.categories[0]?.name || '預設'); setBulkPasteOpen(true) }}
+              exportUrl={api.bookmarksExportUrl()}
+            />
+          </div>
+        </div>
+      )}
+
+      {/* ── Toolbar buttons ── */}
+      <div className="panel-toggles">
+        <button
+          className={`panel-toggle-btn${showBookmarkPanel ? ' active' : ''}`}
+          onClick={() => setShowBookmarkPanel(v => !v)}
+          title="收藏座標列表"
+        >
+          <svg width="15" height="15" viewBox="0 0 24 24" fill="currentColor">
+            <path d="M17 3H7a2 2 0 0 0-2 2v16l7-3 7 3V5a2 2 0 0 0-2-2z"/>
+          </svg>
+          收藏
+        </button>
+      </div>
+
       <div className="map-container">
         <EtaBar
           runtimes={sim.runtimes}
