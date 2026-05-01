@@ -83,6 +83,9 @@
       ],
       "icon": "build/icon.png",
       "category": "public.app-category.utilities",
+      "extendInfo": {
+        "NSLocationWhenInUseUsageDescription": "LocWarp needs your location to center the map on your current position after restoring real GPS."
+      },
       "extraResources": [
         {
           "from": "../dist-py/locwarp-backend",

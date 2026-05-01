@@ -1520,12 +1520,54 @@ const MapView: React.FC<MapViewProps> = ({
     return () => document.removeEventListener('click', handler);
   }, [closeContextMenu]);
 
-  const recenter = useCallback(() => {
+  const recenter = useCallback(async () => {
     const map = mapRef.current;
-    if (!map || !currentPosition) return;
-    map.setView([currentPosition.lat, currentPosition.lng], Math.max(map.getZoom(), 16), {
-      animate: true,
-    });
+    if (!map) return;
+
+    // If a simulated position exists, snap to it immediately.
+    if (currentPosition) {
+      map.setView([currentPosition.lat, currentPosition.lng], Math.max(map.getZoom(), 16), {
+        animate: true,
+      });
+      return;
+    }
+
+    // No simulated position (before first teleport or after restore).
+    // Try to locate the user with the best available method:
+    //   1. Electron native geolocation (macOS CoreLocation / Windows Location, ~50 m)
+    //   2. Backend IP geolocation fallback (~5 km)
+    const btn = recenterBtnRef.current;
+    if (btn) { btn.disabled = true; btn.style.opacity = '0.55'; }
+    try {
+      // Attempt 1: Electron preload navigator.geolocation (system CoreLocation)
+      const electronApi = typeof window !== 'undefined' ? (window as any).electronAPI : undefined;
+      if (electronApi?.locateMac) {
+        try {
+          const r = await electronApi.locateMac();
+          if (r?.ok && r.lat != null && r.lng != null) {
+            const zoom = r.accuracy < 500 ? Math.max(map.getZoom(), 16)
+                       : r.accuracy < 5000 ? Math.max(map.getZoom(), 14)
+                       : Math.max(map.getZoom(), 12);
+            map.setView([r.lat, r.lng], zoom, { animate: true });
+            return;
+          }
+        } catch { /* locateMac unavailable — continue */ }
+      }
+
+      // Attempt 2: backend IP geolocation (works in browser dev mode too)
+      const base = window.location.protocol === 'file:' ? 'http://127.0.0.1:8777' : '';
+      const resp = await fetch(`${base}/api/system/locate-pc`);
+      if (resp.ok) {
+        const d = await resp.json();
+        if (d.ok && d.lat != null && d.lng != null) {
+          map.setView([d.lat, d.lng], Math.max(map.getZoom(), 12), { animate: true });
+          return;
+        }
+      }
+    } catch { /* network unavailable — fall through */ }
+    finally {
+      if (btn) { btn.disabled = false; btn.style.opacity = '1'; }
+    }
   }, [currentPosition]);
 
   // Keep the DOM recenter button's handler + disabled state in sync with
@@ -1534,10 +1576,12 @@ const MapView: React.FC<MapViewProps> = ({
     recenterHandlerRef.current = recenter;
     const btn = recenterBtnRef.current;
     if (!btn) return;
-    btn.disabled = !currentPosition;
+    // Button is always enabled — it falls back to IP geolocation when
+    // there is no current simulated position.
+    btn.disabled = false;
     btn.style.background = currentPosition ? '#6c8cff' : 'var(--bg-surface, #2a2f3a)';
-    btn.style.cursor = currentPosition ? 'pointer' : 'not-allowed';
-    btn.style.opacity = currentPosition ? '1' : '0.55';
+    btn.style.cursor = 'pointer';
+    btn.style.opacity = '1';
   }, [recenter, currentPosition]);
 
   const toggleFollow = useCallback(() => {

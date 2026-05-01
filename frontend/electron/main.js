@@ -242,6 +242,25 @@ async function createWindow() {
     })
   } catch (e) { console.error('[electron] UA hook failed:', e) }
 
+  // Allow the renderer to use navigator.geolocation (uses macOS CoreLocation
+  // or Windows Location internally — no Google API key required).
+  // The OS will show its own permission dialog on first use; after the user
+  // grants it, subsequent requests are answered from the permission store.
+  try {
+    const { session } = require('electron')
+    session.defaultSession.setPermissionRequestHandler((webContents, permission, callback) => {
+      if (permission === 'geolocation') {
+        callback(true) // hand off to the OS permission dialog
+      } else {
+        callback(false)
+      }
+    })
+    // Some Electron versions also check this for inline permission queries.
+    session.defaultSession.setPermissionCheckHandler((webContents, permission) => {
+      return permission === 'geolocation'
+    })
+  } catch (e) { console.error('[electron] permission handler failed:', e) }
+
   mainWindow = new BrowserWindow({
     width: 1280,
     height: 800,

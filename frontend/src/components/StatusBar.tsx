@@ -163,7 +163,8 @@ const StatusBar: React.FC<StatusBarProps> = ({
     // The backend calls ipwho.is → ipapi.co → freeipapi.com server-side
     // so there are no CORS issues and no Electron preload is needed.
     try {
-      const resp = await fetch('/api/system/locate-pc');
+      const base = window.location.protocol === 'file:' ? 'http://127.0.0.1:8777' : ''
+      const resp = await fetch(`${base}/api/system/locate-pc`);
       if (resp.ok) {
         const r = await resp.json();
         applyResult(r);
