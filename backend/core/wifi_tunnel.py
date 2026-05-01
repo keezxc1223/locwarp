@@ -23,6 +23,12 @@ class TunnelRunner:
         self._stop: asyncio.Event = asyncio.Event()
         self._ready: asyncio.Event = asyncio.Event()
         self._error: BaseException | None = None
+        # Original (ip, port) the runner was launched against. Useful so
+        # callers can tell "is the running tunnel actually for the same
+        # iPhone the user is trying to connect to right now?" without
+        # having to re-resolve the udid.
+        self.target_ip: str | None = None
+        self.target_port: int | None = None
 
     def is_running(self) -> bool:
         return self.task is not None and not self.task.done()
@@ -69,6 +75,8 @@ class TunnelRunner:
         self._ready = asyncio.Event()
         self._error = None
         self.info = None
+        self.target_ip = ip
+        self.target_port = port
         self.task = asyncio.create_task(self._run(udid, ip, port))
         try:
             await asyncio.wait_for(self._ready.wait(), timeout=timeout)

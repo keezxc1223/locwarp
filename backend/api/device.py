@@ -509,16 +509,67 @@ async def _per_tunnel_watchdog(udid: str, runner: TunnelRunner) -> None:
         raise
 
 
+def _build_tunnel_udid_candidates(req: WifiTunnelStartRequest) -> list[str]:
+    """Return udids to try for an incoming /wifi/tunnel/start request,
+    in priority order:
+
+    1. The udid the caller explicitly passed (always trusted)
+    2. Currently USB-tracked udids (most likely correct in single-device
+       use, and for the dual-device USB+WiFi flow)
+    3. Cached pair records under ~/.pymobiledevice3/, sorted by mtime
+       (most recently used first) — needed when the user opens LocWarp
+       without USB and just types an IP
+
+    The list is de-duped while preserving order. Caller iterates them;
+    pair-verify fails fast (~200-400ms) on a wrong identifier so trying
+    several is cheap. Bug history: v0.2.92 only used the first candidate,
+    which broke multi-iPhone users whose target's pair record happened
+    to not be the most-recently-used one."""
+    candidates: list[str] = []
+
+    def _add(c: str | None) -> None:
+        if c and c not in candidates:
+            candidates.append(c)
+
+    _add(req.udid)
+    try:
+        dm = _dm()
+        for u in dm._connections.keys():
+            _add(u)
+    except (RuntimeError, AttributeError):
+        pass
+    try:
+        from pymobiledevice3.pair_records import iter_remote_pair_records
+        records = sorted(
+            iter_remote_pair_records(),
+            key=lambda p: p.stat().st_mtime,
+            reverse=True,
+        )
+        for rec in records:
+            stem = rec.name
+            if stem.startswith("remote_"):
+                stem = stem.split("remote_", 1)[1]
+            ident = stem.split(".", 1)[0]
+            _add(ident)
+    except Exception:
+        _tunnel_logger.debug("Could not enumerate cached pair records", exc_info=True)
+
+    if not candidates:
+        candidates.append(f"pending:{req.ip}:{req.port}")
+    return candidates
+
+
 @router.post("/wifi/tunnel/start")
 async def wifi_tunnel_start(req: WifiTunnelStartRequest):
     """Start an in-process WiFi tunnel for one device (requires admin).
 
-    The runner is keyed in _tunnels by udid_hint (req.udid) when provided.
-    If absent, a temp key is used; /wifi/tunnel/start-and-connect will re-
-    key it under the real udid once the RSD handshake reveals the device
-    identity. The tunnel cap is enforced separately from the device cap
-    so we don't accidentally start a 4th tunnel while only 3 devices are
-    visible to dm._connections."""
+    The runner is keyed in _tunnels by the actual udid once we resolve
+    which paired iPhone is at the requested IP/port. Resolution iterates
+    candidate udids (req.udid > USB-tracked > cached pair records) and
+    keeps the one whose pair-verify handshake actually succeeds. The
+    tunnel cap is enforced separately from the device cap so we don't
+    accidentally start a 4th tunnel while only 3 devices are visible to
+    dm._connections."""
     async with _tunnels_lock:
         # Active runners count toward the cap. Stale entries get pruned
         # so a crashed tunnel doesn't permanently block reconnect.
@@ -529,100 +580,96 @@ async def wifi_tunnel_start(req: WifiTunnelStartRequest):
                 detail={"code": "max_devices_reached", "message": f"已連接最多 {MAX_DEVICES} 台裝置"},
             )
 
-        resolved_udid = req.udid
-        if not resolved_udid:
-            try:
-                dm = _dm()
-                conns = list(dm._connections.keys())
-                if conns:
-                    resolved_udid = conns[0]
-            except (RuntimeError, AttributeError):
-                pass
-        if not resolved_udid:
-            # No USB device is currently tracked, but the user may have
-            # previously paired this iPhone via USB — pymobiledevice3
-            # caches a RemotePairing record under
-            # ~/.pymobiledevice3/remote_<udid>.RemotePairing.plist.
-            # Reuse a cached identifier so WiFi tunnel works without
-            # forcing the user to plug USB in again every session.
-            try:
-                from pymobiledevice3.pair_records import iter_remote_paired_identifiers
-                cached = list(iter_remote_paired_identifiers())
-                if len(cached) == 1:
-                    resolved_udid = cached[0]
-                    _tunnel_logger.info(
-                        "No USB tracked; reusing the only cached paired "
-                        "identifier %s for WiFi tunnel",
-                        resolved_udid,
-                    )
-                elif len(cached) > 1:
-                    # Multiple paired devices: pick the most recently
-                    # used record (file mtime) as the best guess. If
-                    # that's the wrong device, the cryptographic
-                    # pair-verify will fail fast and the user can
-                    # retry with USB to disambiguate.
-                    try:
-                        from pymobiledevice3.pair_records import iter_remote_pair_records
-                        records = sorted(
-                            iter_remote_pair_records(),
-                            key=lambda p: p.stat().st_mtime,
-                            reverse=True,
-                        )
-                        if records:
-                            stem = records[0].name
-                            if stem.startswith("remote_"):
-                                stem = stem.split("remote_", 1)[1]
-                            resolved_udid = stem.split(".", 1)[0]
-                            _tunnel_logger.info(
-                                "No USB tracked; %d cached identifiers, "
-                                "trying most recent: %s",
-                                len(cached), resolved_udid,
-                            )
-                    except Exception:
-                        _tunnel_logger.debug(
-                            "Could not pick most-recent cached identifier",
-                            exc_info=True,
-                        )
-            except Exception:
-                _tunnel_logger.debug(
-                    "Could not enumerate cached paired identifiers",
-                    exc_info=True,
-                )
-        if not resolved_udid:
-            resolved_udid = f"pending:{req.ip}:{req.port}"
-
-        existing = _tunnels.get(resolved_udid)
-        if existing is not None and existing.is_running():
-            return {"status": "already_running", "udid": resolved_udid, **(existing.info or {})}
-        if existing is not None:
-            # Stale entry — clean it up before reusing the key.
-            await _tear_down_tunnel(resolved_udid, caller="start_replace_stale")
-
+        candidates = _build_tunnel_udid_candidates(req)
         _tunnel_logger.info(
-            "Starting WiFi tunnel: udid=%s ip=%s port=%d",
-            resolved_udid, req.ip, req.port,
+            "WiFi tunnel start: ip=%s port=%d candidates=%s",
+            req.ip, req.port, candidates,
         )
 
-        runner = TunnelRunner()
-        try:
-            info = await runner.start(resolved_udid, req.ip, req.port, timeout=20.0)
-        except asyncio.TimeoutError:
-            raise HTTPException(
-                status_code=500,
-                detail={"code": "tunnel_timeout", "message": "Tunnel 啟動逾時(20 秒)"},
-            )
-        except Exception as e:
-            raise HTTPException(
-                status_code=500,
-                detail={"code": "tunnel_spawn_failed", "message": f"無法啟動 tunnel:{e}"},
+        # If any candidate already has a running tunnel for the same
+        # (ip, port) target, that one wins immediately — idempotent
+        # re-click. We compare target_ip/port (not just udid) so a
+        # tunnel for a DIFFERENT iPhone doesn't get returned when the
+        # user is now trying to connect a new device.
+        for cand in candidates:
+            existing = _tunnels.get(cand)
+            if (
+                existing is not None
+                and existing.is_running()
+                and existing.target_ip == req.ip
+                and existing.target_port == req.port
+            ):
+                return {"status": "already_running", "udid": cand, **(existing.info or {})}
+
+        last_error: Exception | None = None
+        for cand in candidates:
+            existing = _tunnels.get(cand)
+            if existing is not None and existing.is_running():
+                # This udid already owns a tunnel for a DIFFERENT (ip,
+                # port). Don't tear it down — that would kill an active
+                # connection the user isn't asking us to touch. Just skip
+                # this candidate and try the next one.
+                _tunnel_logger.debug(
+                    "Skipping candidate %s: already tunneling to %s:%s "
+                    "(user requested %s:%s)",
+                    cand, existing.target_ip, existing.target_port,
+                    req.ip, req.port,
+                )
+                continue
+            if existing is not None:
+                # Stale entry (runner not running but slot still held);
+                # safe to clean up before reusing.
+                await _tear_down_tunnel(cand, caller="start_replace_stale")
+
+            _tunnel_logger.info(
+                "Trying WiFi tunnel with udid=%s ip=%s port=%d",
+                cand, req.ip, req.port,
             )
 
-        _tunnels[resolved_udid] = runner
-        _tunnel_watchdogs[resolved_udid] = asyncio.create_task(
-            _per_tunnel_watchdog(resolved_udid, runner)
+            # Per-candidate timeout is shorter than the legacy 20s budget.
+            # Pair-verify against the wrong iPhone fails in well under a
+            # second; if a candidate hasn't responded in 8s the iPhone is
+            # almost certainly unreachable on the network and the next
+            # candidate would just hit the same wall, so the loop bails
+            # below on TimeoutError.
+            runner = TunnelRunner()
+            try:
+                info = await runner.start(cand, req.ip, req.port, timeout=8.0)
+            except asyncio.TimeoutError as e:
+                last_error = e
+                _tunnel_logger.warning(
+                    "WiFi tunnel timed out for udid=%s; iPhone may be "
+                    "unreachable on the network — stopping further "
+                    "candidates",
+                    cand,
+                )
+                # Network-level timeout: trying more udids is unlikely to
+                # help. Surface the timeout error to the caller.
+                raise HTTPException(
+                    status_code=500,
+                    detail={"code": "tunnel_timeout", "message": "Tunnel 啟動逾時"},
+                ) from e
+            except Exception as e:
+                last_error = e
+                _tunnel_logger.info(
+                    "WiFi tunnel candidate %s failed (%s); trying next",
+                    cand, type(e).__name__,
+                )
+                continue
+
+            _tunnels[cand] = runner
+            _tunnel_watchdogs[cand] = asyncio.create_task(
+                _per_tunnel_watchdog(cand, runner)
+            )
+            _tunnel_logger.info("WiFi tunnel started for %s: %s", cand, info)
+            return {"status": "started", "udid": cand, **info}
+
+        # All candidates exhausted without a successful handshake.
+        msg = f"無法啟動 tunnel:{last_error}" if last_error else "無法啟動 tunnel"
+        raise HTTPException(
+            status_code=500,
+            detail={"code": "tunnel_spawn_failed", "message": msg},
         )
-        _tunnel_logger.info("WiFi tunnel started for %s: %s", resolved_udid, info)
-        return {"status": "started", "udid": resolved_udid, **info}
 
 
 @router.get("/wifi/tunnel/status")
