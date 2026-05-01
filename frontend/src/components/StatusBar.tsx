@@ -126,32 +126,55 @@ const StatusBar: React.FC<StatusBarProps> = ({
     setLocatePcError(null);
     setLocatePcBusy(true);
 
-    const api = (typeof window !== 'undefined') ? window.electronAPI : undefined;
-    if (!api?.locatePc) {
-      setLocatePcError('electronAPI.locatePc unavailable (preload missing)');
-      setLocatePcBusy(false);
-      return;
-    }
-    try {
-      const r = await api.locatePc();
+    // Helper: apply a successful locate result
+    const applyResult = (r: { ok: boolean; lat?: number; lng?: number; accuracy?: number; via?: string; code?: string; message?: string }) => {
       setLocatePcBusy(false);
       if (r.ok && r.lat != null && r.lng != null) {
         setLocatePcResult({
           lat: r.lat,
           lng: r.lng,
-          accuracy: r.accuracy ?? 100,
-          via: r.via ?? 'unknown',
+          accuracy: r.accuracy ?? 5000,
+          via: r.via ?? 'ip',
         });
-        return;
+        return true;
       }
       if (r.code === 'DENIED') {
         setLocatePcError(t('status.locate_pc_denied'));
+      } else {
+        setLocatePcError(`${r.code ?? 'ERROR'}${r.message ? ': ' + r.message : ''}`);
+      }
+      return false;
+    };
+
+    // Attempt 1: Electron IPC (works in packaged app and electron dev mode)
+    const electronApi = (typeof window !== 'undefined') ? (window as any).electronAPI : undefined;
+    if (electronApi?.locatePc) {
+      try {
+        const r = await electronApi.locatePc();
+        applyResult(r);
+        return;
+      } catch (e: any) {
+        // Electron IPC failed — fall through to backend API
+        console.warn('[locate-pc] Electron IPC error:', e?.message || e);
+      }
+    }
+
+    // Attempt 2: Backend API (works in browser / dev-mode without Electron)
+    // The backend calls ipwho.is → ipapi.co → freeipapi.com server-side
+    // so there are no CORS issues and no Electron preload is needed.
+    try {
+      const resp = await fetch('/api/system/locate-pc');
+      if (resp.ok) {
+        const r = await resp.json();
+        applyResult(r);
         return;
       }
-      setLocatePcError(`${r.code ?? 'ERROR'}${r.message ? ': ' + r.message : ''}`);
+      const err = await resp.json().catch(() => ({}));
+      setLocatePcBusy(false);
+      setLocatePcError((err as any)?.detail?.message ?? `HTTP ${resp.status}`);
     } catch (e: any) {
       setLocatePcBusy(false);
-      setLocatePcError(`IPC error: ${e?.message || e}`);
+      setLocatePcError(`Network error: ${e?.message || e}`);
     }
   };
 

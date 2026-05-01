@@ -74,3 +74,57 @@ async def open_log_folder():
         raise HTTPException(status_code=500, detail={"code": "open_log_failed",
                                                      "message": f"無法開啟資料夾:{exc}"})
     return {"status": "opened", "path": str(log_dir)}
+
+
+@router.get("/locate-pc")
+async def locate_pc():
+    """IP-geolocation endpoint used when Electron IPC is unavailable (browser / dev mode).
+
+    Tries three free services in order and returns the first success.
+    Accuracy is city-level (~5 km) — good enough to pan the map to the
+    approximate real-world location of the computer.
+    """
+    import httpx
+
+    _SERVICES = [
+        ("https://ipwho.is/",
+         lambda d: (d.get("latitude"), d.get("longitude"), "ipwho.is")),
+        ("https://ipapi.co/json/",
+         lambda d: (d.get("latitude"), d.get("longitude"), "ipapi.co")),
+        ("https://freeipapi.com/api/json/",
+         lambda d: (d.get("latitude"), d.get("longitude"), "freeipapi.com")),
+    ]
+
+    errors: list[str] = []
+    async with httpx.AsyncClient(
+        timeout=6.0,
+        headers={"User-Agent": "LocWarp/1.0"},
+        follow_redirects=True,
+    ) as client:
+        for url, extract in _SERVICES:
+            try:
+                resp = await client.get(url)
+                if resp.status_code == 200:
+                    data = resp.json()
+                    lat, lng, via = extract(data)
+                    if lat is not None and lng is not None:
+                        return {
+                            "ok": True,
+                            "lat": float(lat),
+                            "lng": float(lng),
+                            "accuracy": 5000,
+                            "via": via,
+                        }
+                    errors.append(f"{via}: missing lat/lng in response")
+                else:
+                    errors.append(f"{url}: HTTP {resp.status_code}")
+            except Exception as exc:
+                errors.append(f"{url}: {exc}")
+
+    raise HTTPException(
+        status_code=503,
+        detail={
+            "code": "ALL_FAILED",
+            "message": "IP geolocation: all services unreachable — " + "; ".join(errors),
+        },
+    )
