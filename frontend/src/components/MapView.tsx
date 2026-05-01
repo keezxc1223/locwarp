@@ -1533,13 +1533,36 @@ const MapView: React.FC<MapViewProps> = ({
     }
 
     // No simulated position (before first teleport or after restore).
-    // Try to locate the user with the best available method:
-    //   1. Electron native geolocation (macOS CoreLocation / Windows Location, ~50 m)
-    //   2. Backend IP geolocation fallback (~5 km)
+    // Locate the phone itself using three methods in order of accuracy:
+    //   1. Device GPS via Safari Web Inspector — reads the phone's real CoreLocation
+    //      (requires Safari open + Settings > Safari > Advanced > Web Inspector = ON)
+    //   2. Electron native geolocation (macOS CoreLocation on the Mac, ~50 m)
+    //   3. Backend IP geolocation fallback (~5 km)
     const btn = recenterBtnRef.current;
     if (btn) { btn.disabled = true; btn.style.opacity = '0.55'; }
     try {
-      // Attempt 1: Electron preload navigator.geolocation (system CoreLocation)
+      const base = window.location.protocol === 'file:' ? 'http://127.0.0.1:8777' : '';
+
+      // Attempt 1: phone's own GPS via Safari Web Inspector
+      const primaryUdid = devices && devices.length > 0 ? devices[0].udid : null;
+      if (primaryUdid) {
+        try {
+          const resp = await fetch(`${base}/api/device/${encodeURIComponent(primaryUdid)}/gps`);
+          if (resp.ok) {
+            const d = await resp.json();
+            if (d.ok && d.lat != null && d.lng != null) {
+              const acc: number = d.accuracy ?? 5000;
+              const zoom = acc < 100 ? Math.max(map.getZoom(), 17)
+                         : acc < 1000 ? Math.max(map.getZoom(), 15)
+                         : Math.max(map.getZoom(), 13);
+              map.setView([d.lat, d.lng], zoom, { animate: true });
+              return;
+            }
+          }
+        } catch { /* Web Inspector unavailable — continue */ }
+      }
+
+      // Attempt 2: Electron native geolocation (Mac's CoreLocation, ~50 m)
       const electronApi = typeof window !== 'undefined' ? (window as any).electronAPI : undefined;
       if (electronApi?.locateMac) {
         try {
@@ -1554,21 +1577,21 @@ const MapView: React.FC<MapViewProps> = ({
         } catch { /* locateMac unavailable — continue */ }
       }
 
-      // Attempt 2: backend IP geolocation (works in browser dev mode too)
-      const base = window.location.protocol === 'file:' ? 'http://127.0.0.1:8777' : '';
-      const resp = await fetch(`${base}/api/system/locate-pc`);
-      if (resp.ok) {
-        const d = await resp.json();
-        if (d.ok && d.lat != null && d.lng != null) {
-          map.setView([d.lat, d.lng], Math.max(map.getZoom(), 12), { animate: true });
-          return;
+      // Attempt 3: backend IP geolocation (always works, city-level ~5 km)
+      try {
+        const resp = await fetch(`${base}/api/system/locate-pc`);
+        if (resp.ok) {
+          const d = await resp.json();
+          if (d.ok && d.lat != null && d.lng != null) {
+            map.setView([d.lat, d.lng], Math.max(map.getZoom(), 12), { animate: true });
+            return;
+          }
         }
-      }
-    } catch { /* network unavailable — fall through */ }
-    finally {
+      } catch { /* network unavailable */ }
+    } finally {
       if (btn) { btn.disabled = false; btn.style.opacity = '1'; }
     }
-  }, [currentPosition]);
+  }, [currentPosition, devices]);
 
   // Keep the DOM recenter button's handler + disabled state in sync with
   // React state without re-creating the button on every render.

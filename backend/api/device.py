@@ -1,7 +1,13 @@
+import asyncio
+import json
+import logging
+
 from fastapi import APIRouter, HTTPException
 from pydantic import BaseModel
 
 from models.schemas import DeviceInfo
+
+logger = logging.getLogger(__name__)
 
 router = APIRouter(prefix="/api/device", tags=["device"])
 
@@ -1037,3 +1043,172 @@ async def device_info(udid: str):
         if d.udid == udid:
             return d
     raise HTTPException(status_code=404, detail="Device not found")
+
+
+# ── Device GPS via Safari Web Inspector ────────────────────────────────────────
+
+async def _read_gps_via_webinspector(lockdown, gps_timeout: float = 10.0) -> dict | None:
+    """Execute navigator.geolocation in Safari via Web Inspector and return GPS fix.
+
+    Works on both real GPS (after restore) and simulated GPS (during teleport),
+    so it always reflects the coordinate the phone thinks it is at.
+
+    Requirements on the device:
+    • Safari open with at least one web page tab
+    • Settings > Safari > Advanced > Web Inspector = ON
+    • Location permission granted to Safari (or to the current page's origin)
+
+    Returns {"lat", "lng", "accuracy"} or None on failure.
+    """
+    from pymobiledevice3.services.webinspector import WebinspectorService, WirTypes
+    from pymobiledevice3.exceptions import WebInspectorNotEnabledError
+
+    inspector = WebinspectorService(lockdown)
+    try:
+        # Attempt connection; WebInspectorNotEnabledError means the toggle is off.
+        await asyncio.wait_for(inspector.connect(timeout=4.0), timeout=6.0)
+    except (asyncio.TimeoutError, WebInspectorNotEnabledError, Exception) as exc:
+        logger.debug("WebInspector connect failed: %s", exc)
+        return None
+
+    try:
+        # Collect open page listings (wait 1.5 s for webinspectord to reply).
+        try:
+            ap_list = await asyncio.wait_for(
+                inspector.get_open_application_pages(timeout=1.5), timeout=4.0
+            )
+        except asyncio.TimeoutError:
+            ap_list = []
+
+        # Keep only real web pages (not JS contexts, service workers, etc.)
+        web_pages = [
+            ap for ap in ap_list
+            if ap.page.type_ in (WirTypes.WEB, WirTypes.WEB_PAGE, WirTypes.PAGE)
+        ]
+        if not web_pages:
+            logger.debug("WebInspector: no open Safari web pages found")
+            return None
+
+        ap = web_pages[0]
+        logger.debug("WebInspector: using page %s", ap)
+
+        try:
+            session = await asyncio.wait_for(
+                inspector.inspector_session(ap.application, ap.page), timeout=5.0
+            )
+        except asyncio.TimeoutError:
+            logger.debug("WebInspector: inspector_session timed out")
+            return None
+
+        # Kick off geolocation in Safari; store the result in window globals so
+        # we can poll without needing awaitPromise support in the protocol stack.
+        init_js = (
+            "(function(){"
+            "window._lw_done=false;window._lw_loc=null;"
+            "if(!navigator.geolocation){window._lw_loc={error:'no geolocation'};window._lw_done=true;return;}"
+            "navigator.geolocation.getCurrentPosition("
+            "function(p){window._lw_loc={lat:p.coords.latitude,lng:p.coords.longitude,acc:p.coords.accuracy};window._lw_done=true;},"
+            "function(e){window._lw_loc={error:e.message||String(e.code)};window._lw_done=true;},"
+            "{timeout:" + str(int(gps_timeout * 1000)) + ",enableHighAccuracy:true,maximumAge:300000}"
+            ");return 'started';})()"
+        )
+        await session.runtime_evaluate(init_js, return_by_value=True)
+
+        # Poll until done or timeout.
+        poll_js = "window._lw_done?JSON.stringify(window._lw_loc):null"
+        deadline = asyncio.get_event_loop().time() + gps_timeout + 1.0
+        while asyncio.get_event_loop().time() < deadline:
+            await asyncio.sleep(0.3)
+            try:
+                raw = await asyncio.wait_for(
+                    session.runtime_evaluate(poll_js, return_by_value=True), timeout=3.0
+                )
+            except asyncio.TimeoutError:
+                continue
+
+            if raw is None:
+                continue  # not done yet
+
+            try:
+                loc = json.loads(raw) if isinstance(raw, str) else raw
+            except Exception:
+                continue
+
+            if isinstance(loc, dict):
+                if "lat" in loc:
+                    return {
+                        "lat": float(loc["lat"]),
+                        "lng": float(loc["lng"]),
+                        "accuracy": float(loc.get("acc", 10)),
+                    }
+                elif "error" in loc:
+                    logger.debug("WebInspector geolocation error: %s", loc["error"])
+                    return None
+
+        logger.debug("WebInspector geolocation timed out after %.1f s", gps_timeout)
+        return None
+
+    except Exception as exc:
+        logger.debug("WebInspector GPS read failed: %s", exc)
+        return None
+    finally:
+        try:
+            await inspector.close()
+        except Exception:
+            pass
+
+
+@router.get("/{udid}/gps")
+async def get_device_gps(udid: str):
+    """Return the phone's current GPS position by executing navigator.geolocation
+    in an open Safari tab via Web Inspector.
+
+    This returns the *phone's* actual coordinates — real GPS after restore, or
+    the simulated position while teleporting.  Accuracy is whatever the device
+    reports (typically 5–65 m with GPS/WiFi).
+
+    Prerequisites (on the device):
+    • Safari open with at least one web tab
+    • Settings > Safari > Advanced > Web Inspector = ON
+    • Safari has Location Services permission (any page that has previously
+      been granted location access works; a fresh allow-prompt may appear)
+    """
+    dm = _dm()
+    conn = dm._connections.get(udid)
+    if not conn:
+        raise HTTPException(
+            status_code=404,
+            detail={"code": "NOT_CONNECTED", "message": "Device not connected"},
+        )
+
+    # Prefer usbmux lockdown for WebInspector; fall back to RSD lockdown.
+    lockdown = conn.usbmux_lockdown or conn.lockdown
+
+    loc = await _read_gps_via_webinspector(lockdown, gps_timeout=10.0)
+
+    # If WebInspector failed (Safari not open / Web Inspector off), try the RSD
+    # lockdown path as well (iOS 17+ shim remote service).
+    if loc is None and conn.usbmux_lockdown and conn.lockdown is not conn.usbmux_lockdown:
+        loc = await _read_gps_via_webinspector(conn.lockdown, gps_timeout=6.0)
+
+    if loc:
+        return {
+            "ok": True,
+            "lat": loc["lat"],
+            "lng": loc["lng"],
+            "accuracy": loc["accuracy"],
+            "via": "device_gps",
+        }
+
+    raise HTTPException(
+        status_code=503,
+        detail={
+            "code": "GPS_UNAVAILABLE",
+            "message": (
+                "無法讀取手機 GPS。請確認：\n"
+                "1. 手機上 Safari 已開啟至少一個分頁\n"
+                "2. 設定 > Safari > 進階 > 網頁檢查器 = 開啟\n"
+                "3. Safari 已取得定位權限"
+            ),
+        },
+    )
