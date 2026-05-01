@@ -1572,17 +1572,53 @@ const MapView: React.FC<MapViewProps> = ({
         finally { clearTimeout(gpsTimer); }
       }
 
-      // ── Method B: backend IP geolocation (city-level ~5 km, always works) ──
-      try {
-        const resp = await fetch(`${base}/api/system/locate-pc`);
-        if (resp.ok) {
-          const d = await resp.json();
-          if (d.ok && d.lat != null && d.lng != null) {
-            applyFix(d.lat, d.lng, 5000, 'IP 定位（約 5km 精度）');
-            return;
+      // ── Method B: direct IP geolocation from the renderer ──────────────────
+      // Call the IP services directly from Electron's Chromium engine instead
+      // of routing through the backend.  The backend's PyInstaller bundle may
+      // lack the CA certificate bundle (certifi) needed for HTTPS, causing all
+      // three services to silently fail.  Chromium's SSL stack always works.
+      const IP_SVCS: Array<{ url: string; extract: (d: Record<string, unknown>) => { lat: number; lng: number } | null }> = [
+        {
+          url: 'https://ipwho.is/',
+          extract: (d) => {
+            const lat = d['latitude'], lng = d['longitude'];
+            return typeof lat === 'number' && typeof lng === 'number' ? { lat, lng } : null;
+          },
+        },
+        {
+          url: 'https://ipapi.co/json/',
+          extract: (d) => {
+            const lat = parseFloat(String(d['latitude']));
+            const lng = parseFloat(String(d['longitude']));
+            return Number.isFinite(lat) && Number.isFinite(lng) ? { lat, lng } : null;
+          },
+        },
+        {
+          url: 'https://freeipapi.com/api/json/',
+          extract: (d) => {
+            const lat = parseFloat(String(d['latitude']));
+            const lng = parseFloat(String(d['longitude']));
+            return Number.isFinite(lat) && Number.isFinite(lng) ? { lat, lng } : null;
+          },
+        },
+      ];
+
+      for (const svc of IP_SVCS) {
+        const ctrl = new AbortController();
+        const t = setTimeout(() => ctrl.abort(), 5000);
+        try {
+          const resp = await fetch(svc.url, { signal: ctrl.signal });
+          if (resp.ok) {
+            const d = await resp.json();
+            const loc = svc.extract(d);
+            if (loc) {
+              applyFix(loc.lat, loc.lng, 5000, 'IP 定位（約 5km 精度）');
+              return;
+            }
           }
-        }
-      } catch { /* network unavailable */ }
+        } catch { /* service unreachable, try next */ }
+        finally { clearTimeout(t); }
+      }
 
       // All methods failed.
       onShowToast?.('⚠️ 定位失敗：請確認網路連線');

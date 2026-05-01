@@ -96,30 +96,42 @@ async def locate_pc():
     ]
 
     errors: list[str] = []
-    async with httpx.AsyncClient(
-        timeout=6.0,
-        headers={"User-Agent": "LocWarp/1.0"},
-        follow_redirects=True,
-    ) as client:
-        for url, extract in _SERVICES:
-            try:
-                resp = await client.get(url)
-                if resp.status_code == 200:
-                    data = resp.json()
-                    lat, lng, via = extract(data)
-                    if lat is not None and lng is not None:
-                        return {
-                            "ok": True,
-                            "lat": float(lat),
-                            "lng": float(lng),
-                            "accuracy": 5000,
-                            "via": via,
-                        }
-                    errors.append(f"{via}: missing lat/lng in response")
-                else:
-                    errors.append(f"{url}: HTTP {resp.status_code}")
-            except Exception as exc:
-                errors.append(f"{url}: {exc}")
+
+    # In a PyInstaller bundle the certifi CA bundle may not be accessible,
+    # causing SSL verification to fail for HTTPS requests.  Try with
+    # verification first; if every attempt raises an SSL error, retry the
+    # whole loop with verify=False (safe for public IP-geolocation services).
+    for verify in (True, False):
+        errors.clear()
+        async with httpx.AsyncClient(
+            timeout=6.0,
+            headers={"User-Agent": "LocWarp/1.0"},
+            follow_redirects=True,
+            verify=verify,
+        ) as client:
+            for url, extract in _SERVICES:
+                try:
+                    resp = await client.get(url)
+                    if resp.status_code == 200:
+                        data = resp.json()
+                        lat, lng, via = extract(data)
+                        if lat is not None and lng is not None:
+                            return {
+                                "ok": True,
+                                "lat": float(lat),
+                                "lng": float(lng),
+                                "accuracy": 5000,
+                                "via": via,
+                            }
+                        errors.append(f"{via}: missing lat/lng in response")
+                    else:
+                        errors.append(f"{url}: HTTP {resp.status_code}")
+                except Exception as exc:
+                    errors.append(f"{url}: {exc}")
+
+        # If all errors look like SSL failures, retry without verification.
+        if not all("SSL" in e or "certificate" in e.lower() or "CERTIFICATE" in e for e in errors):
+            break  # Non-SSL failure — no point retrying with verify=False
 
     raise HTTPException(
         status_code=503,
