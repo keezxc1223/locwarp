@@ -143,9 +143,31 @@ ipcMain.handle('locate-pc', async () => {
   }
 })
 
-// Strip the default "File Edit View Window Help" menubar — LocWarp has its
-// own in-window controls and the native menu only adds noise on Windows.
-Menu.setApplicationMenu(null)
+// On Windows the native menubar is noise — remove it entirely.
+// On macOS we MUST keep at least an Edit submenu so that the OS can wire
+// up Cmd+C / Cmd+V / Cmd+Z etc. in text inputs.  Without any application
+// menu macOS severs the responder chain for those keys and paste stops
+// working in every <input> / <textarea> in the renderer.
+if (process.platform === 'darwin') {
+  Menu.setApplicationMenu(Menu.buildFromTemplate([
+    {
+      label: 'Edit',
+      submenu: [
+        { role: 'undo' },
+        { role: 'redo' },
+        { type: 'separator' },
+        { role: 'cut' },
+        { role: 'copy' },
+        { role: 'paste' },
+        { role: 'pasteAndMatchStyle' },
+        { role: 'delete' },
+        { role: 'selectAll' },
+      ],
+    },
+  ]))
+} else {
+  Menu.setApplicationMenu(null)
+}
 
 let mainWindow
 let backendProc = null
