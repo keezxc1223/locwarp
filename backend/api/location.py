@@ -332,6 +332,26 @@ async def multi_stop(req: MultiStopRequest):
     return {"status": "started", "stops": len(req.waypoints), "mode": req.mode}
 
 
+class InsertWaypointRequest(BaseModel):
+    after_index: int
+    lat: float
+    lng: float
+    udid: str | None = None
+
+
+@router.post("/insert_waypoint")
+async def insert_waypoint(req: InsertWaypointRequest):
+    """Insert a new waypoint into the running multi-stop / loop route at
+    after_index+1 without requiring the user to Stop+Start. See
+    SimulationEngine.live_insert_waypoint for the splice / resume contract."""
+    engine = await _engine(req.udid)
+    try:
+        result = await engine.live_insert_waypoint(req.after_index, req.lat, req.lng)
+    except Exception as e:
+        raise HTTPException(status_code=500, detail=str(e))
+    return result
+
+
 @router.post("/randomwalk")
 async def random_walk(req: RandomWalkRequest):
     engine = await _engine(getattr(req, "udid", None) if 'req' in dir() else None)

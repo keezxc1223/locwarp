@@ -156,6 +156,14 @@ export const pauseSim = (udid?: string) => request<any>('POST', `/api/location/p
 export const resumeSim = (udid?: string) => request<any>('POST', `/api/location/resume${qs(udid)}`)
 export const restoreSim = (udid?: string) => request<any>('POST', `/api/location/restore${qs(udid)}`)
 export const stopSim = (udid?: string) => request<any>('POST', `/api/location/stop${qs(udid)}`)
+// Live waypoint insert into a running multi-stop / loop. Returns
+// {ok, mode: 'live'|'deferred', splice_in_past}. Frontend fans out
+// to every connected udid in group mode so all engines stay aligned
+// on the same waypoint list.
+export const insertWaypoint = (after_index: number, lat: number, lng: number, udid?: string) =>
+  request<{ ok: boolean; mode?: 'live' | 'deferred'; splice_in_past?: boolean; reason?: string }>(
+    'POST', '/api/location/insert_waypoint', { after_index, lat, lng, ...ud(udid) },
+  )
 export const getStatus = (udid?: string) => request<any>('GET', `/api/location/status${qs(udid)}`)
 
 // Cooldown

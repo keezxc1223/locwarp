@@ -168,6 +168,11 @@ class SimulationEngine:
         # disconnect-promotion can capture it and restore on the new
         # leader. The handler increments this after each completed leg.
         self._random_walk_count: int = 0
+        # Holds the live-insert-waypoint splice/resume task so the
+        # event loop's weak-reference task tracking doesn't garbage
+        # collect it mid-execution. Cleared by the task itself when it
+        # finishes (success or exception).
+        self._splice_resume_task: asyncio.Task | None = None
 
     # ── Public API ───────────────────────────────────────────
 
@@ -401,6 +406,134 @@ class SimulationEngine:
         """Stop everything and clear the simulated location."""
         await self._restore_handler.restore()
 
+    async def live_insert_waypoint(
+        self, after_index: int, lat: float, lng: float,
+    ) -> dict:
+        """Splice a new waypoint into the current route at index after_index+1.
+
+        Three behaviours depending on engine state:
+
+        1. Currently running multi_stop / start_loop AND the splice is
+           in a future leg → snapshot the engine, mutate the captured
+           waypoints, restart the sim from the iPhone's current
+           position. iPhone briefly pauses (~200-500ms) then walks
+           through the new waypoint as part of the route.
+        2. Currently running AND the splice is in a past or current leg
+           → splice into the route list for display and future runs,
+           but do NOT make the iPhone backtrack. User is presumed to be
+           planning the route ahead, not redirecting in real time. The
+           rest of the route continues from the iPhone's current pos.
+        3. Not currently running → splice into _last_sim_args so the
+           next manual Start picks up the new list. Equivalent to
+           editing the waypoint list before running.
+
+        Returns ``{ok, mode, splice_in_past, reason?}``. ``mode`` is
+        one of ``"live"``, ``"deferred"``, or absent when ``ok=False``.
+        """
+        kind = self._last_sim_kind
+        if kind not in ("multi_stop", "start_loop"):
+            return {"ok": False, "reason": "not_route_mode"}
+        args = dict(self._last_sim_args or {})
+        wps = list(args.get("waypoints") or [])
+        if not wps:
+            return {"ok": False, "reason": "no_waypoints"}
+
+        target = max(0, min(int(after_index) + 1, len(wps)))
+        new_wp = Coordinate(lat=float(lat), lng=float(lng))
+        wps.insert(target, new_wp)
+        args["waypoints"] = wps
+
+        is_running = self.state in (
+            SimulationState.MULTI_STOP,
+            SimulationState.LOOPING,
+        )
+
+        # Defer: just persist for the next Start.
+        if not is_running:
+            self._last_sim_args = args
+            try:
+                self._user_waypoints = list(wps)
+            except Exception:
+                pass
+            return {"ok": True, "mode": "deferred", "splice_in_past": False}
+
+        # IMPORTANT: do NOT read self.segment_index here. multi_stop /
+        # start_loop set engine.segment_index = i ONCE per leg, then
+        # _move_along_route overwrites it with the densified coord
+        # index inside the per-step interpolation loop. So 99% of the
+        # time it's NOT the leg index — it's a coord index that gets
+        # clamped to len(wps) - 2 on resume and sends the iPhone to
+        # the last leg (endpoint) or some random middle leg.
+        # _user_waypoint_next IS stable: it's incremented once per
+        # named user wp passed, so leg_index = _user_waypoint_next - 1.
+        cur_uwn = int(self._user_waypoint_next)
+        cur_seg = max(0, cur_uwn - 1)
+        # "Past" splice = the inserted wp lands in or before the leg
+        # we're currently walking (target ≤ cur_seg + 1). The iPhone
+        # has either already finished those legs or is mid-flight on
+        # the leg that would now contain the new wp; backtracking to
+        # visit the new wp would surprise the user, so we just record
+        # it for the route list and skip past it on resume.
+        splice_in_past = target <= cur_seg + 1
+
+        snap = self.capture_resumable_snapshot()
+        if snap is None:
+            # Engine state raced to IDLE between the check and snapshot
+            # capture. Fall back to deferred.
+            self._last_sim_args = args
+            return {"ok": True, "mode": "deferred", "splice_in_past": splice_in_past}
+
+        snap["args"] = args
+        # Both multi_stop AND start_loop walk leg-by-leg through the
+        # waypoint list (route_loop densifies the route via OSRM only
+        # for display; movement still iterates user wps), so the same
+        # segment_index math works for both.
+        #
+        # Resume leg = the leg whose wp_b is the SAME wp_b the iPhone
+        # was already heading toward (so the in-flight current_pos →
+        # wp_b movement keeps its destination). After splicing at
+        # `target`, all old indices ≥ target shifted by +1. Where wp_b
+        # (originally at cur_seg + 1) now lives:
+        #   • target > cur_seg + 1 (future splice)  → wp_b stays at
+        #     cur_seg + 1, leg_start = cur_seg.
+        #   • target ≤ cur_seg + 1 (past or current) → wp_b shifted to
+        #     cur_seg + 2, leg_start = cur_seg + 1. The inserted wp
+        #     (now at cur_seg + 1) is recorded for the route list /
+        #     polyline but the iPhone walks current_pos → wp_b
+        #     directly, no backtrack.
+        # Earlier code used cur_seg + 2 for the past case which jumped
+        # the leg loop two ahead and made the iPhone walk straight to
+        # a much later waypoint or the endpoint.
+        snap["segment_index"] = cur_seg + 1 if splice_in_past else cur_seg
+        snap["user_waypoint_next"] = cur_uwn + (1 if target <= cur_uwn else 0)
+
+        # Fire-and-forget the stop + resume so the API call returns
+        # quickly. The new sim starts as soon as the in-flight task
+        # cancellation completes. Hold a reference on the engine so
+        # asyncio's weak-ref task tracking can't garbage-collect the
+        # coroutine mid-execution — without this the new sim was
+        # being collected and the iPhone never moved past the splice
+        # point even though the route polyline had updated.
+        async def _splice_and_resume():
+            try:
+                await self.stop()
+                await self.resume_from_snapshot(snap)
+            except Exception:
+                logger.exception("live_insert_waypoint splice/resume failed")
+            finally:
+                # Only clear the slot if we're still the registered
+                # task. A reentrant live_insert (user clicks insert
+                # twice in quick succession) would have replaced the
+                # slot with a newer task; clearing it here would drop
+                # the only reference and let asyncio GC the new task
+                # mid-execution — same bug as the original missing
+                # reference.
+                if self._splice_resume_task is asyncio.current_task():
+                    self._splice_resume_task = None
+
+        self._splice_resume_task = asyncio.create_task(_splice_and_resume())
+        return {"ok": True, "mode": "live", "splice_in_past": splice_in_past}
+
     async def stop(self) -> None:
         """Stop the current movement gracefully.
 
@@ -450,11 +583,21 @@ class SimulationEngine:
         if not self._last_sim_kind or not self._last_sim_args:
             return None
         cur = self.current_position
+        # multi_stop / start_loop: self.segment_index gets clobbered by
+        # _move_along_route's inner step loop (which writes the
+        # densified-coord index, not the leg index). Use
+        # _user_waypoint_next - 1 instead, which is the stable leg
+        # index source. navigate / random_walk use segment_index in
+        # its densified-coord meaning, so leave them on segment_index.
+        if self._last_sim_kind in ("multi_stop", "start_loop"):
+            seg_for_resume = max(0, int(self._user_waypoint_next) - 1)
+        else:
+            seg_for_resume = int(self.segment_index)
         snap = {
             "kind": self._last_sim_kind,
             "args": dict(self._last_sim_args),
             "current_pos": (cur.lat, cur.lng) if cur else None,
-            "segment_index": int(self.segment_index),
+            "segment_index": seg_for_resume,
             "lap_count": int(self.lap_count),
             "user_waypoint_next": int(self._user_waypoint_next),
             "distance_traveled": float(self.distance_traveled),
@@ -865,5 +1008,11 @@ class SimulationEngine:
         self._stop_event.clear()
         # Fresh session — let the next handler resolve speed from its own
         # request, not from a stale apply_speed from a previous session.
-        self._speed_was_applied = False
-        self._active_speed_profile = None
+        # Resume entries (handoff between devices, live waypoint insert)
+        # set _resume_snapshot BEFORE calling the handler — preserve any
+        # mid-flight applied speed in that case so the iPhone keeps the
+        # speed the user just set instead of falling back to the slowest
+        # mode default.
+        if self._resume_snapshot is None:
+            self._speed_was_applied = False
+            self._active_speed_profile = None

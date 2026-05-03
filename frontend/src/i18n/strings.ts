@@ -264,7 +264,10 @@ export const STRINGS = {
   'panel.waypoints_set_as_start_short': { zh: '起點', en: 'Start' },
   'panel.wp_fly_set_as_start': { zh: '設為起點並飛過去', en: 'Set as start + fly' },
   'map.wp_set_as_start': { zh: '設為起點並飛過去', en: 'Set as start and fly here' },
+  'map.wp_insert_after': { zh: '在這之後插入新路徑點', en: 'Insert new waypoint after this' },
   'map.wp_delete': { zh: '刪除路徑點', en: 'Delete waypoint' },
+  'panel.wp_insert_banner': { zh: '點地圖任意位置 → 新路徑點插入到 {label} 後面 (Esc 取消)', en: 'Click on the map → new waypoint inserted after {label} (Esc to cancel)' },
+  'panel.wp_insert_cancel': { zh: '取消', en: 'Cancel' },
 
   // ── Map ──────────────────────────────────────
   'map.recenter': { zh: '定位到目前位置', en: 'Recenter on current position' },

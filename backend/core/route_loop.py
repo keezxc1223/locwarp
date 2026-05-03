@@ -190,10 +190,13 @@ class RouteLooper:
                 wp_b = closed_waypoints[leg_idx + 1]
                 engine.segment_index = leg_idx
 
-                # Resume support: on the first iteration after taking over from
-                # a peer, start from the iPhone's actual GPS instead of routing
-                # back to wp_a (which would teleport to the previous waypoint).
-                if first_iteration and leg_idx == 0 and resume_snap and engine.current_position is not None:
+                # Resume support: on the first leg of the first lap after
+                # taking over (peer handoff or live waypoint splice), start
+                # from the iPhone's actual GPS instead of routing back to
+                # wp_a (which would teleport to the previous waypoint).
+                # Compares against leg_start, not 0, so a splice that
+                # resumes at leg_idx > 0 still uses current_position.
+                if first_iteration and leg_idx == leg_start and resume_snap and engine.current_position is not None:
                     leg_origin = engine.current_position
                 else:
                     leg_origin = wp_a

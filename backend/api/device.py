@@ -340,13 +340,18 @@ async def wifi_tunnel_discover():
         from pymobiledevice3.bonjour import browse_remotepairing
         instances = await browse_remotepairing(timeout=3.0)
         for inst in instances:
-            # Newer pymobiledevice3 returns Address objects (with .ip / .port
-            # attributes), older releases returned plain strings. Coerce to
-            # str either way before doing the IPv4-vs-IPv6 string heuristic
-            # — otherwise `":" not in a` raises TypeError on the Address
-            # type and the whole mDNS branch silently dies.
+            # Newer pymobiledevice3 returns Address objects with .ip and
+            # .iface attributes; older releases returned plain string IPs.
+            # Pull the bare IP either way so the UI shows e.g.
+            # "192.168.0.185" not "Address(ip='192.168.0.185',
+            # iface='Intel(R) Ethernet Controller (3) I225-V')".
             raw_addrs = inst.addresses or []
-            str_addrs = [str(a) for a in raw_addrs]
+            str_addrs: list[str] = []
+            for a in raw_addrs:
+                if hasattr(a, "ip"):
+                    str_addrs.append(str(a.ip))
+                else:
+                    str_addrs.append(str(a))
             ipv4s = [s for s in str_addrs if ":" not in s]
             addrs = ipv4s if ipv4s else str_addrs
             for addr in addrs:
