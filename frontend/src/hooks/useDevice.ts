@@ -209,9 +209,9 @@ export function useDevice(subscribe?: WsSubscribe) {
     : { running: false }
 
   const startWifiTunnel = useCallback(
-    async (ip: string, port = 49152) => {
+    async (ip: string, port = 49152, udidHint?: string) => {
       try {
-        const res = await wifiTunnelStartAndConnect(ip, port)
+        const res = await wifiTunnelStartAndConnect(ip, port, udidHint)
         const info: DeviceInfo = {
           udid: res.udid,
           name: res.name,
@@ -232,6 +232,29 @@ export function useDevice(subscribe?: WsSubscribe) {
             rsd_port: res.rsd_port,
           }]
         })
+        // Persist every successful tunnel into savedips, regardless of
+        // who initiated it (manual button, launch auto-connect, mDNS
+        // discover-and-connect). Without this, an iPhone that was
+        // connected via auto-discovery never gets remembered, and the
+        // next launch only auto-connects whichever iPhone the user once
+        // manually clicked through. v0.2.110 bug surfaced when a user
+        // with two iPhones only had one of them in savedips.
+        try {
+          const raw = localStorage.getItem('locwarp.tunnel.savedips') || '[]'
+          const list = (() => {
+            try { return JSON.parse(raw) as Array<{ ip: string; port: number; udid?: string; lastUsed: number }> }
+            catch { return [] }
+          })()
+          const baseList = Array.isArray(list) ? list : []
+          // Dedup by both (ip, port) AND by udid — covers the case where
+          // an iPhone reconnects on a NEW DHCP-assigned IP. Without the
+          // udid dedup we'd accumulate stale IPs for the same device.
+          const filtered = baseList.filter((e) =>
+            e && !(e.ip === ip && e.port === port) && !(res.udid && e.udid === res.udid)
+          )
+          const next = [{ ip, port, udid: res.udid, lastUsed: Date.now() }, ...filtered].slice(0, 5)
+          localStorage.setItem('locwarp.tunnel.savedips', JSON.stringify(next))
+        } catch { /* storage disabled */ }
         return info
       } catch (err) {
         console.error('WiFi tunnel failed:', err)

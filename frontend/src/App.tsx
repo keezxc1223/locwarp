@@ -375,7 +375,7 @@ const App: React.FC = () => {
     if (!ws.connected) return
     if (wifiAutoConnectAttemptedRef.current) return
     let enabled: boolean
-    let savedList: Array<{ ip: string; port: number }> = []
+    let savedList: Array<{ ip: string; port: number; udid?: string }> = []
     try {
       enabled = localStorage.getItem('locwarp.tunnel.autoconnect') !== '0'
       const raw = localStorage.getItem('locwarp.tunnel.savedips') || '[]'
@@ -384,7 +384,11 @@ const App: React.FC = () => {
         if (Array.isArray(parsed)) {
           savedList = parsed
             .filter((e) => e && typeof e.ip === 'string' && e.ip.trim())
-            .map((e) => ({ ip: String(e.ip).trim(), port: Number(e.port) || 49152 }))
+            .map((e) => ({
+              ip: String(e.ip).trim(),
+              port: Number(e.port) || 49152,
+              udid: typeof e.udid === 'string' && e.udid ? e.udid : undefined,
+            }))
         }
       } catch { /* ignore — fall back to legacy below */ }
       // Legacy single-IP fallback for upgraders.
@@ -398,7 +402,7 @@ const App: React.FC = () => {
     } catch {
       return
     }
-    if (!enabled || savedList.length === 0) return
+    if (!enabled) return
     wifiAutoConnectAttemptedRef.current = true
     // Defer so device.scan() and any backend-side restored tunnels have
     // time to surface in `device.connectedDevices` before we decide
@@ -414,25 +418,45 @@ const App: React.FC = () => {
             (status?.tunnels || [])
               .map((tn) => `${tn.rsd_address || ''}:${tn.rsd_port || 0}`),
           )
-          // De-dupe by ip:port and cap at the same MAX_DEVICES the
-          // backend enforces — anything beyond would 409 anyway.
+          // Two sources for auto-connect candidates:
+          //   1. savedips: previously-connected iPhones (UDID known)
+          //   2. mDNS / subnet discover: iPhones currently broadcasting
+          //      their RemotePairing service (UDID unknown until handshake)
+          // Discover catches the case where a user connected a second
+          // iPhone via the auto-connect path itself (so it never went
+          // through the manual save) — without it, only one iPhone keeps
+          // auto-connecting on every launch even though both are paired.
           const seen = new Set<string>()
-          const uniq: Array<{ ip: string; port: number }> = []
-          for (const entry of savedList) {
-            const key = `${entry.ip}:${entry.port}`
-            if (seen.has(key)) continue
-            if (alreadyTunneled.has(key)) continue
+          const uniq: Array<{ ip: string; port: number; udid?: string }> = []
+          const addCand = (ip: string, port: number, udid?: string) => {
+            const key = `${ip}:${port}`
+            if (seen.has(key)) return
+            if (alreadyTunneled.has(key)) return
             seen.add(key)
-            uniq.push(entry)
-            if (uniq.length >= 3) break
+            uniq.push({ ip, port, udid })
           }
-          if (uniq.length === 0) return
+          for (const entry of savedList) addCand(entry.ip, entry.port, entry.udid)
+          // Discover is best-effort and runs in parallel; failures don't
+          // block the savedips path.
+          try {
+            const dres = await api.wifiTunnelDiscover()
+            for (const d of (dres?.devices || [])) {
+              addCand(String(d.ip), Number(d.port) || 49152)
+            }
+          } catch { /* discover failed — savedips entries still try */ }
+          // Cap at MAX_DEVICES the backend enforces — anything beyond
+          // would 409 anyway.
+          const limited = uniq.slice(0, 3)
+          if (limited.length === 0) return
           // Parallel: every iPhone gets a tunnel attempt at the same
           // time so the user doesn't wait sequentially for unreachable
-          // ones to time out (~10s each).
+          // ones to time out (~10s each). Pass entry.udid so the backend
+          // tries the right pair record FIRST — without the hint, the
+          // second device's request can stall on the wrong candidate's
+          // 8s handshake timeout and bail.
           await Promise.allSettled(
-            uniq.map((entry) =>
-              device.startWifiTunnel(entry.ip, entry.port).catch(() => {}),
+            limited.map((entry) =>
+              device.startWifiTunnel(entry.ip, entry.port, entry.udid).catch(() => {}),
             ),
           )
         } catch {

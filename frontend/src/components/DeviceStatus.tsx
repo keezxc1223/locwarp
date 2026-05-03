@@ -677,22 +677,13 @@ const DeviceStatus: React.FC<DeviceStatusProps> = ({
                             await onStartWifiTunnel(tunnelIp.trim(), parseInt(tunnelPort) || 49152);
                             const ip = tunnelIp.trim();
                             const port = parseInt(tunnelPort) || 49152;
-                            // Legacy single-entry keys — kept so an old
-                            // build still pre-fills correctly after upgrade.
+                            // Legacy single-entry keys — kept so the IP
+                            // input field pre-fills correctly next launch.
+                            // The savedips multi-entry list is written by
+                            // useDevice.startWifiTunnel for every code
+                            // path, so we don't need to write it here.
                             localStorage.setItem('locwarp.tunnel.ip', ip);
                             localStorage.setItem('locwarp.tunnel.port', String(port));
-                            // Multi-device: append to the saved list so
-                            // launch-time auto-connect tries every iPhone
-                            // the user has previously paired, not just one.
-                            try {
-                              const raw = localStorage.getItem('locwarp.tunnel.savedips') || '[]';
-                              const list = (() => { try { return JSON.parse(raw) as Array<{ip: string; port: number; lastUsed: number}>; } catch { return []; } })();
-                              const filtered = Array.isArray(list)
-                                ? list.filter((e) => !(e && e.ip === ip && e.port === port))
-                                : [];
-                              const next = [{ ip, port, lastUsed: Date.now() }, ...filtered].slice(0, 5);
-                              localStorage.setItem('locwarp.tunnel.savedips', JSON.stringify(next));
-                            } catch { /* storage disabled */ }
                             setTunnelIp('');
                           } catch (err: any) {
                             setTunnelError(err.message || 'WiFi tunnel failed');
