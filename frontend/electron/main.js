@@ -2,6 +2,21 @@ const { app, BrowserWindow, Menu, shell, ipcMain } = require('electron')
 const path = require('path')
 const { spawn } = require('child_process')
 const http = require('http')
+const os = require('os')
+
+// Win 10 builds before 22H2 (19045), all EOL by 2026, can't launch
+// Chromium 124's sandboxed GPU process (error_code=18 confirmed on
+// 1903; same code path on 1809/1909/2004/20H2/21Hx). Fall back to
+// software rendering on those builds so the window actually paints.
+// Win 10 22H2 and Win 11 skip this branch and keep full acceleration.
+if (process.platform === 'win32') {
+  const winBuild = parseInt((os.release() || '0.0.0').split('.')[2] || '0', 10)
+  if (winBuild > 0 && winBuild < 19045) {
+    app.disableHardwareAcceleration()
+    app.commandLine.appendSwitch('no-sandbox')
+    app.commandLine.appendSwitch('in-process-gpu')
+  }
+}
 
 // Locate-PC over IPC: shells out to PowerShell + System.Device.Location
 // (the Windows Location API). This taps Windows' built-in Wi-Fi
