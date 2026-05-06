@@ -55,7 +55,7 @@ TB1i7pEcifAeh8oDLLZFqiRVrpUaZmmDAn
 > | 主版本 | 已驗證版本 | 狀態 |
 > | --- | --- | --- |
 > | **iOS 26.x** | 26.4.2 · 26.4.1 · 26.4.1 iPadOS · 26.4 · 26.3.1 · 26.2 · 26.2.1 iPadOS (M1 iPad) | ![Reported](https://img.shields.io/badge/回報可用-6c8cff?style=flat-square) |
-> | **iOS 18.x** | 18.7.8 · 18.7.7 · 18.7.1 · 18.6.2 · 18.5 iPadOS · 18.1.1 | ![Reported](https://img.shields.io/badge/回報可用-6c8cff?style=flat-square) |
+> | **iOS 18.x** | 18.7.8 · 18.7.7 · 18.7.1 · 18.6.2 · 18.5 iPadOS · 18.3.1 · 18.1.1 | ![Reported](https://img.shields.io/badge/回報可用-6c8cff?style=flat-square) |
 > | **iOS 17.x** | 17.6.1 | ![Reported](https://img.shields.io/badge/回報可用-6c8cff?style=flat-square) |
 > | **iOS 16.x**(社群維護) | 16.7.15 · 16.7.12([#9](https://github.com/keezxc1223/locwarp/pull/9),@bitifyChen) | ![Reported](https://img.shields.io/badge/回報可用-6c8cff?style=flat-square) ![Community](https://img.shields.io/badge/社群維護-ffa726?style=flat-square) |
 > | **iOS 15.x 及以下** | n/a | ![Unsupported](https://img.shields.io/badge/不支援-f44336?style=flat-square) |
