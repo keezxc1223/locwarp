@@ -94,25 +94,89 @@ def _last_phone_hit_seconds_ago() -> float | None:
 # ── Windows Firewall helpers ─────────────────────────────────
 
 
+_RULE_NAME = "LocWarp Phone Control"
+# Names Windows Defender auto-assigns to Block rules when the user clicks
+# "Cancel" on the first-bind dialog. These rules are program-bound (no
+# localport filter) so the port-scoped Block sweep below won't catch them
+# — we delete them by name instead. backend exe is built by PyInstaller as
+# `locwarp-backend.exe`; frontend is the Electron `LocWarp.exe`.
+_AUTO_BLOCK_NAMES = ("locwarp-backend", "LocWarp")
+
+
 def _firewall_add_rule(port: int) -> tuple[bool, str]:
-    """Add an inbound TCP allow rule for `port`. Requires LocWarp to be
-    running elevated (the installer runs the app as admin via the
-    `requireAdministrator` manifest, so this normally succeeds)."""
+    """Add an inbound TCP allow rule for `port`. Before adding, sweeps
+    away any pre-existing Block rules that would shadow the Allow:
+
+      * Block rules on the same TCP port (any name)
+      * Defender-auto Block rules named after the LocWarp executables
+        (created when the user clicks Cancel on the first-bind dialog
+         — these are program-bound with no localport, and Block always
+         wins over Allow on the same profile)
+
+    Then dedupes: if our Allow rule already exists, returns success
+    instead of appending an identical row (older versions accumulated
+    one extra row per button click).
+
+    Requires LocWarp to be running elevated; the installer requests
+    admin via the `requireAdministrator` manifest so the bundled exe
+    normally has it."""
     import platform
     if platform.system() != "Windows":
         return False, "Windows-only"
+    import subprocess
+    netsh_kwargs = {
+        "capture_output": True,
+        "text": True,
+        "timeout": 4.0,
+        "creationflags": 0x08000000,  # CREATE_NO_WINDOW
+    }
+
+    # 1) Sweep Block rules scoped to our TCP port (any name).
     try:
-        import subprocess
+        subprocess.run(
+            ["netsh", "advfirewall", "firewall", "delete", "rule",
+             "name=all", "dir=in", "action=block",
+             "protocol=TCP", f"localport={port}"],
+            **netsh_kwargs,
+        )
+    except Exception:
+        logger.debug("port-scoped block sweep failed", exc_info=True)
+
+    # 2) Sweep Defender-auto Block rules by program name (no port filter
+    #    because those rules are program-bound, not port-bound).
+    for auto_name in _AUTO_BLOCK_NAMES:
+        try:
+            subprocess.run(
+                ["netsh", "advfirewall", "firewall", "delete", "rule",
+                 f"name={auto_name}", "dir=in", "action=block"],
+                **netsh_kwargs,
+            )
+        except Exception:
+            logger.debug("auto-name block sweep failed for %s", auto_name, exc_info=True)
+
+    # 3) Skip add if our Allow rule already exists.
+    try:
+        proc = subprocess.run(
+            ["netsh", "advfirewall", "firewall", "show", "rule",
+             f"name={_RULE_NAME}"],
+            **netsh_kwargs,
+        )
+        if proc.returncode == 0 and _RULE_NAME in (proc.stdout or ""):
+            return True, "rule already exists"
+    except Exception:
+        logger.debug("existing-rule check failed", exc_info=True)
+
+    # 4) Add the Allow rule.
+    try:
         proc = subprocess.run(
             [
                 "netsh", "advfirewall", "firewall", "add", "rule",
-                "name=LocWarp Phone Control",
+                f"name={_RULE_NAME}",
                 "dir=in", "action=allow",
                 "protocol=TCP", f"localport={port}",
                 "profile=private,public",
             ],
-            capture_output=True, text=True, timeout=4.0,
-            creationflags=0x08000000,  # CREATE_NO_WINDOW
+            **netsh_kwargs,
         )
         if proc.returncode == 0:
             return True, "rule added"
@@ -298,11 +362,11 @@ class _NavigateBody(BaseModel):
 
 @router.get("/api/phone/info")
 async def phone_info(request: Request):
-    """Desktop-only: returns LAN IPs, port, PIN, and the mDNS .local URL
-    (universal across users — phone never has to know an IP). Also
-    reports firewall status + last-seen phone-page hit so the UI can
-    diagnose why a phone can't reach the URL without the user having to
-    check anything themselves."""
+    """Desktop-only: returns LAN IPs, port, PIN, and last-seen phone-
+    page hit timestamp so the UI can show "phone reached the URL N
+    seconds ago" and diagnose why a phone can't connect (wrong IP vs.
+    firewall blocked vs. PIN typo) without the user having to check
+    anything themselves."""
     if not _is_localhost(request):
         raise HTTPException(status_code=403, detail="Localhost only")
     from config import API_PORT
