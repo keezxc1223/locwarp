@@ -4,14 +4,14 @@ const { spawn } = require('child_process')
 const http = require('http')
 const os = require('os')
 
-// Win 10 builds before 22H2 (19045), all EOL by 2026, can't launch
-// Chromium 124's sandboxed GPU process (error_code=18 confirmed on
-// 1903; same code path on 1809/1909/2004/20H2/21Hx). Fall back to
-// software rendering on those builds so the window actually paints.
-// Win 10 22H2 and Win 11 skip this branch and keep full acceleration.
+// Every Windows 10 build (1809 through 22H2 = 19045) can't launch
+// Chromium 124's sandboxed GPU process: error_code=18 reproduces on
+// 22H2 too, not just the pre-22H2 builds covered in v0.2.121. Fall
+// back to software rendering on all Win 10 so the window actually
+// paints. Win 11 (build 22000+) keeps full hardware acceleration.
 if (process.platform === 'win32') {
   const winBuild = parseInt((os.release() || '0.0.0').split('.')[2] || '0', 10)
-  if (winBuild > 0 && winBuild < 19045) {
+  if (winBuild > 0 && winBuild < 22000) {
     app.disableHardwareAcceleration()
     app.commandLine.appendSwitch('no-sandbox')
     app.commandLine.appendSwitch('in-process-gpu')
