@@ -4,6 +4,7 @@ from __future__ import annotations
 
 import asyncio
 import logging
+import time
 
 from models.schemas import JoystickInput, MovementMode, SimulationState
 from services.interpolator import RouteInterpolator
@@ -74,6 +75,13 @@ class JoystickHandler:
 
         try:
             while self.is_active and not engine._stop_event.is_set():
+                # Anchor wall-clock for this tick before the push so the
+                # inter-tick sleep below can subtract push + emit cost.
+                # Otherwise effective tick = _TICK_INTERVAL + push_latency
+                # and the iPhone-side speedometer reads ~75% of the
+                # requested joystick speed (issue #22, route-based loop
+                # had the same bug).
+                tick_start = time.monotonic()
                 inp = self._current_input
 
                 if inp.intensity > 0 and engine.current_position is not None:
@@ -107,11 +115,17 @@ class JoystickHandler:
                         "bearing": inp.direction,
                     })
 
-                # Check pause
+                # Check pause (this can sit arbitrarily long; pause time is
+                # excluded from the tick budget by re-anchoring tick_start
+                # after the wait so we don't burst-push to "catch up").
                 if not engine._pause_event.is_set():
                     await engine._pause_event.wait()
+                    tick_start = time.monotonic()
 
-                await asyncio.sleep(_TICK_INTERVAL)
+                elapsed = time.monotonic() - tick_start
+                sleep_for = max(_TICK_INTERVAL - elapsed, 0.0)
+                if sleep_for > 0:
+                    await asyncio.sleep(sleep_for)
         except asyncio.CancelledError:
             pass
         except Exception:

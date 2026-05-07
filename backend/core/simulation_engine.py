@@ -858,6 +858,14 @@ class SimulationEngine:
                 lng = point["lng"]
                 bearing = point.get("bearing", 0.0)
 
+                # Anchor wall-clock for this tick BEFORE the position push so
+                # the inter-tick sleep below can subtract whatever push +
+                # emit cost. Without this, every tick took
+                # update_interval + push_latency, so the iPhone-side
+                # CoreLocation speedometer measured ~75% of the requested
+                # speed over WiFi tunnel (issue #22).
+                tick_start = time.monotonic()
+
                 # Calculate distance from previous point
                 step_dist = RouteInterpolator.haversine(prev_lat, prev_lng, lat, lng)
                 accumulated_distance += step_dist
@@ -927,15 +935,20 @@ class SimulationEngine:
                         "total": len(user_wps),
                     })
 
-                # Wait for the next tick (unless this is the last point)
+                # Wait for the next tick (unless this is the last point).
+                # Subtract the time already spent pushing + emitting so the
+                # tick rate matches update_interval, not
+                # update_interval + push_latency.
                 if idx < len(timed_points) - 1:
                     next_point = timed_points[idx + 1]
                     wait_time = next_point["timestamp_offset"] - point["timestamp_offset"]
-                    if wait_time > 0:
+                    elapsed = time.monotonic() - tick_start
+                    sleep_for = max(wait_time - elapsed, 0.0)
+                    if sleep_for > 0:
                         try:
                             await asyncio.wait_for(
                                 self._stop_event.wait(),
-                                timeout=wait_time,
+                                timeout=sleep_for,
                             )
                             break
                         except asyncio.TimeoutError:
