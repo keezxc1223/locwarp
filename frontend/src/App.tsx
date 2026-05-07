@@ -281,10 +281,24 @@ const App: React.FC = () => {
         if (diffSec >= 3600 && lastToastedZoneRef.current !== tz.zone) {
           lastToastedZoneRef.current = tz.zone
           const diffH = Math.round(diffSec / 3600)
-          // Show the destination's current wall time for context.
-          const destNow = new Date(tz.timestamp * 1000)
-          const hh = String(destNow.getUTCHours()).padStart(2, '0')
-          const mm = String(destNow.getUTCMinutes()).padStart(2, '0')
+          // TimezoneDB's `timestamp` is the wall-clock time encoded as if
+          // it were UTC (real_unix + gmt_offset). Subtract the offset to
+          // get a real UTC instant so Intl with `timeZone: tz.zone` shifts
+          // it the right amount instead of double-applying the offset (the
+          // double-apply bug shipped the destination's date one day late
+          // for any positive offset, e.g. TW→JP showed tomorrow's date).
+          const destNow = new Date((tz.timestamp - tz.gmt_offset_seconds) * 1000)
+          let timeStr = ''
+          try {
+            timeStr = new Intl.DateTimeFormat('en-GB', {
+              timeZone: tz.zone,
+              hour: '2-digit', minute: '2-digit', hourCycle: 'h23',
+            }).format(destNow)
+          } catch {
+            // Fall back to the raw shifted reading if Intl can't resolve.
+            const fallback = new Date(tz.timestamp * 1000)
+            timeStr = `${String(fallback.getUTCHours()).padStart(2, '0')}:${String(fallback.getUTCMinutes()).padStart(2, '0')}`
+          }
           // Destination-local date (YYYY-MM-DD). en-CA formats as ISO
           // by default so we don't have to reorder month/day pieces.
           let dateStr = ''
@@ -294,7 +308,7 @@ const App: React.FC = () => {
               year: 'numeric', month: '2-digit', day: '2-digit',
             }).format(destNow)
           } catch {
-            dateStr = new Date(destNow.getTime()).toISOString().slice(0, 10)
+            dateStr = new Date(tz.timestamp * 1000).toISOString().slice(0, 10)
           }
           // Localize the zone name via Intl so 'America/New_York' becomes
           // '北美東部夏令時間' for zh users / 'Eastern Daylight Time' for en.
@@ -326,7 +340,7 @@ const App: React.FC = () => {
           const line1 = t('toast.timezone_diff')
             .replace('{zone}', zoneLabel)
             .replace('{hours}', String(diffH))
-            .replace('{time}', `${hh}:${mm}`)
+            .replace('{time}', timeStr)
 
           const dateWeekday = [dateStr, weekdayStr].filter(Boolean).join(' ')
           const place = [countryStr, cityStr].filter(Boolean).join(' ')
