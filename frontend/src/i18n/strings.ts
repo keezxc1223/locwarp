@@ -476,7 +476,6 @@ export const STRINGS = {
 
   // ── Toasts extra ─────────────────────────────
   'toast.no_position_random': { zh: '尚未取得目前位置,無法產生隨機路徑點', en: 'No current position, cannot generate random waypoints' },
-  'toast.timezone_diff': { zh: '已進入 {zone} 時區(時差 {hours} 小時,當地 {time})', en: 'Now in {zone} (offset {hours}h, local {time})' },
   'toast.route_optimized': { zh: '路線已最佳化(總時長約 {min} 分)', en: 'Route optimized ({min} min total)' },
   'toast.route_optimize_failed': { zh: '路線最佳化失敗', en: 'Route optimize failed' },
   'toast.route_optimize_estimate': { zh: '直線估算', en: 'straight-line estimate' },

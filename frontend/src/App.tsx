@@ -107,9 +107,6 @@ const App: React.FC = () => {
     countryCode: '', timezoneZone: null, gmtOffsetSeconds: null,
     weatherCode: null, tempC: null,
   })
-  // Most recently announced timezone diff so we only toast once per zone
-  // change, not on every redundant lookup.
-  const lastToastedZoneRef = useRef<string>('')
   // Last position we successfully looked up reverse-geo/timezone for. Used
   // to suppress redundant lookups when jitter nudges the coordinate but the
   // user hasn't actually moved.
@@ -273,81 +270,6 @@ const App: React.FC = () => {
         const tz = await api.lookupTimezone(pos.lat, pos.lng)
         if (cancelled || !tz) return
         setLocMeta((prev) => ({ ...prev, timezoneZone: tz.zone, gmtOffsetSeconds: tz.gmt_offset_seconds }))
-        // Compare against the user's local timezone offset. JS's
-        // getTimezoneOffset returns minutes with INVERTED sign (UTC+8 → -480),
-        // so negate it and convert to seconds before comparing.
-        const localOffsetSec = -new Date().getTimezoneOffset() * 60
-        const diffSec = Math.abs(tz.gmt_offset_seconds - localOffsetSec)
-        if (diffSec >= 3600 && lastToastedZoneRef.current !== tz.zone) {
-          lastToastedZoneRef.current = tz.zone
-          const diffH = Math.round(diffSec / 3600)
-          // TimezoneDB's `timestamp` is the wall-clock time encoded as if
-          // it were UTC (real_unix + gmt_offset). Subtract the offset to
-          // get a real UTC instant so Intl with `timeZone: tz.zone` shifts
-          // it the right amount instead of double-applying the offset (the
-          // double-apply bug shipped the destination's date one day late
-          // for any positive offset, e.g. TW→JP showed tomorrow's date).
-          const destNow = new Date((tz.timestamp - tz.gmt_offset_seconds) * 1000)
-          let timeStr = ''
-          try {
-            timeStr = new Intl.DateTimeFormat('en-GB', {
-              timeZone: tz.zone,
-              hour: '2-digit', minute: '2-digit', hourCycle: 'h23',
-            }).format(destNow)
-          } catch {
-            // Fall back to the raw shifted reading if Intl can't resolve.
-            const fallback = new Date(tz.timestamp * 1000)
-            timeStr = `${String(fallback.getUTCHours()).padStart(2, '0')}:${String(fallback.getUTCMinutes()).padStart(2, '0')}`
-          }
-          // Destination-local date (YYYY-MM-DD). en-CA formats as ISO
-          // by default so we don't have to reorder month/day pieces.
-          let dateStr = ''
-          try {
-            dateStr = new Intl.DateTimeFormat('en-CA', {
-              timeZone: tz.zone,
-              year: 'numeric', month: '2-digit', day: '2-digit',
-            }).format(destNow)
-          } catch {
-            dateStr = new Date(tz.timestamp * 1000).toISOString().slice(0, 10)
-          }
-          // Localize the zone name via Intl so 'America/New_York' becomes
-          // '北美東部夏令時間' for zh users / 'Eastern Daylight Time' for en.
-          // Fall back to the raw IANA id if the runtime can't resolve it.
-          let zoneLabel = tz.zone
-          try {
-            const lang = (typeof localStorage !== 'undefined' && localStorage.getItem('locwarp.lang') === 'en') ? 'en' : 'zh-TW'
-            const parts = new Intl.DateTimeFormat(lang, { timeZone: tz.zone, timeZoneName: 'long' }).formatToParts(destNow)
-            const named = parts.find((p) => p.type === 'timeZoneName')?.value
-            if (named) zoneLabel = named
-          } catch { /* keep IANA id */ }
-          // Build the second line in pieces so any missing field
-          // (blank country / city / weekday) just falls out instead of
-          // leaving an orphan separator.
-          const lang2 = (typeof localStorage !== 'undefined' && localStorage.getItem('locwarp.lang') === 'en') ? 'en' : 'zh-TW'
-          let weekdayStr = ''
-          try {
-            weekdayStr = new Intl.DateTimeFormat(lang2, { timeZone: tz.zone, weekday: 'long' }).format(destNow)
-          } catch { /* skip */ }
-          const cc = String(geoRes?.country_code ?? '').toUpperCase()
-          let countryStr = ''
-          if (cc) {
-            try {
-              countryStr = new Intl.DisplayNames([lang2], { type: 'region' }).of(cc) ?? ''
-            } catch { /* skip */ }
-          }
-          const cityStr: string = String(geoRes?.short_name ?? '').trim()
-
-          const line1 = t('toast.timezone_diff')
-            .replace('{zone}', zoneLabel)
-            .replace('{hours}', String(diffH))
-            .replace('{time}', timeStr)
-
-          const dateWeekday = [dateStr, weekdayStr].filter(Boolean).join(' ')
-          const place = [countryStr, cityStr].filter(Boolean).join(' ')
-          const line2 = place ? `${dateWeekday} · ${place}` : dateWeekday
-
-          showToast(line2 ? `${line1}\n${line2}` : line1)
-        }
       } catch { /* ignore */ }
       try {
         const wx = await api.lookupWeather(pos.lat, pos.lng)
@@ -2320,6 +2242,8 @@ const App: React.FC = () => {
           countryCode={locMeta.countryCode}
           weatherCode={locMeta.weatherCode}
           tempC={locMeta.tempC}
+          timezoneZone={locMeta.timezoneZone}
+          gmtOffsetSeconds={locMeta.gmtOffsetSeconds}
           onOpenAvatarPicker={() => setAvatarPickerOpen((v) => !v)}
           onLocatePcFly={handleTeleport}
           onLocatePcPanOnly={handleMapPanOnly}

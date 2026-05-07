@@ -10,9 +10,6 @@ import pkg from '../../package.json';
 import { WeatherIcon, categorize, labelKeyFor } from './WeatherIcon';
 import { useUpdateCheck } from './UpdateChecker';
 
-const DEVICE_COLORS = ['#4285f4', '#ff9800'];
-const DEVICE_LETTERS = ['A', 'B'];
-
 const APP_VERSION = (pkg as { version: string }).version;
 
 interface Position {
@@ -47,6 +44,13 @@ interface StatusBarProps {
   // Weather at the current virtual location (Open-Meteo). null = unknown.
   weatherCode?: number | null;
   tempC?: number | null;
+  // Destination timezone, populated from the same reverse-geocode/timezone
+  // pipeline that fills countryCode/weather. Used to render the trailing
+  // "+1h JST · 16:42" chip when the virtual location's GMT offset differs
+  // from the user's local offset by at least one hour. Null = unknown / no
+  // timezone resolved yet for the current position.
+  timezoneZone?: string | null;
+  gmtOffsetSeconds?: number | null;
 }
 
 function stateToMode(state: string): SimMode | null {
@@ -99,10 +103,21 @@ const StatusBar: React.FC<StatusBarProps> = ({
   countryCode = '',
   weatherCode = null,
   tempC = null,
+  timezoneZone = null,
+  gmtOffsetSeconds = null,
 }) => {
   const t = useT();
   const { latest: updateLatest, releaseUrl: updateUrl } = useUpdateCheck();
   const [cooldownDisplay, setCooldownDisplay] = useState(cooldown);
+  // Tick every second so the right-side clock and the destination-timezone
+  // chip both stay live. Without this React only re-renders StatusBar when
+  // a parent prop changes (position update, mode swap, etc.), so the time
+  // text would freeze whenever the user wasn't actively moving the map.
+  const [now, setNow] = useState(() => new Date());
+  useEffect(() => {
+    const id = setInterval(() => setNow(new Date()), 1000);
+    return () => clearInterval(id);
+  }, []);
   const [copied, setCopied] = useState(false);
   // Initial-position dialog state (React modal replaces unavailable
   // native window.prompt which Electron does not support).
@@ -233,36 +248,10 @@ const StatusBar: React.FC<StatusBarProps> = ({
         letterSpacing: '-0.005em',
       }}
     >
-      {/* Connection / device name / iOS version removed from the bottom bar —
-          the left-side DeviceStatus panel already shows all of this, so
-          repeating it here only ate horizontal space. */}
-
-      {/* Dual-device pills: in group mode both iPhones are kept on the
-          exact same virtual coordinate (see _auto_sync_new_device_to_primary
-          + follower mirroring), so the shared coord / flag / weather /
-          speed / mode are rendered ONCE below this row. The pills here
-          only need to identify A and B. */}
-      {dualDevice && devices && devices.slice(0, 2).map((dev, i) => {
-        const color = DEVICE_COLORS[i];
-        const letter = DEVICE_LETTERS[i];
-        return (
-          <div
-            key={dev.udid}
-            style={{
-              display: 'flex', alignItems: 'center', gap: 6,
-              padding: '2px 8px',
-              borderRadius: 4,
-              background: 'rgba(255,255,255,0.04)',
-              fontFamily: 'monospace', fontSize: 11,
-            }}
-            title={dev.name}
-          >
-            <span style={{ color, fontWeight: 700 }}>{letter}</span>
-            <span style={{ opacity: 0.75 }}>{dev.name}</span>
-          </div>
-        );
-      })}
-      {dualDevice && <div style={{ width: 1, height: 14, background: 'rgba(255,255,255,0.12)' }} />}
+      {/* Connection / device name / iOS version + per-device A/B/C pills
+          removed from the bottom bar — the left-side DeviceStatus panel
+          already shows all of this, so repeating it here only ate
+          horizontal space. */}
 
       {/* Weather chip. Shows current conditions at the virtual location
           with an animated icon. Renders in both single and dual mode
@@ -356,6 +345,78 @@ const StatusBar: React.FC<StatusBarProps> = ({
         <span style={{ opacity: 0.4 }}>|</span>
         <span style={{ opacity: 0.7 }}>{t(modeLabelKeys[mode])}</span>
       </div>
+
+      {/* Destination timezone chip. Replaces the old toast (v0.2.128) — only
+          shows when the virtual location's GMT offset differs from the
+          user's local offset by >=1 hour. Time portion ticks live thanks
+          to the `now` state above. Date + weekday + time are all derived
+          from the destination timezone via Intl, so daylight savings and
+          midnight rollovers are handled by the runtime. */}
+      {timezoneZone && gmtOffsetSeconds != null && (() => {
+        const localOffsetSec = -now.getTimezoneOffset() * 60;
+        const diffSec = gmtOffsetSeconds - localOffsetSec;
+        if (Math.abs(diffSec) < 3600) return null;
+        const diffH = Math.round(diffSec / 3600);
+        const sign = diffH >= 0 ? '+' : '';
+        const lang = (typeof localStorage !== 'undefined' && localStorage.getItem('locwarp.lang') === 'en') ? 'en' : 'zh-TW';
+        let timeStr = '';
+        let zoneAbbr = timezoneZone;
+        let dateStr = '';
+        let weekdayStr = '';
+        try {
+          timeStr = new Intl.DateTimeFormat('en-GB', {
+            timeZone: timezoneZone,
+            hour: '2-digit', minute: '2-digit', hourCycle: 'h23',
+          }).format(now);
+        } catch { /* leave blank */ }
+        try {
+          // zh-TW with month: 'numeric' renders "5/8"; en with month: 'short'
+          // renders "May 8". Both are compact enough for the status bar.
+          dateStr = new Intl.DateTimeFormat(lang, {
+            timeZone: timezoneZone,
+            month: lang === 'en' ? 'short' : 'numeric',
+            day: 'numeric',
+          }).format(now);
+        } catch { /* skip */ }
+        try {
+          weekdayStr = new Intl.DateTimeFormat(lang, {
+            timeZone: timezoneZone,
+            weekday: 'short',
+          }).format(now);
+        } catch { /* skip */ }
+        try {
+          const parts = new Intl.DateTimeFormat('en', {
+            timeZone: timezoneZone, timeZoneName: 'short',
+          }).formatToParts(now);
+          const named = parts.find((p) => p.type === 'timeZoneName')?.value;
+          if (named) zoneAbbr = named;
+        } catch { /* keep IANA id */ }
+        const dateBlock = [dateStr, weekdayStr].filter(Boolean).join(' ');
+        return (
+          <>
+            <div style={{ width: 1, height: 14, background: 'rgba(255,255,255,0.12)' }} />
+            <div
+              style={{
+                display: 'inline-flex', alignItems: 'center', gap: 5,
+                padding: '3px 8px', borderRadius: 999,
+                background: 'rgba(255,255,255,0.06)',
+                border: '1px solid rgba(255,255,255,0.08)',
+                fontSize: 11, fontFamily: 'monospace',
+              }}
+              title={`${timezoneZone} (${sign}${diffH}h)`}
+            >
+              <svg width="11" height="11" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" style={{ opacity: 0.6 }}>
+                <circle cx="12" cy="12" r="10" />
+                <polyline points="12,6 12,12 16,14" />
+              </svg>
+              <span style={{ fontWeight: 600 }}>{sign}{diffH}h</span>
+              <span style={{ opacity: 0.75 }}>{zoneAbbr}</span>
+              {dateBlock && <span style={{ opacity: 0.75 }}>{dateBlock}</span>}
+              {timeStr && <span style={{ opacity: 0.85 }}>{timeStr}</span>}
+            </div>
+          </>
+        );
+      })()}
 
       {/* Force wrap to a second row here */}
       <div style={{ flexBasis: '100%', height: 0 }} />
@@ -547,7 +608,7 @@ const StatusBar: React.FC<StatusBarProps> = ({
         <LangToggle />
         <div style={{ width: 1, height: 12, background: 'rgba(255,255,255,0.12)' }} />
         <span style={{ opacity: 0.4, fontSize: 10 }}>
-          {new Date().toLocaleTimeString(undefined, { hour12: false })}
+          {now.toLocaleTimeString(undefined, { hour12: false })}
         </span>
         <div style={{ width: 1, height: 12, background: 'rgba(255,255,255,0.12)' }} />
         {updateLatest && updateUrl ? (
