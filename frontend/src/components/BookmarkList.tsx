@@ -569,25 +569,57 @@ const BookmarkList: React.FC<BookmarkListProps> = ({
           </svg>
           {t('bm.add_custom')}
         </button>
-      </div>
-      {/* Row 2: secondary tools (export / bulk paste / import / multi-select /
-          reorder / manage categories). All icon-only to fit six in a row. */}
-      <div style={{ display: 'flex', flexWrap: 'wrap', alignItems: 'center', gap: 6, marginBottom: 8 }}>
         {exportUrl && (
           <a
             className="action-btn"
             href={exportUrl}
             download="bookmarks.json"
-            style={{ padding: '3px 6px', fontSize: 12, textDecoration: 'none', display: 'inline-flex', alignItems: 'center' }}
+            style={{
+              display: 'inline-flex', alignItems: 'center', gap: 4,
+              padding: '3px 8px', fontSize: 12, cursor: 'pointer',
+              textDecoration: 'none',
+            }}
             title={t('bm.export_tooltip')}
           >
-            <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2">
+            <svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2">
               <path d="M21 15v4a2 2 0 01-2 2H5a2 2 0 01-2-2v-4" />
               <polyline points="7 10 12 15 17 10" />
               <line x1="12" y1="15" x2="12" y2="3" />
             </svg>
+            {t('bm.export')}
           </a>
         )}
+        {onImport && (
+          <label
+            className="action-btn"
+            style={{
+              display: 'inline-flex', alignItems: 'center', gap: 4,
+              padding: '3px 8px', fontSize: 12, cursor: 'pointer',
+            }}
+            title={t('bm.import_tooltip')}
+          >
+            <svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2">
+              <path d="M21 15v4a2 2 0 01-2 2H5a2 2 0 01-2-2v-4" />
+              <polyline points="17 8 12 3 7 8" />
+              <line x1="12" y1="3" x2="12" y2="15" />
+            </svg>
+            {t('bm.import')}
+            <input
+              type="file"
+              accept="application/json,.json"
+              style={{ display: 'none' }}
+              onChange={async (e) => {
+                const f = e.target.files?.[0];
+                if (f) await onImport(f);
+                e.target.value = '';
+              }}
+            />
+          </label>
+        )}
+      </div>
+      {/* Row 2: secondary tools (bulk paste / multi-select / reorder /
+          manage categories). Icon-only to keep the row compact. */}
+      <div style={{ display: 'flex', flexWrap: 'wrap', alignItems: 'center', gap: 6, marginBottom: 8 }}>
         {onBulkPaste && (
           <button
             className="action-btn"
@@ -602,29 +634,6 @@ const BookmarkList: React.FC<BookmarkListProps> = ({
               <line x1="15" y1="16" x2="18" y2="16" />
             </svg>
           </button>
-        )}
-        {onImport && (
-          <label
-            className="action-btn"
-            style={{ padding: '3px 6px', fontSize: 12, cursor: 'pointer', display: 'inline-flex', alignItems: 'center' }}
-            title={t('bm.import_tooltip')}
-          >
-            <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2">
-              <path d="M21 15v4a2 2 0 01-2 2H5a2 2 0 01-2-2v-4" />
-              <polyline points="17 8 12 3 7 8" />
-              <line x1="12" y1="3" x2="12" y2="15" />
-            </svg>
-            <input
-              type="file"
-              accept="application/json,.json"
-              style={{ display: 'none' }}
-              onChange={async (e) => {
-                const f = e.target.files?.[0];
-                if (f) await onImport(f);
-                e.target.value = '';
-              }}
-            />
-          </label>
         )}
         <button
           className="action-btn"
