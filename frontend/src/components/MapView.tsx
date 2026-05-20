@@ -44,6 +44,10 @@ interface MapViewProps {
   waypoints: Waypoint[];
   routePath: Position[];
   randomWalkRadius: number | null;
+  // Fixed sampling centre of an active random walk (broadcast by the backend
+  // on start). When set and mode is "fixed", the radius circle pins here.
+  randomWalkCenter?: Position | null;
+  randomWalkCenterMode?: 'fixed' | 'follow';
   onMapClick: (lat: number, lng: number) => void;
   onTeleport: (lat: number, lng: number, source?: 'menu' | 'coord') => void;
   onNavigate: (lat: number, lng: number, source?: 'menu' | 'coord') => void;
@@ -234,6 +238,8 @@ const MapView: React.FC<MapViewProps> = ({
   waypoints,
   routePath,
   randomWalkRadius,
+  randomWalkCenter,
+  randomWalkCenterMode = 'fixed',
   onMapClick,
   onTeleport,
   onNavigate,
@@ -1388,10 +1394,20 @@ const MapView: React.FC<MapViewProps> = ({
 
     if (dualMode) return;
 
-    // Draw circle when radius is set and we have a position
-    if (randomWalkRadius && randomWalkRadius > 0 && currentPosition) {
+    // Circle centre:
+    //  - "follow" mode (or before a walk starts): track the avatar so it
+    //    shows where the next hop can land.
+    //  - "fixed" mode while walking: pin to the captured start centre so the
+    //    circle stops drifting away from the real (fixed) sampling area.
+    const center =
+      randomWalkCenterMode === 'fixed' && randomWalkCenter
+        ? randomWalkCenter
+        : currentPosition;
+
+    // Draw circle when radius is set and we have a centre
+    if (randomWalkRadius && randomWalkRadius > 0 && center) {
       const circle = L.circle(
-        [currentPosition.lat, currentPosition.lng],
+        [center.lat, center.lng],
         {
           radius: randomWalkRadius,
           color: '#4285f4',
@@ -1404,7 +1420,7 @@ const MapView: React.FC<MapViewProps> = ({
       ).addTo(map);
       radiusCircleRef.current = circle;
     }
-  }, [randomWalkRadius, currentPosition, dualMode]);
+  }, [randomWalkRadius, currentPosition, randomWalkCenter, randomWalkCenterMode, dualMode]);
 
   // ── Dual-mode per-device overlays ────────────────────────────────────
   // Keeps refs for markers/polylines/circles keyed by udid so updates don't

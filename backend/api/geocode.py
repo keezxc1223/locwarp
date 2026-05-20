@@ -189,7 +189,12 @@ async def route_optimize(req: RouteOptimizeRequest):
     # forcing a "straight-line estimate" label on every optimize.
     engine = (req.engine or "osrm").lower()
     durations: list[list[float]] | None = None
-    if engine == "valhalla":
+    if req.straight_line:
+        # Straight-line mode moves crow-flight, so order by haversine distance.
+        # Road-based duration ordering is wrong for straight-line travel; here
+        # haversine is the true distance, so this is NOT a fallback estimate.
+        durations = haversine_duration_matrix(req.waypoints, req.profile)
+    elif engine == "valhalla":
         durations = await valhalla_matrix(req.waypoints, req.profile)
         if not durations:
             logger.info(

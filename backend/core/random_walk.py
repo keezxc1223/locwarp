@@ -37,6 +37,9 @@ class RandomWalkHandler:
         seed: int | None = None,
         straight_line: bool = False,
         route_engine: str | None = None,
+        center_mode: str = "fixed",
+        forward_enabled: bool = False,
+        forward_turn_deg: float = 35.0,
     ) -> None:
         """Begin a random walk around *center* within *radius_m*.
 
@@ -109,16 +112,33 @@ class RandomWalkHandler:
                     center.lat, center.lng, radius_m, rng=rng,
                 )
 
-        while not engine._stop_event.is_set():
-            # Pick a random destination within the radius
-            dest_lat, dest_lng = RouteInterpolator.random_point_in_radius(
-                center.lat, center.lng, radius_m, rng=rng,
-            )
+        # Heading is only used by the forward (correlated) walk. Draw the
+        # initial bearing only when forward is enabled so the plain uniform
+        # walk keeps consuming the seeded rng in the exact same order as
+        # before (preserves dual-device group sync).
+        heading = (rng or random).uniform(0.0, 360.0) if forward_enabled else 0.0
 
+        while not engine._stop_event.is_set():
             current = engine.current_position
             if current is None:
                 logger.warning("Random walk: no current position, stopping")
                 break
+
+            # Pick the next destination. The sampling circle's centre depends
+            # on center_mode: "fixed" keeps it on the start point (bounded
+            # walk), "follow" re-centres on the current position (free wander).
+            sample_lat = center.lat if center_mode != "follow" else current.lat
+            sample_lng = center.lng if center_mode != "follow" else current.lng
+            if forward_enabled:
+                dest_lat, dest_lng, heading = RouteInterpolator.random_point_forward(
+                    sample_lat, sample_lng, radius_m,
+                    current.lat, current.lng,
+                    heading, forward_turn_deg, rng=rng,
+                )
+            else:
+                dest_lat, dest_lng = RouteInterpolator.random_point_in_radius(
+                    sample_lat, sample_lng, radius_m, rng=rng,
+                )
 
             logger.info(
                 "Random walk leg %d: (%.6f, %.6f) → (%.6f, %.6f)",

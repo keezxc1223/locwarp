@@ -124,6 +124,14 @@ class RandomWalkRequest(BaseModel):
     # Dual-device group mode: both devices pass the same seed so they pick
     # identical sequences of random destinations, keeping their paths synced.
     seed: int | None = None
+    # Where the sampling circle sits each leg:
+    #   "fixed"  → pinned to the start point (bounded walk, never leaves it)
+    #   "follow" → re-centred on the current position (free wander, drifts)
+    center_mode: str = "fixed"
+    # Directional persistence (correlated random walk) so the path flows
+    # forward instead of doubling straight back onto the road it just walked.
+    forward_enabled: bool = False
+    forward_turn_deg: float = 35.0
 
 
 class JoystickStartRequest(BaseModel):
@@ -293,6 +301,10 @@ class RouteOptimizeRequest(BaseModel):
     # BRouter has no matrix API of its own. used_estimate is only set
     # when every road-aware matrix is unavailable.
     engine: str = "osrm"
+    # When the user moves in straight lines (no OSRM), order by straight-line
+    # (haversine) distance instead of road duration. Road-based ordering is
+    # wrong for crow-flight travel; here haversine IS the real distance.
+    straight_line: bool = False
 
 
 class RouteOptimizeResponse(BaseModel):

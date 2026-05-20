@@ -444,6 +444,9 @@ async def random_walk(req: RandomWalkRequest):
         seed=req.seed,
         straight_line=req.straight_line,
         route_engine=req.route_engine,
+        center_mode=req.center_mode,
+        forward_enabled=req.forward_enabled,
+        forward_turn_deg=req.forward_turn_deg,
     ))
     return {"status": "started", "radius_m": req.radius_m, "mode": req.mode}
 

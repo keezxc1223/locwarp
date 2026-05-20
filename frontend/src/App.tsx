@@ -1559,6 +1559,10 @@ const App: React.FC = () => {
           pauseRandomWalk={sim.pauseRandomWalk}
           onPauseRandomWalkChange={sim.setPauseRandomWalk}
           onRandomWalkRadiusChange={setRandomWalkRadius}
+          randomWalkCenterMode={sim.randomWalkCenterMode}
+          onRandomWalkCenterModeChange={sim.setRandomWalkCenterMode}
+          forwardWalk={sim.forwardWalk}
+          onForwardWalkChange={sim.setForwardWalk}
           goldDittoA={goldDittoA}
           onGoldDittoAChange={setGoldDittoA}
           onGoldDittoStart={handleGoldDittoStart}
@@ -1786,7 +1790,7 @@ const App: React.FC = () => {
                         try {
                           const res = await api.routeOptimize(
                             sim.waypoints.map((w: any) => ({ lat: w.lat, lng: w.lng })),
-                            sim.moveMode, true, sim.routeEngine,
+                            sim.moveMode, true, sim.routeEngine, sim.straightLine,
                           )
                           if (res?.waypoints?.length) {
                             sim.setWaypoints(res.waypoints)
@@ -1988,6 +1992,8 @@ const App: React.FC = () => {
             (sim.mode === SimMode.Loop || sim.mode === SimMode.MultiStop) ? wpGenRadius :
             null
           }
+          randomWalkCenter={sim.mode === SimMode.RandomWalk ? sim.randomWalkCenter : null}
+          randomWalkCenterMode={sim.randomWalkCenterMode}
           onMapClick={handleMapClick}
           onTeleport={handleTeleport}
           onNavigate={handleNavigate}

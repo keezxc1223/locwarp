@@ -122,6 +122,10 @@ interface ControlPanelProps {
   pauseRandomWalk?: { enabled: boolean; min: number; max: number };
   onPauseRandomWalkChange?: (v: { enabled: boolean; min: number; max: number }) => void;
   onRandomWalkRadiusChange: (radius: number) => void;
+  randomWalkCenterMode?: 'fixed' | 'follow';
+  onRandomWalkCenterModeChange?: (v: 'fixed' | 'follow') => void;
+  forwardWalk?: { enabled: boolean; turnDeg: number };
+  onForwardWalkChange?: (v: { enabled: boolean; turnDeg: number }) => void;
   goldDittoA?: string;
   onGoldDittoAChange?: (v: string) => void;
   onGoldDittoStart?: () => void;
@@ -298,6 +302,10 @@ const ControlPanel: React.FC<ControlPanelProps> = ({
   pauseRandomWalk,
   onPauseRandomWalkChange,
   onRandomWalkRadiusChange,
+  randomWalkCenterMode = 'fixed',
+  onRandomWalkCenterModeChange,
+  forwardWalk = { enabled: false, turnDeg: 35 },
+  onForwardWalkChange,
   goldDittoA = '',
   onGoldDittoAChange,
   onGoldDittoStart,
@@ -604,6 +612,63 @@ const ControlPanel: React.FC<ControlPanelProps> = ({
                 </button>
               ))}
             </div>
+
+            {/* Sampling-circle centre mode */}
+            <div style={{ marginTop: 10 }}>
+              <div style={{ fontSize: 11, opacity: 0.7, marginBottom: 4 }}>{t('panel.rw_center_mode')}</div>
+              <div style={{ display: 'flex', gap: 6 }}>
+                {(['fixed', 'follow'] as const).map((m) => (
+                  <button
+                    key={m}
+                    className={`action-btn${randomWalkCenterMode === m ? ' primary' : ''}`}
+                    style={{ flex: 1, padding: '4px 8px', fontSize: 11 }}
+                    onClick={() => onRandomWalkCenterModeChange?.(m)}
+                  >
+                    {t(m === 'fixed' ? 'panel.rw_center_fixed' : 'panel.rw_center_follow')}
+                  </button>
+                ))}
+              </div>
+              {randomWalkCenterMode === 'follow' && (
+                <div style={{ fontSize: 10, opacity: 0.55, marginTop: 4 }}>{t('panel.rw_center_follow_hint')}</div>
+              )}
+            </div>
+
+            {/* Forward (correlated) walk: avoid backtracking */}
+            {onForwardWalkChange && (
+              <div style={{
+                marginTop: 8,
+                padding: '8px 10px',
+                background: 'rgba(255,255,255,0.03)',
+                border: '1px solid rgba(108, 140, 255, 0.10)',
+                borderRadius: 6,
+              }}>
+                <label className="lw-checkbox">
+                  <input
+                    type="checkbox"
+                    checked={forwardWalk.enabled}
+                    onChange={(e) => onForwardWalkChange({ ...forwardWalk, enabled: e.target.checked })}
+                  />
+                  <span className="lw-checkbox-box"></span>
+                  <span className="lw-checkbox-label">{t('panel.forward_walk')}</span>
+                </label>
+                {forwardWalk.enabled && (
+                  <div style={{ display: 'flex', alignItems: 'center', gap: 8, marginTop: 8, fontSize: 11 }}>
+                    <span style={{ opacity: 0.6, minWidth: 16 }}>{t('panel.forward_turn_straight')}</span>
+                    <input
+                      type="range"
+                      min={10}
+                      max={90}
+                      step={5}
+                      value={forwardWalk.turnDeg}
+                      onChange={(e) => onForwardWalkChange({ ...forwardWalk, turnDeg: parseInt(e.target.value) })}
+                      style={{ flex: 1 }}
+                    />
+                    <span style={{ opacity: 0.6, minWidth: 16 }}>{t('panel.forward_turn_winding')}</span>
+                  </div>
+                )}
+              </div>
+            )}
+
             {pauseRandomWalk && onPauseRandomWalkChange && (
               <div style={{ marginTop: 8 }}>
                 <PauseControl

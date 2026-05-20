@@ -342,6 +342,9 @@ class SimulationEngine:
         seed: int | None = None,
         straight_line: bool = False,
         route_engine: str | None = None,
+        center_mode: str = "fixed",
+        forward_enabled: bool = False,
+        forward_turn_deg: float = 35.0,
     ) -> None:
         """Begin a random walk within a radius."""
         await self._ensure_stopped()
@@ -357,6 +360,8 @@ class SimulationEngine:
             speed_kmh=speed_kmh, speed_min_kmh=speed_min_kmh, speed_max_kmh=speed_max_kmh,
             pause_enabled=pause_enabled, pause_min=pause_min, pause_max=pause_max,
             seed=effective_seed, straight_line=straight_line, route_engine=route_engine,
+            center_mode=center_mode, forward_enabled=forward_enabled,
+            forward_turn_deg=forward_turn_deg,
         )
         seed = effective_seed
         await self._run_handler(
@@ -367,6 +372,8 @@ class SimulationEngine:
                 pause_enabled=pause_enabled, pause_min=pause_min, pause_max=pause_max,
                 seed=seed,
                 straight_line=straight_line, route_engine=route_engine,
+                center_mode=center_mode, forward_enabled=forward_enabled,
+                forward_turn_deg=forward_turn_deg,
             ),
             "Random walk",
         )

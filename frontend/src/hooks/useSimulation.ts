@@ -147,6 +147,39 @@ export function useSimulation(subscribe?: WsSubscribe, primaryUdid?: string | nu
     try { localStorage.setItem('locwarp.straight_line', v ? '1' : '0') } catch { /* ignore */ }
   }
 
+  // Random-walk circle centre mode. "fixed" pins the circle to the start
+  // point (bounded walk); "follow" re-centres on the current position each
+  // leg (free wander). Persisted in localStorage.
+  const [randomWalkCenterMode, setRandomWalkCenterModeRaw] = useState<'fixed' | 'follow'>(() => {
+    try { return localStorage.getItem('locwarp.rw_center_mode') === 'follow' ? 'follow' : 'fixed' } catch { return 'fixed' }
+  })
+  const setRandomWalkCenterMode = (v: 'fixed' | 'follow') => {
+    setRandomWalkCenterModeRaw(v)
+    try { localStorage.setItem('locwarp.rw_center_mode', v) } catch { /* ignore */ }
+  }
+
+  // Forward (correlated) random walk: directional persistence so the path
+  // flows forward instead of doubling back onto the road just walked.
+  interface ForwardWalk { enabled: boolean; turnDeg: number }
+  const [forwardWalk, setForwardWalkRaw] = useState<ForwardWalk>(() => {
+    try {
+      const raw = localStorage.getItem('locwarp.rw_forward')
+      if (raw) {
+        const p = JSON.parse(raw)
+        return { enabled: !!p.enabled, turnDeg: typeof p.turnDeg === 'number' ? p.turnDeg : 35 }
+      }
+    } catch { /* ignore */ }
+    return { enabled: false, turnDeg: 35 }
+  })
+  const setForwardWalk = (v: ForwardWalk) => {
+    setForwardWalkRaw(v)
+    try { localStorage.setItem('locwarp.rw_forward', JSON.stringify(v)) } catch { /* ignore */ }
+  }
+  // Captured centre of the active random walk (the start point the backend
+  // pins the sampling circle to). Lets the map circle freeze there in
+  // "fixed" mode instead of drifting with the avatar.
+  const [randomWalkCenter, setRandomWalkCenter] = useState<LatLng | null>(null)
+
   // Routing engine selection. Persisted in localStorage; backend default is
   // 'osrm' so omitting the field is equivalent to picking it explicitly.
   const ROUTE_ENGINES = ['osrm', 'osrm_fossgis', 'valhalla', 'brouter'] as const
@@ -511,6 +544,7 @@ export function useSimulation(subscribe?: WsSubscribe, primaryUdid?: string | nu
           setRoutePath([])
           setDestination(null)
           setEta(null)
+          setRandomWalkCenter(null)
         } else if (st === 'disconnected') {
           // USB unplug or tunnel death of THIS engine. In dual-device
           // mode the surviving device is still running the same sim, so
@@ -525,6 +559,12 @@ export function useSimulation(subscribe?: WsSubscribe, primaryUdid?: string | nu
           setStatus((prev) => ({ ...prev, paused: true, state: st }))
         } else if (st) {
           setStatus((prev) => ({ ...prev, running: true, paused: false, state: st }))
+          // Random walk broadcasts the fixed sampling centre on start; keep
+          // it so the map can pin the radius circle there (fixed mode).
+          if (st === 'random_walk' && wsMessage.data?.center) {
+            const c = wsMessage.data.center
+            setRandomWalkCenter({ lat: c.lat, lng: c.lng })
+          }
         }
         break
       }
@@ -650,7 +690,7 @@ export function useSimulation(subscribe?: WsSubscribe, primaryUdid?: string | nu
       try {
         _setMode(SimMode.RandomWalk)
         setProgress(0)
-        const res = await api.randomWalk(center, radiusM, moveMode, { speed_kmh: customSpeedKmh, speed_min_kmh: speedMinKmh, speed_max_kmh: speedMaxKmh }, { pause_enabled: pauseRandomWalk.enabled, pause_min: pauseRandomWalk.min, pause_max: pauseRandomWalk.max }, undefined, undefined, straightLine, routeEngine)
+        const res = await api.randomWalk(center, radiusM, moveMode, { speed_kmh: customSpeedKmh, speed_min_kmh: speedMinKmh, speed_max_kmh: speedMaxKmh }, { pause_enabled: pauseRandomWalk.enabled, pause_min: pauseRandomWalk.min, pause_max: pauseRandomWalk.max }, undefined, undefined, straightLine, routeEngine, randomWalkCenterMode, forwardWalk)
         setStatus((prev) => ({ ...prev, running: true, paused: false }))
         setEffectiveSpeed({ kmh: customSpeedKmh ?? MODE_DEFAULT_KMH[moveMode], min: speedMinKmh, max: speedMaxKmh })
         return res
@@ -659,7 +699,7 @@ export function useSimulation(subscribe?: WsSubscribe, primaryUdid?: string | nu
         throw err
       }
     },
-    [moveMode, customSpeedKmh, speedMinKmh, speedMaxKmh, pauseMultiStop, pauseLoop, pauseRandomWalk, straightLine, routeEngine],
+    [moveMode, customSpeedKmh, speedMinKmh, speedMaxKmh, pauseMultiStop, pauseLoop, pauseRandomWalk, straightLine, routeEngine, randomWalkCenterMode, forwardWalk],
   )
 
   const joystickStart = useCallback(async () => {
@@ -858,8 +898,8 @@ export function useSimulation(subscribe?: WsSubscribe, primaryUdid?: string | nu
     await preSyncStart(udids)
     // Shared seed → both engines produce identical destination sequences.
     const seed = udids.length >= 2 ? Date.now() : null
-    return fanout(udids, 'randomwalk', (u) => api.randomWalk(center, r, moveMode, { speed_kmh: customSpeedKmh, speed_min_kmh: speedMinKmh, speed_max_kmh: speedMaxKmh }, { pause_enabled: pauseRandomWalk.enabled, pause_min: pauseRandomWalk.min, pause_max: pauseRandomWalk.max }, u, seed, straightLine, routeEngine))
-  }, [fanout, preSyncStart, moveMode, customSpeedKmh, speedMinKmh, speedMaxKmh, pauseRandomWalk, straightLine, routeEngine])
+    return fanout(udids, 'randomwalk', (u) => api.randomWalk(center, r, moveMode, { speed_kmh: customSpeedKmh, speed_min_kmh: speedMinKmh, speed_max_kmh: speedMaxKmh }, { pause_enabled: pauseRandomWalk.enabled, pause_min: pauseRandomWalk.min, pause_max: pauseRandomWalk.max }, u, seed, straightLine, routeEngine, randomWalkCenterMode, forwardWalk))
+  }, [fanout, preSyncStart, moveMode, customSpeedKmh, speedMinKmh, speedMaxKmh, pauseRandomWalk, straightLine, routeEngine, randomWalkCenterMode, forwardWalk])
   const applySpeedAll = useCallback(async (udids: string[]) => {
     const outcome = await fanout(udids, 'apply-speed', (u) => api.applySpeed(moveMode, { speed_kmh: customSpeedKmh, speed_min_kmh: speedMinKmh, speed_max_kmh: speedMaxKmh }, u))
     if (outcome.ok.length > 0) {
@@ -951,6 +991,11 @@ export function useSimulation(subscribe?: WsSubscribe, primaryUdid?: string | nu
     setSpeedMaxKmh,
     straightLine,
     setStraightLine,
+    randomWalkCenterMode,
+    setRandomWalkCenterMode,
+    forwardWalk,
+    setForwardWalk,
+    randomWalkCenter,
     routeEngine,
     setRouteEngine,
     pauseMultiStop,

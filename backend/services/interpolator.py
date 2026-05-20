@@ -228,3 +228,45 @@ class RouteInterpolator:
         dist = radius_m * math.sqrt(r.random())
 
         return RouteInterpolator.move_point(center_lat, center_lng, math.degrees(angle), dist)
+
+    @staticmethod
+    def random_point_forward(
+        bound_center_lat: float,
+        bound_center_lng: float,
+        radius_m: float,
+        cur_lat: float,
+        cur_lng: float,
+        heading_deg: float,
+        turn_std_deg: float = 35.0,
+        rng: random.Random | None = None,
+    ) -> tuple[float, float, float]:
+        """Pick the next destination with directional persistence.
+
+        A correlated random walk: the next bearing is the current
+        *heading_deg* plus a Gaussian turn (std-dev *turn_std_deg*, clamped
+        to +-120 deg so the walk never reverses straight back). The step
+        length is a random fraction of *radius_m*. If the candidate would
+        leave the bounding circle (centre = bound_center, radius = radius_m)
+        the bearing is steered back toward that centre so the walk stays
+        inside the requested area.
+
+        Returns (lat, lng, new_heading_deg) so the caller carries the heading
+        into the next leg. This keeps consecutive legs flowing forward, which
+        avoids re-walking the road just travelled.
+        """
+        r = rng if rng is not None else random
+        turn = max(-120.0, min(120.0, r.gauss(0.0, turn_std_deg)))
+        new_heading = (heading_deg + turn) % 360.0
+        step = radius_m * (0.3 + 0.3 * r.random())  # 0.3R ~ 0.6R
+
+        lat, lng = RouteInterpolator.move_point(cur_lat, cur_lng, new_heading, step)
+
+        # Overshot the bounding circle → steer the heading toward the centre
+        # (shortest-angle blend) and recompute, keeping the walk in-bounds.
+        if RouteInterpolator.haversine(lat, lng, bound_center_lat, bound_center_lng) > radius_m:
+            to_center = RouteInterpolator.bearing(cur_lat, cur_lng, bound_center_lat, bound_center_lng)
+            diff = ((to_center - new_heading + 540.0) % 360.0) - 180.0
+            new_heading = (new_heading + diff * 0.6) % 360.0
+            lat, lng = RouteInterpolator.move_point(cur_lat, cur_lng, new_heading, step)
+
+        return lat, lng, new_heading
