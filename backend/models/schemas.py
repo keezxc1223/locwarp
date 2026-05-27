@@ -81,11 +81,12 @@ class LoopRequest(BaseModel):
     # Number of laps to run before auto-stopping. None / 0 / negative means
     # infinite laps (current default behaviour, user stops manually).
     lap_count: int | None = None
-    # Jump mode: teleport point-to-point with a fixed interval instead of
-    # walking the routed path. Used for fruit-farm sniping where the user
-    # wants the device to dwell at each waypoint, not interpolate between.
+    # Jump mode: teleport point-to-point instead of walking the routed
+    # path. jump_pre_delay is the wait before each teleport; jump_post_delay
+    # is the wait after. Both honour pause/stop so the user can interrupt.
     jump_mode: bool = False
-    jump_interval: float = 12.0
+    jump_pre_delay: float = 2.0
+    jump_post_delay: float = 4.0
 
 
 class MultiStopRequest(BaseModel):
@@ -102,10 +103,11 @@ class MultiStopRequest(BaseModel):
     straight_line: bool = False
     route_engine: str | None = None
     udid: str | None = None
-    # Jump mode: teleport point-to-point with a fixed interval instead of
-    # walking the routed path. See LoopRequest.jump_mode for details.
+    # Jump mode: teleport point-to-point instead of walking the routed
+    # path. See LoopRequest.jump_mode for details.
     jump_mode: bool = False
-    jump_interval: float = 12.0
+    jump_pre_delay: float = 2.0
+    jump_post_delay: float = 4.0
 
 
 class RandomWalkRequest(BaseModel):

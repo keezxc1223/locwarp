@@ -34,7 +34,8 @@ class MultiStopNavigator:
         straight_line: bool = False,
         route_engine: str | None = None,
         jump_mode: bool = False,
-        jump_interval: float = 12.0,
+        jump_pre_delay: float = 2.0,
+        jump_post_delay: float = 4.0,
     ) -> None:
         """Navigate through *waypoints* one leg at a time.
 
@@ -55,16 +56,17 @@ class MultiStopNavigator:
         if len(waypoints) < 2:
             raise ValueError("At least 2 waypoints are required for multi-stop")
 
-        # Jump mode: teleport point-to-point with a fixed dwell interval.
-        # Skips OSRM routing and the normal "near first waypoint?" preamble
-        # because the user wants to land exactly on each stop, in order,
-        # without walking. Honors loop=True to repeat. stop_duration /
-        # pause_* are ignored — jump_interval is the dwell time.
+        # Jump mode: teleport point-to-point with configurable pre / post
+        # delays. Skips OSRM routing and the normal "near first waypoint?"
+        # preamble because the user wants to land exactly on each stop, in
+        # order, without walking. Honors loop=True to repeat. stop_duration
+        # / pause_* are ignored. Both delays honour pause + stop.
         if jump_mode:
             await _run_jump_multistop(
                 engine,
                 waypoints,
-                interval=max(0.0, float(jump_interval)),
+                pre_delay=max(0.0, float(jump_pre_delay)),
+                post_delay=max(0.0, float(jump_post_delay)),
                 loop=loop,
             )
             return
@@ -302,16 +304,69 @@ class MultiStopNavigator:
         return 6_371_000 * math.sqrt(dlat ** 2 + dlng ** 2)
 
 
+async def jump_wait(engine, seconds: float, *, source: str) -> bool:
+    """Sleep for *seconds*, honouring both stop and pause.
+
+    - Stop wakes the wait immediately and returns True.
+    - Pause freezes the remaining countdown: when resumed, the leftover
+      time runs to completion. Without this, pause was a no-op in jump
+      mode (issue #32) — the next teleport fired regardless.
+
+    Polls in 100 ms slices so a pause that lands mid-delay takes effect
+    promptly without spinning a dedicated watcher task.
+    """
+    remaining = max(0.0, float(seconds))
+    emitted = False
+    try:
+        while True:
+            if engine._stop_event.is_set():
+                return True
+            if not engine._pause_event.is_set():
+                pause_task = asyncio.ensure_future(engine._pause_event.wait())
+                stop_task = asyncio.ensure_future(engine._stop_event.wait())
+                try:
+                    await asyncio.wait(
+                        {pause_task, stop_task},
+                        return_when=asyncio.FIRST_COMPLETED,
+                    )
+                finally:
+                    for t in (pause_task, stop_task):
+                        if not t.done():
+                            t.cancel()
+                if engine._stop_event.is_set():
+                    return True
+            if remaining <= 0:
+                return False
+            if not emitted and seconds > 0:
+                await engine._emit("pause_countdown", {
+                    "duration_seconds": seconds,
+                    "source": source,
+                })
+                emitted = True
+            slice_s = min(remaining, 0.1)
+            try:
+                await asyncio.wait_for(engine._stop_event.wait(), timeout=slice_s)
+                return True
+            except asyncio.TimeoutError:
+                remaining -= slice_s
+    finally:
+        if emitted:
+            await engine._emit("pause_countdown_end", {"source": source})
+
+
 async def _run_jump_multistop(
     engine,
     waypoints: list[Coordinate],
     *,
-    interval: float,
+    pre_delay: float,
+    post_delay: float,
     loop: bool,
 ) -> None:
-    """Teleport sequentially through *waypoints*, dwelling *interval* seconds
-    at each stop. When *loop* is True, repeats from the first stop after
-    reaching the last. Stops cleanly when ``engine._stop_event`` is set."""
+    """Teleport sequentially through *waypoints*. Each stop is preceded
+    by *pre_delay* seconds and followed by *post_delay* seconds. When
+    *loop* is True, repeats from the first stop after reaching the last.
+    Stops cleanly when ``engine._stop_event`` is set; pause freezes both
+    delays."""
     engine.state = SimulationState.MULTI_STOP
     engine.total_segments = len(waypoints)
     engine.lap_count = 0
@@ -332,22 +387,17 @@ async def _run_jump_multistop(
     })
 
     logger.info(
-        "Jump multi-stop started: %d waypoints, interval=%.1fs, loop=%s",
-        len(waypoints), interval, loop,
+        "Jump multi-stop started: %d waypoints, pre=%.1fs post=%.1fs, loop=%s",
+        len(waypoints), pre_delay, post_delay, loop,
     )
-
-    async def _dwell() -> bool:
-        if interval <= 0:
-            return engine._stop_event.is_set()
-        try:
-            await asyncio.wait_for(engine._stop_event.wait(), timeout=interval)
-            return True
-        except asyncio.TimeoutError:
-            return False
 
     running = True
     while running and not engine._stop_event.is_set():
         for i, wp in enumerate(waypoints):
+            if engine._stop_event.is_set():
+                break
+            if await jump_wait(engine, pre_delay, source="multi_stop"):
+                break
             if engine._stop_event.is_set():
                 break
             await engine._set_position(wp.lat, wp.lng)
@@ -375,13 +425,13 @@ async def _run_jump_multistop(
                 "total": len(waypoints),
                 "lat": wp.lat, "lng": wp.lng,
             })
-            # Don't dwell after the very last stop on a non-looping run -
-            # the simulation is finished, so dwelling there would just delay
-            # the IDLE transition without serving any purpose.
+            # Skip the post-delay after the very last stop on a non-looping
+            # run — the simulation is finished, so the wait would just
+            # delay the IDLE transition without serving any purpose.
             is_last = (i == len(waypoints) - 1)
             if is_last and not loop:
                 continue
-            if await _dwell():
+            if await jump_wait(engine, post_delay, source="multi_stop"):
                 break
 
         if not loop or engine._stop_event.is_set():

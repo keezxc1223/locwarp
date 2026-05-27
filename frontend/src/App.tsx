@@ -1578,8 +1578,10 @@ const App: React.FC = () => {
           onClickToAddWaypointChange={setClickToAddWaypoint}
           jumpMode={sim.jumpMode}
           onJumpModeChange={sim.setJumpMode}
-          jumpInterval={sim.jumpInterval}
-          onJumpIntervalChange={sim.setJumpInterval}
+          jumpPreDelay={sim.jumpPreDelay}
+          onJumpPreDelayChange={sim.setJumpPreDelay}
+          jumpPostDelay={sim.jumpPostDelay}
+          onJumpPostDelayChange={sim.setJumpPostDelay}
           openLibraryToken={openLibraryToken}
           modeExtraSection={(sim.mode === SimMode.Loop || sim.mode === SimMode.MultiStop) ? (
           <div className="section" style={{ margin: '0 0 8px 0' }}>

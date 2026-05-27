@@ -141,12 +141,14 @@ interface ControlPanelProps {
   clickToAddWaypoint?: boolean;
   onClickToAddWaypointChange?: (v: boolean) => void;
   // Jump mode: when toggled on for Loop / MultiStop, the device teleports
-  // point-to-point with a fixed dwell interval instead of walking the
-  // routed path. Used for fruit-farm sniping.
+  // point-to-point with configurable pre / post delays around each
+  // teleport, instead of walking the routed path.
   jumpMode?: boolean;
   onJumpModeChange?: (v: boolean) => void;
-  jumpInterval?: number;
-  onJumpIntervalChange?: (v: number) => void;
+  jumpPreDelay?: number;
+  onJumpPreDelayChange?: (v: number) => void;
+  jumpPostDelay?: number;
+  onJumpPostDelayChange?: (v: number) => void;
   // Incremented by any external source (e.g. map top-left library
   // button) to request the library panel be opened. useEffect on the
   // value toggles libraryOpen=true so the parent doesn't have to own
@@ -324,8 +326,10 @@ const ControlPanel: React.FC<ControlPanelProps> = ({
   onClickToAddWaypointChange,
   jumpMode = false,
   onJumpModeChange,
-  jumpInterval = 12,
-  onJumpIntervalChange,
+  jumpPreDelay = 2,
+  onJumpPreDelayChange,
+  jumpPostDelay = 4,
+  onJumpPostDelayChange,
   openLibraryToken,
   openLibraryTab,
 }) => {
@@ -574,25 +578,46 @@ const ControlPanel: React.FC<ControlPanelProps> = ({
                   </span>
                 </label>
                 {jumpMode && (
-                  <span style={{ display: 'inline-flex', alignItems: 'center', gap: 5, fontSize: 11, opacity: 0.85 }}>
-                    {t('panel.jump_interval')}
-                    <input
-                      type="number"
-                      step="0.5"
-                      min="0"
-                      value={jumpInterval}
-                      onChange={(e) => {
-                        const v = parseFloat(e.target.value)
-                        if (Number.isFinite(v) && v >= 0 && onJumpIntervalChange) onJumpIntervalChange(v)
-                      }}
-                      style={{
-                        width: 60, padding: '2px 6px', fontSize: 11,
-                        background: '#0f1218', color: '#e6e8ee',
-                        border: '1px solid rgba(255,255,255,0.12)', borderRadius: 4,
-                      }}
-                    />
-                    <span style={{ opacity: 0.7 }}>{t('panel.jump_interval_seconds')}</span>
-                  </span>
+                  <>
+                    <span style={{ display: 'inline-flex', alignItems: 'center', gap: 5, fontSize: 11, opacity: 0.85 }}>
+                      {t('panel.jump_pre_delay')}
+                      <input
+                        type="number"
+                        step="0.5"
+                        min="0"
+                        value={jumpPreDelay}
+                        onChange={(e) => {
+                          const v = parseFloat(e.target.value)
+                          if (Number.isFinite(v) && v >= 0 && onJumpPreDelayChange) onJumpPreDelayChange(v)
+                        }}
+                        style={{
+                          width: 60, padding: '2px 6px', fontSize: 11,
+                          background: '#0f1218', color: '#e6e8ee',
+                          border: '1px solid rgba(255,255,255,0.12)', borderRadius: 4,
+                        }}
+                      />
+                      <span style={{ opacity: 0.7 }}>{t('panel.jump_delay_seconds')}</span>
+                    </span>
+                    <span style={{ display: 'inline-flex', alignItems: 'center', gap: 5, fontSize: 11, opacity: 0.85 }}>
+                      {t('panel.jump_post_delay')}
+                      <input
+                        type="number"
+                        step="0.5"
+                        min="0"
+                        value={jumpPostDelay}
+                        onChange={(e) => {
+                          const v = parseFloat(e.target.value)
+                          if (Number.isFinite(v) && v >= 0 && onJumpPostDelayChange) onJumpPostDelayChange(v)
+                        }}
+                        style={{
+                          width: 60, padding: '2px 6px', fontSize: 11,
+                          background: '#0f1218', color: '#e6e8ee',
+                          border: '1px solid rgba(255,255,255,0.12)', borderRadius: 4,
+                        }}
+                      />
+                      <span style={{ opacity: 0.7 }}>{t('panel.jump_delay_seconds')}</span>
+                    </span>
+                  </>
                 )}
               </div>
             )}

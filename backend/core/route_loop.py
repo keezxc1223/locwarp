@@ -8,6 +8,7 @@ import random
 
 from models.schemas import Coordinate, MovementMode, SimulationState
 from config import resolve_speed_profile
+from core.multi_stop import jump_wait
 
 logger = logging.getLogger(__name__)
 
@@ -33,7 +34,8 @@ class RouteLooper:
         route_engine: str | None = None,
         lap_count: int | None = None,
         jump_mode: bool = False,
-        jump_interval: float = 12.0,
+        jump_pre_delay: float = 2.0,
+        jump_post_delay: float = 4.0,
     ) -> None:
         """Build a multi-waypoint route that forms a closed loop, then
         traverse it repeatedly until stopped.
@@ -51,15 +53,16 @@ class RouteLooper:
         if len(waypoints) < 2:
             raise ValueError("At least 2 waypoints are required for a loop")
 
-        # Jump mode: teleport point-to-point with a fixed dwell interval
-        # instead of walking. Skips OSRM routing entirely. Resume / per-
-        # station random pause / speed profile are not used in this mode
-        # because there's no continuous movement to interpolate.
+        # Jump mode: teleport point-to-point with configurable pre / post
+        # delays instead of walking. Skips OSRM routing entirely. Resume /
+        # per-station random pause / speed profile are not used in this
+        # mode because there's no continuous movement to interpolate.
         if jump_mode:
             await _run_jump_loop(
                 engine,
                 waypoints,
-                interval=max(0.0, float(jump_interval)),
+                pre_delay=max(0.0, float(jump_pre_delay)),
+                post_delay=max(0.0, float(jump_post_delay)),
                 lap_count=lap_count,
                 close_loop=True,
             )
@@ -293,14 +296,16 @@ async def _run_jump_loop(
     engine,
     waypoints: list[Coordinate],
     *,
-    interval: float,
+    pre_delay: float,
+    post_delay: float,
     lap_count: int | None,
     close_loop: bool,
 ) -> None:
-    """Teleport sequentially through *waypoints*, dwelling *interval* seconds
-    at each. When *close_loop* is True, the final dwell is followed by a
-    teleport back to waypoints[0] (start of next lap). Stops cleanly when
-    ``engine._stop_event`` is set."""
+    """Teleport sequentially through *waypoints*. Each stop is preceded by
+    *pre_delay* seconds and followed by *post_delay* seconds. When
+    *close_loop* is True, the final teleport returns to waypoints[0]
+    (start of next lap). Stops cleanly when ``engine._stop_event`` is
+    set; pause freezes both delays."""
     engine.state = SimulationState.LOOPING
     engine.total_segments = len(waypoints)
     engine.lap_count = 0
@@ -319,24 +324,18 @@ async def _run_jump_loop(
     })
 
     logger.info(
-        "Jump loop started: %d waypoints, interval=%.1fs, laps=%s",
-        len(waypoints), interval, lap_count or "∞",
+        "Jump loop started: %d waypoints, pre=%.1fs post=%.1fs, laps=%s",
+        len(waypoints), pre_delay, post_delay, lap_count or "∞",
     )
 
     limit = lap_count if (lap_count is not None and lap_count > 0) else None
 
-    async def _dwell() -> bool:
-        """Sleep for *interval* seconds; return True if stop was requested."""
-        if interval <= 0:
-            return engine._stop_event.is_set()
-        try:
-            await asyncio.wait_for(engine._stop_event.wait(), timeout=interval)
-            return True
-        except asyncio.TimeoutError:
-            return False
-
     while not engine._stop_event.is_set():
         for i, wp in enumerate(waypoints):
+            if engine._stop_event.is_set():
+                break
+            if await jump_wait(engine, pre_delay, source="loop"):
+                break
             if engine._stop_event.is_set():
                 break
             await engine._set_position(wp.lat, wp.lng)
@@ -359,7 +358,7 @@ async def _run_jump_loop(
                 "current_index": i,
                 "next_index": min(i + 1, len(waypoints) - 1),
             })
-            if await _dwell():
+            if await jump_wait(engine, post_delay, source="loop"):
                 break
 
         if engine._stop_event.is_set():

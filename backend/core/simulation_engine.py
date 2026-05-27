@@ -246,7 +246,8 @@ class SimulationEngine:
         route_engine: str | None = None,
         lap_count: int | None = None,
         jump_mode: bool = False,
-        jump_interval: float = 12.0,
+        jump_pre_delay: float = 2.0,
+        jump_post_delay: float = 4.0,
     ) -> None:
         """Start looping through a closed route."""
         await self._ensure_stopped()
@@ -259,7 +260,7 @@ class SimulationEngine:
             pause_enabled=pause_enabled, pause_min=pause_min, pause_max=pause_max,
             straight_line=straight_line, route_engine=route_engine,
             lap_count=lap_count,
-            jump_mode=jump_mode, jump_interval=jump_interval,
+            jump_mode=jump_mode, jump_pre_delay=jump_pre_delay, jump_post_delay=jump_post_delay,
         )
         await self._run_handler(
             self._looper.start_loop(
@@ -268,7 +269,7 @@ class SimulationEngine:
                 pause_enabled=pause_enabled, pause_min=pause_min, pause_max=pause_max,
                 straight_line=straight_line, route_engine=route_engine,
                 lap_count=lap_count,
-                jump_mode=jump_mode, jump_interval=jump_interval,
+                jump_mode=jump_mode, jump_pre_delay=jump_pre_delay, jump_post_delay=jump_post_delay,
             ),
             "Loop",
         )
@@ -303,7 +304,8 @@ class SimulationEngine:
         straight_line: bool = False,
         route_engine: str | None = None,
         jump_mode: bool = False,
-        jump_interval: float = 12.0,
+        jump_pre_delay: float = 2.0,
+        jump_post_delay: float = 4.0,
     ) -> None:
         """Navigate through waypoints with optional stops."""
         await self._ensure_stopped()
@@ -315,7 +317,7 @@ class SimulationEngine:
             speed_kmh=speed_kmh, speed_min_kmh=speed_min_kmh, speed_max_kmh=speed_max_kmh,
             pause_enabled=pause_enabled, pause_min=pause_min, pause_max=pause_max,
             straight_line=straight_line, route_engine=route_engine,
-            jump_mode=jump_mode, jump_interval=jump_interval,
+            jump_mode=jump_mode, jump_pre_delay=jump_pre_delay, jump_post_delay=jump_post_delay,
         )
         await self._run_handler(
             self._multi_stop.start(
@@ -323,7 +325,7 @@ class SimulationEngine:
                 speed_min_kmh=speed_min_kmh, speed_max_kmh=speed_max_kmh,
                 pause_enabled=pause_enabled, pause_min=pause_min, pause_max=pause_max,
                 straight_line=straight_line, route_engine=route_engine,
-                jump_mode=jump_mode, jump_interval=jump_interval,
+                jump_mode=jump_mode, jump_pre_delay=jump_pre_delay, jump_post_delay=jump_post_delay,
             ),
             "Multi-stop",
         )
