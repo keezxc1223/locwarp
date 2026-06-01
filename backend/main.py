@@ -67,6 +67,10 @@ class AppState:
         # the backend, not the renderer) can honour the same choice.
         self._geocode_provider: str = "nominatim"
         self._google_geocode_key: str = ""
+        # WiFi tunnel keep-alive: re-push the current simulated location to
+        # idle Network tunnels so iOS doesn't drop the RSD socket when the
+        # phone screen turns off. Default ON; user can toggle in the panel.
+        self._wifi_keepalive_enabled: bool = True
         self._load_settings()
 
     def _load_settings(self):
@@ -94,6 +98,9 @@ class AppState:
             gk = data.get("google_geocode_key")
             if isinstance(gk, str):
                 self._google_geocode_key = gk
+            ka = data.get("wifi_keepalive_enabled")
+            if isinstance(ka, bool):
+                self._wifi_keepalive_enabled = ka
         except (ValueError, KeyError):
             logger.warning("Settings payload field malformed; keeping defaults", exc_info=True)
 
@@ -106,6 +113,7 @@ class AppState:
             "bookmark_expanded_categories": self._bookmark_expanded_categories,
             "geocode_provider": self._geocode_provider,
             "google_geocode_key": self._google_geocode_key,
+            "wifi_keepalive_enabled": self._wifi_keepalive_enabled,
         }
         safe_write_json(SETTINGS_FILE, data)
 
@@ -590,6 +598,50 @@ async def _usbmux_presence_watchdog():
             logger.exception("usbmux watchdog iteration crashed; continuing")
 
 
+async def _wifi_tunnel_keepalive():
+    """Keep idle WiFi tunnels alive across phone screen-off.
+
+    During active navigation the engine pushes coordinates every cycle,
+    which is exactly why a moving WiFi tunnel survives the screen turning
+    off while an idle one drops within seconds. This loop mirrors that
+    traffic: every KEEPALIVE_INTERVAL it re-pushes the current simulated
+    location for each Network-connected device whose engine is idle. The
+    re-push doubles as keeping the fake location pinned. Active sims are
+    skipped (they already generate traffic). Toggleable via settings —
+    issue #33."""
+    import asyncio
+    from models.schemas import SimulationState
+    KEEPALIVE_INTERVAL = 20.0
+    # States where the engine is NOT actively pushing on its own, so the
+    # socket would otherwise go quiet and iOS could reap it.
+    IDLE_STATES = {SimulationState.IDLE, SimulationState.PAUSED}
+    while True:
+        try:
+            await asyncio.sleep(KEEPALIVE_INTERVAL)
+            if not app_state._wifi_keepalive_enabled:
+                continue
+            dm = app_state.device_manager
+            for udid, conn in list(dm._connections.items()):
+                if getattr(conn, "connection_type", "USB") != "Network":
+                    continue
+                eng = app_state.simulation_engines.get(udid)
+                if eng is None or eng.state not in IDLE_STATES:
+                    continue
+                pos = eng.current_position
+                if pos is None:
+                    continue
+                try:
+                    await eng.location_service.set(pos.lat, pos.lng)
+                except Exception:
+                    logger.debug(
+                        "WiFi keepalive re-push failed for %s", udid, exc_info=True,
+                    )
+        except asyncio.CancelledError:
+            raise
+        except Exception:
+            logger.debug("WiFi keepalive loop iteration error", exc_info=True)
+
+
 @asynccontextmanager
 async def lifespan(application: FastAPI):
     import asyncio
@@ -609,15 +661,18 @@ async def lifespan(application: FastAPI):
         logger.exception("Auto-connect on startup failed (device may need manual connect)")
 
     watchdog_task = asyncio.create_task(_usbmux_presence_watchdog())
+    keepalive_task = asyncio.create_task(_wifi_tunnel_keepalive())
 
     yield
 
     # ── Shutdown ──
     watchdog_task.cancel()
-    try:
-        await watchdog_task
-    except (asyncio.CancelledError, Exception):
-        pass
+    keepalive_task.cancel()
+    for _t in (watchdog_task, keepalive_task):
+        try:
+            await _t
+        except (asyncio.CancelledError, Exception):
+            pass
 
     app_state.save_settings()
     await app_state.device_manager.disconnect_all()

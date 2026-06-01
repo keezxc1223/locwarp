@@ -1261,6 +1261,30 @@ async def wifi_tunnel_start_and_connect(req: WifiTunnelStartRequest):
         raise HTTPException(status_code=500, detail=f"Tunnel started but connection failed: {e}")
 
 
+class WifiKeepaliveRequest(BaseModel):
+    enabled: bool
+
+
+@router.get("/wifi/tunnel/keepalive")
+async def wifi_tunnel_keepalive_get():
+    """Return whether the idle-tunnel keep-alive loop is enabled."""
+    from main import app_state
+    return {"enabled": bool(app_state._wifi_keepalive_enabled)}
+
+
+@router.post("/wifi/tunnel/keepalive")
+async def wifi_tunnel_keepalive_set(req: WifiKeepaliveRequest):
+    """Enable / disable the keep-alive that re-pushes the current location
+    to idle WiFi tunnels so iOS doesn't drop them when the screen is off."""
+    from main import app_state
+    app_state._wifi_keepalive_enabled = bool(req.enabled)
+    try:
+        app_state.save_settings()
+    except Exception:
+        pass  # best-effort persist; never fail the toggle
+    return {"enabled": app_state._wifi_keepalive_enabled}
+
+
 # ── Generic UDID routes (MUST be defined after all specific /wifi/* routes
 #    so that /wifi/* paths do not accidentally match {udid}). ─────────────
 

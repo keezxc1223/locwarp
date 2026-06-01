@@ -132,6 +132,11 @@ export const wifiTunnelStop = (udid?: string) =>
     'POST', '/api/device/wifi/tunnel/stop', udid ? { udid } : {},
   )
 export const wifiRepair = () => request<{ status: string; udid: string; name: string; ios_version: string; remote_record_regenerated: boolean }>('POST', '/api/device/wifi/repair')
+// WiFi tunnel keep-alive: backend re-pushes the current simulated location
+// to idle tunnels so iOS doesn't drop the RSD socket when the screen is off.
+export const wifiKeepaliveGet = () => request<{ enabled: boolean }>('GET', '/api/device/wifi/tunnel/keepalive')
+export const wifiKeepaliveSet = (enabled: boolean) =>
+  request<{ enabled: boolean }>('POST', '/api/device/wifi/tunnel/keepalive', { enabled })
 export const amfiRevealDeveloperMode = (udid: string) =>
   request<{ status: string }>('POST', `/api/device/${encodeURIComponent(udid)}/amfi/reveal-developer-mode`)
 

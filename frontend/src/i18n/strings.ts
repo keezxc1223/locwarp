@@ -279,6 +279,22 @@ export const STRINGS = {
     zh: '從最近連線過的 IP 直接挑一個帶回欄位,免重打',
     en: 'Pick a recently used IP — fills the field without retyping',
   },
+  'wifi.tunnel_local_endpoint': { zh: '本機通道', en: 'Local tunnel' },
+  'wifi.pin_on': { zh: '已釘選', en: 'Pinned' },
+  'wifi.pin_off': { zh: '釘選', en: 'Pin' },
+  'wifi.pin_on_tooltip': {
+    zh: '已釘選:斷線後會自動嘗試重新連接。點一下取消釘選',
+    en: 'Pinned: auto-reconnects after a drop. Click to unpin',
+  },
+  'wifi.pin_off_tooltip': {
+    zh: '釘選這台:斷線後自動嘗試重新連接,不必手動按 Start',
+    en: 'Pin this device: auto-reconnect after a drop, no manual Start needed',
+  },
+  'wifi.keepalive_label': { zh: '螢幕暗掉維持連線(實驗)', en: 'Stay connected when screen off (experimental)' },
+  'wifi.keepalive_tooltip': {
+    zh: '閒置時定期重送目前座標,讓手機螢幕暗掉也不易斷線。若反而不穩可關閉',
+    en: 'Periodically re-pushes the current location while idle so the tunnel survives screen-off. Turn off if it causes instability',
+  },
   'dev_mode.reveal_button': { zh: '顯示開發者模式選項', en: 'Reveal Developer Mode option' },
   'dev_mode.reveal_working': { zh: '處理中...', en: 'Working...' },
   'dev_mode.reveal_tooltip': {

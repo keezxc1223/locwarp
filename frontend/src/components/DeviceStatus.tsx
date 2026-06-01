@@ -1,6 +1,6 @@
 import React, { useState } from 'react';
 import { createPortal } from 'react-dom';
-import { wifiTunnelDiscover, wifiTunnelFindPort, wifiRepair, type TunnelInfo } from '../services/api';
+import { wifiTunnelDiscover, wifiTunnelFindPort, wifiRepair, wifiKeepaliveGet, wifiKeepaliveSet, type TunnelInfo } from '../services/api';
 import { useT } from '../i18n';
 
 const MAX_TUNNEL_DEVICES = 3;
@@ -31,6 +31,8 @@ interface DeviceStatusProps {
   tunnels?: TunnelInfo[];
   onWifiConnect?: (ip: string) => Promise<any>;
   onRevealDeveloperMode?: (udid: string) => Promise<void>;
+  pinnedUdids?: string[];
+  onTogglePin?: (udid: string) => void;
 }
 
 const DeviceStatus: React.FC<DeviceStatusProps> = ({
@@ -45,6 +47,8 @@ const DeviceStatus: React.FC<DeviceStatusProps> = ({
   tunnels = [],
   onWifiConnect,
   onRevealDeveloperMode,
+  pinnedUdids = [],
+  onTogglePin,
 }) => {
   const t = useT();
   const [showDropdown, setShowDropdown] = useState(false);
@@ -68,6 +72,13 @@ const DeviceStatus: React.FC<DeviceStatusProps> = ({
   const [savedIps, setSavedIps] = useState(readSavedIps);
   const [showSavedIps, setShowSavedIps] = useState(false);
   const refreshSavedIps = () => setSavedIps(readSavedIps());
+  // Map udid -> last known device name, harvested from savedips. Lets the
+  // active-tunnel card and recent list keep showing the real phone name
+  // after a WiFi drop, instead of falling back to a raw UDID string
+  // (issue #33). The name is written into savedips on every successful
+  // connect by useDevice.startWifiTunnel.
+  const savedNameByUdid: Record<string, string> = {};
+  savedIps.forEach((e: any) => { if (e && e.udid && e.name) savedNameByUdid[e.udid] = e.name; });
   // Auto-attempt the saved IP/port on app launch. Default ON so users who
   // previously connected over WiFi don't have to re-click on every cold
   // start — App.tsx reads this flag once after the WS handshake settles.
@@ -77,6 +88,16 @@ const DeviceStatus: React.FC<DeviceStatusProps> = ({
   const handleAutoConnectToggle = (next: boolean) => {
     setAutoConnectEnabled(next);
     try { localStorage.setItem('locwarp.tunnel.autoconnect', next ? '1' : '0'); } catch { /* ignore */ }
+  };
+  // Keep-alive lives on the backend (it pokes the RSD tunnel), so we read
+  // its current value once on mount and write changes through the API.
+  const [keepaliveEnabled, setKeepaliveEnabled] = useState<boolean>(true);
+  React.useEffect(() => {
+    wifiKeepaliveGet().then((r) => setKeepaliveEnabled(r.enabled !== false)).catch(() => { /* keep default */ });
+  }, []);
+  const handleKeepaliveToggle = (next: boolean) => {
+    setKeepaliveEnabled(next);
+    wifiKeepaliveSet(next).catch(() => { /* best-effort */ });
   };
   const [tunnelConnecting, setTunnelConnecting] = useState(false);
   const [tunnelError, setTunnelError] = useState<string | null>(null);
@@ -609,6 +630,29 @@ const DeviceStatus: React.FC<DeviceStatusProps> = ({
                 <span style={{ flex: 1 }}>{t('wifi.autoconnect_label')}</span>
               </label>
 
+              {/* Keep-alive toggle — backend periodically re-pushes the
+                  current simulated location to idle WiFi tunnels so iOS
+                  doesn't drop the RSD socket when the phone screen turns
+                  off (issue #33). Experimental; default ON. */}
+              <label
+                style={{
+                  display: 'flex', alignItems: 'center', gap: 6,
+                  fontSize: 11, padding: '4px 6px', marginBottom: 8,
+                  background: 'rgba(108, 140, 255, 0.06)',
+                  border: '1px solid rgba(108, 140, 255, 0.2)',
+                  borderRadius: 3, cursor: 'pointer',
+                }}
+                title={t('wifi.keepalive_tooltip')}
+              >
+                <input
+                  type="checkbox"
+                  checked={keepaliveEnabled}
+                  onChange={(e) => handleKeepaliveToggle(e.target.checked)}
+                  style={{ margin: 0 }}
+                />
+                <span style={{ flex: 1 }}>{t('wifi.keepalive_label')}</span>
+              </label>
+
               {/* iOS 17+ WiFi Tunnel (RSD) — list of active tunnels + add form */}
               {onStartWifiTunnel && (
                 <>
@@ -616,7 +660,8 @@ const DeviceStatus: React.FC<DeviceStatusProps> = ({
                     <div style={{ marginBottom: 8 }}>
                       {tunnels.map((tn) => {
                         const dev = devices.find((d) => d.id === tn.udid);
-                        const dispName = dev?.name || tn.udid.slice(0, 12);
+                        const dispName = dev?.name || savedNameByUdid[tn.udid] || tn.udid.slice(0, 12);
+                        const pinned = pinnedUdids.includes(tn.udid);
                         return (
                           <div key={tn.udid} style={{
                             fontSize: 11, padding: '6px 8px', marginBottom: 4,
@@ -630,9 +675,24 @@ const DeviceStatus: React.FC<DeviceStatusProps> = ({
                                 {dispName}
                               </div>
                               <div style={{ fontSize: 10, opacity: 0.6 }}>
-                                RSD {tn.rsd_address}:{tn.rsd_port}
+                                {t('wifi.tunnel_local_endpoint')} {tn.rsd_address}:{tn.rsd_port}
                               </div>
                             </div>
+                            {onTogglePin && (
+                              <button
+                                onClick={() => onTogglePin(tn.udid)}
+                                title={pinned ? t('wifi.pin_on_tooltip') : t('wifi.pin_off_tooltip')}
+                                style={{
+                                  fontSize: 10, padding: '3px 8px', borderRadius: 3,
+                                  border: pinned ? '1px solid rgba(108, 140, 255, 0.6)' : '1px solid rgba(255,255,255,0.18)',
+                                  background: pinned ? 'rgba(108, 140, 255, 0.18)' : 'transparent',
+                                  color: pinned ? '#9ac0ff' : 'var(--text-muted)',
+                                  cursor: 'pointer', whiteSpace: 'nowrap',
+                                }}
+                              >
+                                {pinned ? t('wifi.pin_on') : t('wifi.pin_off')}
+                              </button>
+                            )}
                             <button
                               onClick={async () => { if (onStopTunnel) await onStopTunnel(tn.udid); }}
                               style={{
@@ -675,7 +735,7 @@ const DeviceStatus: React.FC<DeviceStatusProps> = ({
                           type="text" className="search-input"
                           placeholder={t('wifi.ip_placeholder')}
                           value={tunnelIp} onChange={(e) => setTunnelIp(e.target.value)}
-                          style={{ flex: 1, fontSize: 12 }} disabled={tunnelConnecting}
+                          style={{ flex: 1, fontSize: 12, paddingLeft: 10 }} disabled={tunnelConnecting}
                         />
                         {savedIps.length > 0 && (
                           <button
@@ -714,7 +774,7 @@ const DeviceStatus: React.FC<DeviceStatusProps> = ({
                           >
                             {savedIps.map((entry, idx) => {
                               const dev = devices.find((d) => d.id === entry.udid);
-                              const label = dev?.name || (entry.udid ? entry.udid.slice(0, 10) : entry.ip);
+                              const label = dev?.name || (entry as any).name || (entry.udid ? entry.udid.slice(0, 10) : entry.ip);
                               return (
                                 <div
                                   key={`${entry.ip}:${entry.port}:${idx}`}
@@ -753,7 +813,7 @@ const DeviceStatus: React.FC<DeviceStatusProps> = ({
                         <input
                           type="text" className="search-input" placeholder="49152"
                           value={tunnelPort} onChange={(e) => setTunnelPort(e.target.value)}
-                          style={{ flex: 1, fontSize: 12 }} disabled={tunnelConnecting || portScanning}
+                          style={{ flex: 1, fontSize: 12, paddingLeft: 10 }} disabled={tunnelConnecting || portScanning}
                           title={t('wifi.port_empty_hint')}
                         />
                         <button
@@ -795,47 +855,73 @@ const DeviceStatus: React.FC<DeviceStatusProps> = ({
                             return;
                           }
                           setTunnelError(null);
-                          let port = parseInt(tunnelPort);
-                          if (!Number.isFinite(port) || port <= 0) {
-                            // Empty / blank port — scan IANA dynamic range on
-                            // this IP. iOS picks RemotePairing port from
-                            // 49152–65535 at boot, so 49152 is rarely correct.
-                            setPortScanning(true);
+                          setTunnelConnecting(true);
+                          // iOS rebinds its RemotePairing port across reboots /
+                          // network changes, so a single guessed (or stale
+                          // recent-list) port often times out while a different
+                          // open port is the live one (issue #33). Instead of
+                          // firing once at ports[0], try the entered port first
+                          // (fast path when it's still valid), then scan the
+                          // IANA dynamic range and try every open port until a
+                          // handshake actually succeeds.
+                          const tried = new Set<number>();
+                          let connectedPort: number | null = null;
+                          let lastErr: any = null;
+                          const tryPort = async (p: number): Promise<boolean> => {
+                            if (!Number.isFinite(p) || p <= 0 || tried.has(p)) return false;
+                            tried.add(p);
                             try {
-                              const res = await wifiTunnelFindPort(ip);
-                              if (!res.ports || res.ports.length === 0) {
+                              await onStartWifiTunnel(ip, p);
+                              connectedPort = p;
+                              return true;
+                            } catch (err: any) {
+                              lastErr = err;
+                              return false;
+                            }
+                          };
+                          try {
+                            const entered = parseInt(tunnelPort);
+                            if (Number.isFinite(entered) && entered > 0) {
+                              await tryPort(entered);
+                            }
+                            if (connectedPort === null) {
+                              // Scan and walk every open port. Each wrong port
+                              // costs one backend handshake timeout (~8s), but
+                              // the scan usually returns only a handful.
+                              setPortScanning(true);
+                              let ports: number[] = [];
+                              try {
+                                const res = await wifiTunnelFindPort(ip);
+                                ports = res.ports || [];
+                              } catch (err: any) {
+                                lastErr = err;
+                              }
+                              setPortScanning(false);
+                              if (ports.length === 0 && tried.size === 0) {
                                 setTunnelError(t('wifi.port_scan_no_hit'));
-                                setPortScanning(false);
+                                setTunnelConnecting(false);
                                 return;
                               }
-                              port = res.ports[0];
-                              setTunnelPort(String(port));
-                            } catch (err: any) {
-                              setTunnelError(err.message || t('wifi.port_scan_failed'));
-                              setPortScanning(false);
-                              return;
+                              for (const p of ports) {
+                                if (await tryPort(p)) break;
+                              }
                             }
+                            if (connectedPort !== null) {
+                              setTunnelPort(String(connectedPort));
+                              // Legacy single-entry keys — kept so the IP / Port
+                              // input fields pre-fill correctly next launch. The
+                              // savedips multi-entry list is written by
+                              // useDevice.startWifiTunnel for every code path.
+                              localStorage.setItem('locwarp.tunnel.ip', ip);
+                              localStorage.setItem('locwarp.tunnel.port', String(connectedPort));
+                              refreshSavedIps();
+                            } else {
+                              setTunnelError(lastErr?.message || t('wifi.port_scan_no_hit'));
+                            }
+                          } finally {
                             setPortScanning(false);
+                            setTunnelConnecting(false);
                           }
-                          setTunnelConnecting(true);
-                          try {
-                            await onStartWifiTunnel(ip, port);
-                            // Legacy single-entry keys — kept so the IP
-                            // input field pre-fills correctly next launch.
-                            // The savedips multi-entry list is written by
-                            // useDevice.startWifiTunnel for every code
-                            // path, so we don't need to write it here.
-                            localStorage.setItem('locwarp.tunnel.ip', ip);
-                            localStorage.setItem('locwarp.tunnel.port', String(port));
-                            // Keep IP/Port in the input so the user can
-                            // re-establish the same tunnel after a WiFi
-                            // drop or manual Stop without retyping
-                            // (issue #29). Refresh the saved-IP list so
-                            // the new entry shows up in the dropdown.
-                            refreshSavedIps();
-                          } catch (err: any) {
-                            setTunnelError(err.message || 'WiFi tunnel failed');
-                          } finally { setTunnelConnecting(false); }
                         }}
                         disabled={tunnelConnecting || portScanning}
                         style={{ width: '100%', fontSize: 12 }}

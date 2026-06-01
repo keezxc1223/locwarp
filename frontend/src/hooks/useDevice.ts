@@ -1,4 +1,4 @@
-import { useState, useCallback, useEffect } from 'react'
+import { useState, useCallback, useEffect, useRef } from 'react'
 import {
   listDevices, connectDevice, disconnectDevice,
   wifiConnect, wifiScan,
@@ -208,6 +208,89 @@ export function useDevice(subscribe?: WsSubscribe) {
     ? { running: true, rsd_address: tunnels[0].rsd_address, rsd_port: tunnels[0].rsd_port }
     : { running: false }
 
+  // ── Pin & auto-reconnect (issue #33) ──────────────────────────────
+  // A pinned device keeps trying to reconnect on its own after the
+  // backend watchdog gives up (tunnel_lost). The backend already retries
+  // 3x with backoff for transient blips; this covers the longer outages
+  // (phone opened late, left the WiFi for a while) the user has to fix by
+  // hand today. State is persisted so a pin survives an app restart.
+  const PIN_KEY = 'locwarp.tunnel.pinned'
+  const readPinned = (): string[] => {
+    try {
+      const arr = JSON.parse(localStorage.getItem(PIN_KEY) || '[]')
+      return Array.isArray(arr) ? arr.filter((x) => typeof x === 'string') : []
+    } catch { return [] }
+  }
+  const [pinnedUdids, setPinnedUdids] = useState<string[]>(readPinned)
+  const pinnedRef = useRef<string[]>(pinnedUdids)
+  pinnedRef.current = pinnedUdids
+  const tunnelsRef = useRef<TunnelInfo[]>(tunnels)
+  tunnelsRef.current = tunnels
+  const pinRetryTimers = useRef<Record<string, ReturnType<typeof setTimeout>>>({})
+  // Set after startWifiTunnel is defined below; the retry loop calls
+  // through the ref so we avoid a definition-order cycle.
+  const startWifiTunnelRef = useRef<((ip: string, port?: number, udidHint?: string) => Promise<any>) | null>(null)
+
+  const clearPinRetry = useCallback((udid: string) => {
+    const tmr = pinRetryTimers.current[udid]
+    if (tmr) { clearTimeout(tmr); delete pinRetryTimers.current[udid] }
+  }, [])
+
+  const readSavedEntryFor = (udid: string): { ip: string; port: number } | null => {
+    try {
+      const arr = JSON.parse(localStorage.getItem('locwarp.tunnel.savedips') || '[]')
+      if (!Array.isArray(arr)) return null
+      const hit = arr.find((e: any) => e && e.udid === udid && typeof e.ip === 'string')
+      if (hit) return { ip: hit.ip, port: Number(hit.port) || 49152 }
+    } catch { /* ignore */ }
+    return null
+  }
+
+  const schedulePinReconnect = useCallback((udid: string, delayMs = 5000) => {
+    if (pinRetryTimers.current[udid]) return // already scheduled
+    const attempt = async () => {
+      delete pinRetryTimers.current[udid]
+      // Stop if the user unpinned, or the tunnel already came back.
+      if (!pinnedRef.current.includes(udid)) return
+      if (tunnelsRef.current.some((tn) => tn.udid === udid)) return
+      const entry = readSavedEntryFor(udid)
+      if (entry && startWifiTunnelRef.current) {
+        try {
+          await startWifiTunnelRef.current(entry.ip, entry.port, udid)
+          return // success path clears the timer via startWifiTunnel
+        } catch { /* fall through and reschedule */ }
+      }
+      if (pinnedRef.current.includes(udid) && !tunnelsRef.current.some((tn) => tn.udid === udid)) {
+        pinRetryTimers.current[udid] = setTimeout(attempt, 15000)
+      }
+    }
+    pinRetryTimers.current[udid] = setTimeout(attempt, delayMs)
+  }, [])
+
+  const togglePin = useCallback((udid: string) => {
+    setPinnedUdids((prev) => {
+      const next = prev.includes(udid) ? prev.filter((u) => u !== udid) : [...prev, udid]
+      try { localStorage.setItem(PIN_KEY, JSON.stringify(next)) } catch { /* ignore */ }
+      if (!next.includes(udid)) clearPinRetry(udid)
+      return next
+    })
+  }, [clearPinRetry])
+
+  // Drive pin retries off the tunnel lifecycle events. Kept separate from
+  // the panel-state handler above so ordering / deps stay simple.
+  useEffect(() => {
+    if (!subscribe) return
+    return subscribe((msg) => {
+      if (msg.type === 'tunnel_lost') {
+        const udid = msg.data?.udid
+        if (udid && pinnedRef.current.includes(udid)) schedulePinReconnect(udid)
+      } else if (msg.type === 'tunnel_recovered' || msg.type === 'device_connected') {
+        const udid = msg.data?.udid
+        if (udid) clearPinRetry(udid)
+      }
+    })
+  }, [subscribe, schedulePinReconnect, clearPinRetry])
+
   // React to backend tunnel lifecycle events so the DeviceStatus panel
   // doesn't keep showing a dead tunnel as connected when the iPhone
   // leaves the WiFi network. Without this, the `tunnels` list is only
@@ -279,7 +362,7 @@ export function useDevice(subscribe?: WsSubscribe) {
         try {
           const raw = localStorage.getItem('locwarp.tunnel.savedips') || '[]'
           const list = (() => {
-            try { return JSON.parse(raw) as Array<{ ip: string; port: number; udid?: string; lastUsed: number }> }
+            try { return JSON.parse(raw) as Array<{ ip: string; port: number; udid?: string; name?: string; lastUsed: number }> }
             catch { return [] }
           })()
           const baseList = Array.isArray(list) ? list : []
@@ -289,9 +372,14 @@ export function useDevice(subscribe?: WsSubscribe) {
           const filtered = baseList.filter((e) =>
             e && !(e.ip === ip && e.port === port) && !(res.udid && e.udid === res.udid)
           )
-          const next = [{ ip, port, udid: res.udid, lastUsed: Date.now() }, ...filtered].slice(0, 5)
+          // Persist the device name too so the panel can keep showing the
+          // real phone name after a WiFi drop instead of a raw UDID
+          // (issue #33).
+          const next = [{ ip, port, udid: res.udid, name: res.name, lastUsed: Date.now() }, ...filtered].slice(0, 5)
           localStorage.setItem('locwarp.tunnel.savedips', JSON.stringify(next))
         } catch { /* storage disabled */ }
+        // A successful connect clears any pending pin-retry for this device.
+        clearPinRetry(res.udid)
         return info
       } catch (err) {
         console.error('WiFi tunnel failed:', err)
@@ -300,6 +388,9 @@ export function useDevice(subscribe?: WsSubscribe) {
     },
     [],
   )
+  // Expose the latest startWifiTunnel to the pin-retry loop without making
+  // it a hook dependency (the callback is stable, deps: []).
+  startWifiTunnelRef.current = startWifiTunnel
 
   const checkTunnelStatus = useCallback(async () => {
     try {
@@ -359,5 +450,6 @@ export function useDevice(subscribe?: WsSubscribe) {
     connectWifi, scanWifi, wifiScanning, wifiDevices,
     startWifiTunnel, checkTunnelStatus, stopTunnel, tunnelStatus, tunnels,
     connectedDevices, primaryDevice,
+    pinnedUdids, togglePin,
   }
 }

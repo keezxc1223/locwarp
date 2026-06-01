@@ -1330,6 +1330,8 @@ const App: React.FC = () => {
           onStopTunnel={device.stopTunnel}
           tunnelStatus={device.tunnelStatus}
           tunnels={device.tunnels}
+          pinnedUdids={device.pinnedUdids}
+          onTogglePin={device.togglePin}
           onRevealDeveloperMode={async (udid: string) => {
             try {
               await api.amfiRevealDeveloperMode(udid)
