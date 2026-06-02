@@ -132,6 +132,7 @@ interface ControlPanelProps {
   goldDittoBusy?: boolean;
   modeExtraSection?: React.ReactNode;
   currentWaypointsCount?: number;
+  loadedRouteName?: string | null;
   straightLine?: boolean;
   onStraightLineChange?: (v: boolean) => void;
   keepWaypoints?: boolean;
@@ -316,6 +317,7 @@ const ControlPanel: React.FC<ControlPanelProps> = ({
   goldDittoBusy = false,
   modeExtraSection,
   currentWaypointsCount = 0,
+  loadedRouteName = null,
   straightLine = false,
   onStraightLineChange,
   keepWaypoints = false,
@@ -443,6 +445,34 @@ const ControlPanel: React.FC<ControlPanelProps> = ({
         >
           {chevron(sections.mode)} {t('panel.mode')}
         </div>
+        {loadedRouteName && currentWaypointsCount > 0 && (
+          <div
+            className="section-content"
+            style={{
+              display: 'flex', alignItems: 'flex-start', gap: 6,
+              padding: '6px 10px', marginBottom: 6, fontSize: 12,
+              background: 'rgba(108, 140, 255, 0.10)',
+              border: '1px solid rgba(108, 140, 255, 0.30)',
+              borderRadius: 6,
+            }}
+            title={loadedRouteName}
+          >
+            <svg width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="#9ac0ff" strokeWidth="2" style={{ flexShrink: 0, marginTop: 2 }}>
+              <circle cx="6" cy="19" r="2" /><circle cx="18" cy="5" r="2" />
+              <path d="M8 19h6a4 4 0 0 0 0-8H10a4 4 0 0 1 0-8h4" />
+            </svg>
+            <span style={{ opacity: 0.7, flexShrink: 0 }}>{t('panel.loaded_route')}</span>
+            {/* Wrap long names across lines instead of truncating with an
+                ellipsis so the full route name is always readable. */}
+            <span style={{
+              fontWeight: 600, flex: 1, minWidth: 0,
+              whiteSpace: 'normal', overflowWrap: 'anywhere', wordBreak: 'break-word',
+              lineHeight: 1.3,
+            }}>
+              {loadedRouteName}
+            </span>
+          </div>
+        )}
         {sections.mode && (
           <div
             className="section-content"

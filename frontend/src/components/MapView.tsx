@@ -84,7 +84,10 @@ interface MapViewProps {
   // Imperative escape hatch so non-map components (e.g. the StatusBar's
   // "Locate PC" pan-only flow) can move the map view without going
   // through React state.
-  onMapReady?: (api: { panTo: (lat: number, lng: number, zoom?: number) => void }) => void;
+  onMapReady?: (api: {
+    panTo: (lat: number, lng: number, zoom?: number) => void;
+    fitBounds: (points: { lat: number; lng: number }[]) => void;
+  }) => void;
   // Preview-only pin: rendered when the user previews a coord (camera-only
   // fly) so they can see exactly where they're looking on the map. Distinct
   // shape + amber color so it doesn't get confused with the red destination
@@ -805,6 +808,19 @@ const MapView: React.FC<MapViewProps> = ({
             if (!m) return;
             const targetZoom = zoom ?? Math.max(m.getZoom(), 16);
             m.setView([lat, lng], targetZoom, { animate: true });
+          },
+          // Move the view to encompass a set of points (e.g. a loaded
+          // route's waypoints) so the user doesn't have to hunt for where
+          // the route is on the map. A single point just centers on it.
+          fitBounds: (points: { lat: number; lng: number }[]) => {
+            const m = mapRef.current;
+            if (!m || !points || points.length === 0) return;
+            if (points.length === 1) {
+              m.setView([points[0].lat, points[0].lng], Math.max(m.getZoom(), 16), { animate: true });
+              return;
+            }
+            const bounds = L.latLngBounds(points.map((p) => [p.lat, p.lng] as [number, number]));
+            m.fitBounds(bounds, { padding: [60, 60], maxZoom: 17, animate: true });
           },
         });
       } catch { /* non-fatal */ }

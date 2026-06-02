@@ -594,7 +594,10 @@ const App: React.FC = () => {
     void pushRecent(lat, lng, source === 'coord' ? 'coord_teleport' : 'teleport')
   }, [sim, device, t, showToast, pushRecent])
 
-  const mapApiRef = useRef<{ panTo: (lat: number, lng: number, zoom?: number) => void } | null>(null)
+  const mapApiRef = useRef<{
+    panTo: (lat: number, lng: number, zoom?: number) => void
+    fitBounds: (points: { lat: number; lng: number }[]) => void
+  } | null>(null)
   const handleMapPanOnly = useCallback((lat: number, lng: number) => {
     const cl = clampLat(lat)
     const nl = normalizeLng(lng)
@@ -956,6 +959,13 @@ const App: React.FC = () => {
   }, [sim, device, t, showToast])
 
   const [routeLoadConfirm, setRouteLoadConfirm] = useState<{ name: string; waypoints: { lat: number; lng: number }[] } | null>(null)
+  // Name of the route currently loaded into the waypoint list, shown in the
+  // panel so the user knows which route is active. Cleared automatically
+  // once the waypoint list is emptied.
+  const [loadedRouteName, setLoadedRouteName] = useState<string | null>(null)
+  useEffect(() => {
+    if (sim.waypoints.length === 0 && loadedRouteName !== null) setLoadedRouteName(null)
+  }, [sim.waypoints.length, loadedRouteName])
   const handleRouteLoad = useCallback((id: string) => {
     const route = savedRoutes.find((r) => r.id === id)
     if (!route || !Array.isArray(route.waypoints) || route.waypoints.length === 0) return
@@ -967,6 +977,8 @@ const App: React.FC = () => {
     if (!routeLoadConfirm) return
     const { waypoints } = routeLoadConfirm
     sim.setWaypoints(waypoints)
+    // Remember which route is loaded so the panel can show its name.
+    setLoadedRouteName(routeLoadConfirm.name || null)
     if (flyToStart && waypoints.length > 0) {
       const first = waypoints[0]
       const udids = device.connectedDevices.map((d) => d.udid)
@@ -977,6 +989,11 @@ const App: React.FC = () => {
         try { await sim.teleportAll(udids, first.lat, first.lng) } catch { /* ignore */ }
       }
       void pushRecent(first.lat, first.lng, 'coord_teleport')
+    } else if (!flyToStart && waypoints.length > 0) {
+      // "Show waypoints only": don't move the iPhone GPS, but move the
+      // MAP view to the route so the user can see where it is instead of
+      // having to scroll around looking for it.
+      mapApiRef.current?.fitBounds(waypoints)
     }
     setRouteLoadConfirm(null)
   }, [routeLoadConfirm, sim, device, pushRecent])
@@ -1570,6 +1587,7 @@ const App: React.FC = () => {
           onGoldDittoStart={handleGoldDittoStart}
           goldDittoBusy={goldDittoBusy}
           currentWaypointsCount={sim.waypoints.length}
+          loadedRouteName={loadedRouteName}
           straightLine={sim.straightLine}
           onStraightLineChange={sim.setStraightLine}
           keepWaypoints={sim.keepWaypoints}

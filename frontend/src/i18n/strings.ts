@@ -406,6 +406,7 @@ export const STRINGS = {
   'panel.route_load_start': { zh: '起點:', en: 'Start:' },
   'panel.route_load_show_only': { zh: '只顯示路徑', en: 'Show waypoints only' },
   'panel.route_load_fly_start': { zh: '飛到起點 + 顯示', en: 'Fly + show waypoints' },
+  'panel.loaded_route': { zh: '目前路線', en: 'Route' },
   'map.click_not_locate': { zh: '此功能非定位', en: 'This is NOT teleport' },
   'map.click_use_right': { zh: '請用右鍵「瞬移到這裡」', en: 'Right-click to "Teleport here"' },
   'map.device_disconnected': { zh: 'USB 已斷開,請重新插入', en: 'USB disconnected, please reconnect' },
