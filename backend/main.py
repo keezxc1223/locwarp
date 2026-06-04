@@ -611,7 +611,7 @@ async def _wifi_tunnel_keepalive():
     issue #33."""
     import asyncio
     from models.schemas import SimulationState
-    KEEPALIVE_INTERVAL = 20.0
+    KEEPALIVE_INTERVAL = 1.0
     # States where the engine is NOT actively pushing on its own, so the
     # socket would otherwise go quiet and iOS could reap it.
     IDLE_STATES = {SimulationState.IDLE, SimulationState.PAUSED}

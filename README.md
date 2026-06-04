@@ -96,7 +96,7 @@ TB1i7pEcifAeh8oDLLZFqiRVrpUaZmmDAn
 | **Random Walk** | 在指定半徑內隨機漫遊,每段停頓時間可調 |
 | **Joystick** | 以方向 + 力度即時操控,支援 **WASD / 方向鍵** 鍵盤操作 |
 
-#### 點對點跳躍 (v0.2.96+)
+#### 點對點跳躍
 
 路線巡迴 / 多點導航中可勾「**點對點跳躍**」,改成逐點瞬移、不再走 OSRM 路徑。適合不想真的走過去、只要 iPhone 依序停留在每個點上的場景。設定會記在 localStorage。
 
@@ -104,7 +104,7 @@ TB1i7pEcifAeh8oDLLZFqiRVrpUaZmmDAn
 - **跳躍後延遲**(預設 4 秒):瞬移後在該點的停留時間
 
 
-### 多裝置群組模式 (v0.2.0+, 三裝置上限)
+### 多裝置群組模式(三裝置上限)
 
 可同時連接 **最多三台 iPhone**,所有操作 (瞬移、導航、巡迴、多點導航、隨機漫步、搖桿、暫停、繼續、停止、套用速度、全部還原) 會**同步發送**到所有連線的裝置(桌面 UI 跟手機操控都支援)。
 
@@ -116,7 +116,7 @@ TB1i7pEcifAeh8oDLLZFqiRVrpUaZmmDAn
 - **自動連線**:USB 偵測到新裝置 1 秒內自動配對,直到 3 台上限,第四台插上完全不理
 - 地圖維持單一視覺 (所有裝置已永遠重疊,多 marker 反而是雜訊),裝置狀態靠 chip 與 StatusBar pill 呈現
 
-### 路徑來源選擇 (v0.2.90+ / BRouter v0.2.91+)
+### 路徑來源選擇
 
 模式區塊「使用直線路徑」下方多一顆「**路徑來源**」按鈕,點開彈窗可在四家免費路徑生成服務之間切換(全部免 API key、免註冊、免綁卡):
 
@@ -138,7 +138,7 @@ TB1i7pEcifAeh8oDLLZFqiRVrpUaZmmDAn
 - 狀態列顯示**後端實際生效**的速度(輸入新值未套用前不會誤顯示)
 - 到點/到圈暫停時,地圖上方顯示橘色倒數橫幅
 
-### 手機網頁操控 (v0.2.96+)
+### 手機網頁操控
 
 不在電腦旁也能用手機操控 LocWarp。底部狀態列「**手機操控**」按鈕跳出 modal 顯示 LAN 內網址跟 6 位數 PIN,把網址打到手機瀏覽器、輸入 PIN,手機就拿到一張行動裝置版的地圖加七顆功能鈕:
 
@@ -217,7 +217,7 @@ TB1i7pEcifAeh8oDLLZFqiRVrpUaZmmDAn
 
 - 啟動時 backend race condition 自動重試(最多 ~20 秒緩衝),無需手動重開
 - WebSocket 即時推播位置、進度、ETA、剩餘距離、裝置連線狀態
-- 模擬進行中切換模式 tab 不再清空地圖上的終點 / 路徑 / 路徑點(v0.2.90+),閒置時切換才會重置
+- 模擬進行中切換模式 tab 不再清空地圖上的終點 / 路徑 / 路徑點,閒置時切換才會重置
 - 斷線自動重連 + banner 自動清除
 - **iOS 風格頂端分頁**(v0.2.169+):側邊欄改為導航 / 連線 / 收藏 / 設定四個頂端分頁,連線狀態與裝置卡片獨立在「連線」頁,設定獨立在「設定」頁
 - **更新檢查**:啟動時從 GitHub Releases 比對版本,有新版時在底部狀態列版本號旁顯示彩色 `NEW` 膠囊提示(不再彈出對話框打斷操作),點擊版本號即跳轉到下載頁
@@ -274,7 +274,7 @@ TB1i7pEcifAeh8oDLLZFqiRVrpUaZmmDAn
 | [httpx](https://www.python-httpx.org/) | 0.27+ | OSRM / OSRM FOSSGIS / Valhalla / BRouter / Nominatim / TimezoneDB HTTP 呼叫 |
 | [gpxpy](https://github.com/tkrajina/gpxpy) | 1.6+ | GPX 路線解析 |
 
-### WiFi Tunnel(整合於 backend,v0.2.3+,iOS 17+ only)
+### WiFi Tunnel(整合於 backend,iOS 17+ only)
 
 | 技術 | 用途 |
 | --- | --- |
@@ -331,7 +331,7 @@ TB1i7pEcifAeh8oDLLZFqiRVrpUaZmmDAn
 - **In-process WiFi tunnel**:backend 自 v0.2.3 起直接在主 event loop 內執行 `start_tcp_tunnel()`,不再 spawn 獨立 helper exe
 - **Runtime 狀態目錄**:一律寫入 `~/.locwarp/`(bookmarks / settings / tunnel info),避免 PyInstaller 的 `_MEIPASS` 臨時目錄問題
 - **Tile referer / OSM 替換**:OSM 的 tile 服務封鎖散佈型應用,已改用 CartoDB(OSM 資料源、CARTO 代管 CDN、免 referer)
-- **多裝置群組模式**(v0.2.0+, 三裝置上限):同步瞬移 / 同步移動,primary 不被後插裝置搶走,後插的裝置自動同步到 primary 的位置並接續 primary 正在執行的任務(fanout)
+- **多裝置群組模式**(三裝置上限):同步瞬移 / 同步移動,primary 不被後插裝置搶走,後插的裝置自動同步到 primary 的位置並接續 primary 正在執行的任務(fanout)
 - **Idle-gated 地理查詢**:reverse geocode + timezone + 天氣僅在 idle / teleport / disconnect 狀態且位置變動 ≥ 100m 才觸發,避免跑動態模式時 HTTP 對 DVT 頻道產生 contention
 - **並行查詢地理資訊**(v0.2.147+):國旗 / 地標 / 時差 / 天氣同時打,單一服務慢時其他資訊不再跟著卡住
 - **前端天氣直連**:`lookupWeather()` 直接從 renderer 打 Open-Meteo,每個用戶自己 IP 各自計算配額,不透過 backend proxy 避免全體用戶共享一個來源 IP 爆量
