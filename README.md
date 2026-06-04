@@ -39,7 +39,7 @@ TB1i7pEcifAeh8oDLLZFqiRVrpUaZmmDAn
 >
 > LocWarp 為個人獨立維護之開源專案,非商業產品,亦無專職團隊。開發者將盡力於合理時間內新增功能、回應 Issue、修復 Bug 並隨 iOS / pymobiledevice3 版本演進持續更新,然:
 >
-> - 本專案僅保證**於開發者本人測試環境**(目前為 iPhone 16 Pro Max / iOS 26.4.1 + Windows 11 專業版)下運作正常;
+> - 本專案僅保證**於開發者本人測試環境**(目前為 iPhone 16 Pro Max / iOS 26.5 + Windows 11 專業版)下運作正常;
 > - **不保證於其他裝置、iOS 修補版本、網路環境、系統配置下皆能穩定使用**;
 > - 若遇到問題,歡迎至 [Issues](https://github.com/keezxc1223/locwarp/issues) 提交完整環境資訊與日誌,以協助定位與改善;
 > - 本專案不保證永續維護,亦不承擔因使用本工具所生之任何責任。
@@ -98,7 +98,10 @@ TB1i7pEcifAeh8oDLLZFqiRVrpUaZmmDAn
 
 #### 點對點跳躍 (v0.2.96+)
 
-路線巡迴 / 多點導航中可勾「**點對點跳躍**」,改成逐點瞬移、每點停留設定的秒數 (預設 12,可手動調整),不再走 OSRM 路徑。適合不想真的走過去、只要 iPhone 依序停留在每個點上的場景。設定會記在 localStorage。
+路線巡迴 / 多點導航中可勾「**點對點跳躍**」,改成逐點瞬移、不再走 OSRM 路徑。適合不想真的走過去、只要 iPhone 依序停留在每個點上的場景。設定會記在 localStorage。
+
+- **跳躍前延遲**(預設 2 秒):瞬移前的等待,兩段延遲都會被暫停凍結(v0.2.158+)
+- **跳躍後延遲**(預設 4 秒):瞬移後在該點的停留時間
 
 
 ### 多裝置群組模式 (v0.2.0+, 三裝置上限)
@@ -157,10 +160,12 @@ TB1i7pEcifAeh8oDLLZFqiRVrpUaZmmDAn
 
 - **USB 有線**:插上即自動連線,鎖屏不影響
 - **WiFi Tunnel(USB 拔除模式)**:
-  - 按「自動偵測」→ 先 mDNS 廣播 → 失敗自動退回 /24 TCP 掃描 port 49152
+  - 按「自動偵測」→ 先 mDNS 廣播 → 失敗自動退回 /24 TCP 掃描,逐一嘗試每個候選 port
   - 成功連線的 IP / Port 記到 localStorage,下次自動預填
   - 停止 Tunnel 後若 USB 仍插著,**自動切回 USB 模式**
   - 「**重新配對**」按鈕:RemotePairing 記錄損毀時可一鍵透過 USB 重建 `~/.pymobiledevice3/`(iPhone 會跳信任提示)
+  - **釘選裝置**(v0.2.160+):連上後點「釘選」,之後每次啟動自動連上該裝置,斷線也會自動重試;有釘選時不會自動掃網路上的其他手機
+  - **螢幕暗掉維持連線**(v0.2.160+,實驗功能):定期對 RSD tunnel 補送位置保持連線,避免 iPhone 鎖屏後網路介面休眠
 - **USB 即時熱插拔偵測**:
   - 拔除 USB 約 4 秒內偵測,清除 engine + 廣播紅色橫幅 + 右鍵選單顯示「USB 已斷開」
   - 重新插上自動偵測 + 重新連線 + 重建 engine,**不必重新整理**
@@ -214,11 +219,13 @@ TB1i7pEcifAeh8oDLLZFqiRVrpUaZmmDAn
 - WebSocket 即時推播位置、進度、ETA、剩餘距離、裝置連線狀態
 - 模擬進行中切換模式 tab 不再清空地圖上的終點 / 路徑 / 路徑點(v0.2.90+),閒置時切換才會重置
 - 斷線自動重連 + banner 自動清除
+- **iOS 風格頂端分頁**(v0.2.169+):側邊欄改為導航 / 連線 / 收藏 / 設定四個頂端分頁,連線狀態與裝置卡片獨立在「連線」頁,設定獨立在「設定」頁
 - **更新檢查**:啟動時從 GitHub Releases 比對版本,有新版時在底部狀態列版本號旁顯示彩色 `NEW` 膠囊提示(不再彈出對話框打斷操作),點擊版本號即跳轉到下載頁
 - **時差 chip**(狀態列,v0.2.128+):跨時區後顯示當地時間差,點開彈窗看完整時區 / 城市 / GMT 偏移;右下時鐘即時更新
 - **路線完成提示音**(v0.2.131+):路線跑完播一段音效,新增「設定」按鈕可關閉
 - **硬體加速 toggle**(v0.2.132+,設定面板):部分顯示卡驅動下關閉可解決畫面殘影 / 黑屏 ([Issue #24](https://github.com/keezxc1223/locwarp/issues/24))
 - **IP 欄位歷史**(v0.2.152+):Tunnel IP 欄位旁新增「最近」清單,可直接點選免重打
+- **只顯示路徑時自動縮放**(v0.2.161+):選「只顯示路徑」模式時地圖自動移動並縮放至整條路線範圍
 - **Log 資料夾**按鈕(狀態列):一鍵開啟 `~/.locwarp/logs/` 資料夾,方便將 backend.log 附到 Issue
 - 右下角顯示**目前 App 版本**(有新版本時旁邊出現流動漸層 `NEW` 膠囊)
 - 介面語言:繁體中文 / English 即時切換
@@ -262,7 +269,7 @@ TB1i7pEcifAeh8oDLLZFqiRVrpUaZmmDAn
 | [FastAPI](https://fastapi.tiangolo.com/) | 0.110+ | REST API + WebSocket |
 | [uvicorn](https://www.uvicorn.org/) | 0.29+ | ASGI server(`:8777`) |
 | [websockets](https://websockets.readthedocs.io/) | 12+ | 即時位置/狀態推播給前端 |
-| [pymobiledevice3](https://github.com/doronz88/pymobiledevice3) | 9.9+ | iOS 裝置協議(DVT / RemoteServices / lockdown / LegacyLocationService) |
+| [pymobiledevice3](https://github.com/doronz88/pymobiledevice3) | 9.15+ | iOS 裝置協議(DVT / RemoteServices / lockdown / LegacyLocationService) |
 | [pydantic](https://docs.pydantic.dev/) | 2+ | 資料驗證(schemas) |
 | [httpx](https://www.python-httpx.org/) | 0.27+ | OSRM / OSRM FOSSGIS / Valhalla / BRouter / Nominatim / TimezoneDB HTTP 呼叫 |
 | [gpxpy](https://github.com/tkrajina/gpxpy) | 1.6+ | GPX 路線解析 |
