@@ -296,6 +296,8 @@ export const STRINGS = {
     en: 'Periodically re-pushes the current location while idle so the tunnel survives screen-off. Turn off if it causes instability',
   },
   'dev_mode.reveal_button': { zh: '顯示開發者模式選項', en: 'Reveal Developer Mode option' },
+  'dev_mode.enable_button': { zh: '開啟開發者模式', en: 'Enable Developer Mode' },
+  'dev_mode.need_device': { zh: '請先連接 iPhone 再開啟開發者模式', en: 'Connect an iPhone first to enable Developer Mode' },
   'dev_mode.reveal_working': { zh: '處理中...', en: 'Working...' },
   'dev_mode.reveal_tooltip': {
     zh: 'iPhone 設定裡找不到「開發者模式」時按這個,會讓選項出現',

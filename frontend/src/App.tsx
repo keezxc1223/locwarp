@@ -1383,7 +1383,23 @@ const App: React.FC = () => {
           }}
         />
         {activePage === 'settings' && (
-          <SettingsPage onOpenLogFolder={handleOpenLog} />
+          <SettingsPage
+            onOpenLogFolder={handleOpenLog}
+            onEnableDeveloperMode={async () => {
+              const target = device.connectedDevice?.udid
+              if (!target) {
+                showToast(t('dev_mode.need_device'))
+                return
+              }
+              try {
+                await api.amfiRevealDeveloperMode(target)
+                showToast(t('dev_mode.reveal_success'))
+                await device.scan()
+              } catch (err: any) {
+                showToast(t('dev_mode.reveal_failed') + (err?.message ? `: ${err.message}` : ''))
+              }
+            }}
+          />
         )}
         <div style={{ display: activePage === 'connection' ? 'block' : 'none' }}>
         <DeviceStatus
@@ -1410,17 +1426,6 @@ const App: React.FC = () => {
           tunnels={device.tunnels}
           pinnedUdids={device.pinnedUdids}
           onTogglePin={device.togglePin}
-          onRevealDeveloperMode={async (udid: string) => {
-            try {
-              await api.amfiRevealDeveloperMode(udid)
-              showToast(t('dev_mode.reveal_success'))
-              // Refresh so the button hides once the user actually enables
-              // dev mode in Settings and reconnects.
-              await device.scan()
-            } catch (err: any) {
-              showToast(t('dev_mode.reveal_failed') + (err?.message ? `: ${err.message}` : ''))
-            }
-          }}
         />
         </div>
         <div style={{ display: activePage === 'nav' ? 'block' : 'none' }}>

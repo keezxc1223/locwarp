@@ -30,7 +30,6 @@ interface DeviceStatusProps {
   tunnelStatus?: TunnelStatus;
   tunnels?: TunnelInfo[];
   onWifiConnect?: (ip: string) => Promise<any>;
-  onRevealDeveloperMode?: (udid: string) => Promise<void>;
   pinnedUdids?: string[];
   onTogglePin?: (udid: string) => void;
 }
@@ -46,7 +45,6 @@ const DeviceStatus: React.FC<DeviceStatusProps> = ({
   tunnelStatus = { running: false },
   tunnels = [],
   onWifiConnect,
-  onRevealDeveloperMode,
   pinnedUdids = [],
   onTogglePin,
 }) => {
@@ -104,7 +102,6 @@ const DeviceStatus: React.FC<DeviceStatusProps> = ({
   const [showIpHelp, setShowIpHelp] = useState(false);
   const [discovering, setDiscovering] = useState(false);
   const [wifiExpanded, setWifiExpanded] = useState(false);
-  const [revealingDevMode, setRevealingDevMode] = useState(false);
   const [showWifiWarning, setShowWifiWarning] = useState(false);
   const [showRepairConfirm, setShowRepairConfirm] = useState(false);
   const [repairState, setRepairState] = useState<'idle' | 'running' | 'success' | 'failed'>('idle');
@@ -350,51 +347,6 @@ const DeviceStatus: React.FC<DeviceStatusProps> = ({
           })}
         </div>
       )}
-
-      {/* Reveal Developer Mode button — only show when device is connected,
-          iOS >= 16, and dev mode is explicitly reported as OFF. Clicking it
-          writes the AMFIShowOverridePath marker via AMFI so the "Developer
-          Mode" option appears in Settings → Privacy & Security. */}
-      {device && isConnected && device.developerModeEnabled === false && (() => {
-        let major = 0
-        try { major = parseInt((device.iosVersion || '0').split('.')[0], 10) } catch {}
-        if (major < 16) return null
-        return (
-          <button
-            className="dev-mode-card"
-            onClick={async () => {
-              if (!onRevealDeveloperMode) return
-              setRevealingDevMode(true)
-              try {
-                await onRevealDeveloperMode(device.id)
-              } finally {
-                setRevealingDevMode(false)
-              }
-            }}
-            disabled={revealingDevMode}
-            style={{ marginBottom: 8 }}
-            title={t('dev_mode.reveal_tooltip')}
-          >
-            <span className="ic-wrap">
-              <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2">
-                <rect x="5" y="2" width="14" height="20" rx="2" />
-                <line x1="12" y1="18" x2="12" y2="18" />
-              </svg>
-            </span>
-            <span className="text">
-              <span className="title">
-                {revealingDevMode ? t('dev_mode.reveal_working') : t('dev_mode.reveal_button')}
-              </span>
-              <span className="sub">{t('dev_mode.reveal_card_sub')}</span>
-            </span>
-            {!revealingDevMode && (
-              <svg className="arrow" width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.5">
-                <polyline points="9 18 15 12 9 6" />
-              </svg>
-            )}
-          </button>
-        )
-      })()}
 
       {/* Device dropdown — only shown when 2+ USB devices found; single device auto-connects */}
       {devices.length > 1 && (

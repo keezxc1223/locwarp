@@ -12,6 +12,11 @@ import type { RenderMode, RenderModeInfo } from '../types/electron';
 
 interface Props {
   onOpenLogFolder: () => void;
+  // Fires the AMFI "reveal Developer Mode" request against the connected
+  // iPhone. App resolves the target device + surfaces a toast if none is
+  // connected. Lives here permanently (not gated on dev-mode state) so the
+  // option is always reachable from 設定.
+  onEnableDeveloperMode: () => void | Promise<void>;
 }
 
 // iOS-style switch: a pill that slides. Pure CSS via .ios-switch classes.
@@ -44,9 +49,10 @@ const Help: React.FC<{ title: string }> = ({ title }) => (
  * frequently-changed controls (path source, geocode provider, connection
  * toggles) deliberately stay in their contextual pages.
  */
-const SettingsPage: React.FC<Props> = ({ onOpenLogFolder }) => {
+const SettingsPage: React.FC<Props> = ({ onOpenLogFolder, onEnableDeveloperMode }) => {
   const t = useT();
   const [alertEnabled, setAlertEnabled] = useState<boolean>(() => isAlertSoundEnabled());
+  const [devModeBusy, setDevModeBusy] = useState(false);
   const [renderInfo, setRenderInfo] = useState<RenderModeInfo | null>(null);
   const [renderDirty, setRenderDirty] = useState(false);
   const update = useUpdateCheck();
@@ -123,6 +129,22 @@ const SettingsPage: React.FC<Props> = ({ onOpenLogFolder }) => {
         </button>
         <button type="button" className="ios-row ios-row-tap" onClick={onOpenLogFolder} title={t('status.open_log_tooltip')}>
           <span className="ios-row-label">{t('status.open_log')}</span>
+          <Chevron />
+        </button>
+        <button
+          type="button"
+          className="ios-row ios-row-tap"
+          disabled={devModeBusy}
+          title={t('dev_mode.reveal_tooltip')}
+          onClick={async () => {
+            setDevModeBusy(true);
+            try { await onEnableDeveloperMode(); }
+            finally { setDevModeBusy(false); }
+          }}
+        >
+          <span className="ios-row-label">
+            {devModeBusy ? t('dev_mode.reveal_working') : t('dev_mode.enable_button')} <Help title={t('dev_mode.reveal_tooltip')} />
+          </span>
           <Chevron />
         </button>
       </div>
