@@ -281,11 +281,33 @@ export function useDevice(subscribe?: WsSubscribe) {
     pinRetryTimers.current[udid] = setTimeout(attempt, delayMs)
   }, [])
 
+  const PIN_IP_MAP_KEY = 'locwarp.tunnel.pin_ip_map'
+
   const togglePin = useCallback((udid: string) => {
     setPinnedUdids((prev) => {
       const next = prev.includes(udid) ? prev.filter((u) => u !== udid) : [...prev, udid]
       try { localStorage.setItem(PIN_KEY, JSON.stringify(next)) } catch { /* ignore */ }
-      if (!next.includes(udid)) clearPinRetry(udid)
+      if (!next.includes(udid)) {
+        clearPinRetry(udid)
+        // Remove IP mapping when unpinning so the device is no longer
+        // auto-connected on next startup (issue #35).
+        try {
+          const map = JSON.parse(localStorage.getItem(PIN_IP_MAP_KEY) || '{}')
+          delete map[udid]
+          localStorage.setItem(PIN_IP_MAP_KEY, JSON.stringify(map))
+        } catch { /* ignore */ }
+      } else {
+        // Save last known IP when pinning so startup auto-connect can
+        // filter to pinned devices only (issue #35).
+        const entry = readSavedEntryFor(udid)
+        if (entry) {
+          try {
+            const map = JSON.parse(localStorage.getItem(PIN_IP_MAP_KEY) || '{}')
+            map[udid] = `${entry.ip}:${entry.port}`
+            localStorage.setItem(PIN_IP_MAP_KEY, JSON.stringify(map))
+          } catch { /* ignore */ }
+        }
+      }
       return next
     })
   }, [clearPinRetry])

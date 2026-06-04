@@ -401,15 +401,33 @@ const App: React.FC = () => {
             seen.add(key)
             uniq.push({ ip, port, udid })
           }
-          for (const entry of savedList) addCand(entry.ip, entry.port, entry.udid)
-          // Discover is best-effort and runs in parallel; failures don't
-          // block the savedips path.
+          // When the user has pinned devices, only auto-connect those UDIDs.
+          // This prevents a friend's device (present on the same WiFi but
+          // in savedips from a previous session) from being auto-connected
+          // on startup (issue #35). If no pins are set, fall back to the
+          // original behaviour so first-time users are unaffected.
+          const pinnedUdids: string[] = []
           try {
-            const dres = await api.wifiTunnelDiscover()
-            for (const d of (dres?.devices || [])) {
-              addCand(String(d.ip), Number(d.port) || 49152)
-            }
-          } catch { /* discover failed — savedips entries still try */ }
+            const p = JSON.parse(localStorage.getItem('locwarp.tunnel.pinned') || '[]')
+            if (Array.isArray(p)) pinnedUdids.push(...p.filter((x: any) => typeof x === 'string'))
+          } catch { /* ignore */ }
+          const hasPins = pinnedUdids.length > 0
+          const filteredList = hasPins
+            ? savedList.filter((e) => e.udid && pinnedUdids.includes(e.udid))
+            : savedList
+
+          for (const entry of filteredList) addCand(entry.ip, entry.port, entry.udid)
+          // Skip mDNS discover when user has pins — avoids connecting to
+          // unintended devices on the same network. Discover only runs
+          // when no pins are set so new users can still auto-connect.
+          if (!hasPins) {
+            try {
+              const dres = await api.wifiTunnelDiscover()
+              for (const d of (dres?.devices || [])) {
+                addCand(String(d.ip), Number(d.port) || 49152)
+              }
+            } catch { /* discover failed — savedips entries still try */ }
+          }
           // Cap at MAX_DEVICES the backend enforces — anything beyond
           // would 409 anyway.
           const limited = uniq.slice(0, 3)

@@ -1071,7 +1071,6 @@ const ControlPanel: React.FC<ControlPanelProps> = ({
                 <circle cx="9" cy="6" r="1" /><circle cx="9" cy="12" r="1" /><circle cx="9" cy="18" r="1" />
                 <circle cx="15" cy="6" r="1" /><circle cx="15" cy="12" r="1" /><circle cx="15" cy="18" r="1" />
               </svg>
-              {t('panel.library_drag_hint')}
             </div>
             <div style={{ display: 'flex', alignItems: 'center', borderBottom: '1px solid #3a3a42' }}>
               <button
