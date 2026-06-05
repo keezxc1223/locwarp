@@ -118,7 +118,21 @@ export function useSimulation(subscribe?: WsSubscribe, primaryUdid?: string | nu
   const primaryUdidRef = useRef<string | null>(primaryUdid ?? null)
   useEffect(() => { primaryUdidRef.current = primaryUdid ?? null }, [primaryUdid])
   const [mode, _setMode] = useState<SimMode>(SimMode.Teleport)
-  const [moveMode, setMoveMode] = useState<MoveMode>(MoveMode.Walking)
+  // Persisted so the user's preferred default speed survives restarts,
+  // instead of always falling back to walking.
+  const [moveMode, setMoveModeRaw] = useState<MoveMode>(() => {
+    try {
+      const v = localStorage.getItem('locwarp.speed.mode')
+      if (v === MoveMode.Walking || v === MoveMode.Running || v === MoveMode.Driving) {
+        return v as MoveMode
+      }
+    } catch { /* ignore */ }
+    return MoveMode.Walking
+  })
+  const setMoveMode = useCallback((m: MoveMode) => {
+    setMoveModeRaw(m)
+    try { localStorage.setItem('locwarp.speed.mode', m) } catch { /* ignore */ }
+  }, [])
   const [status, setStatus] = useState<SimulationStatus>({
     running: false,
     paused: false,
@@ -134,7 +148,20 @@ export function useSimulation(subscribe?: WsSubscribe, primaryUdid?: string | nu
   const [eta, setEta] = useState<number | null>(null)
   const [waypoints, setWaypoints] = useState<LatLng[]>([])
   const [routePath, setRoutePath] = useState<LatLng[]>([])
-  const [customSpeedKmh, setCustomSpeedKmh] = useState<number | null>(null)
+  const [customSpeedKmh, setCustomSpeedKmhRaw] = useState<number | null>(() => {
+    try {
+      const v = localStorage.getItem('locwarp.speed.custom_kmh')
+      if (v != null) { const n = parseFloat(v); if (Number.isFinite(n) && n > 0) return n }
+    } catch { /* ignore */ }
+    return null
+  })
+  const setCustomSpeedKmh = useCallback((v: number | null) => {
+    setCustomSpeedKmhRaw(v)
+    try {
+      if (v == null) localStorage.removeItem('locwarp.speed.custom_kmh')
+      else localStorage.setItem('locwarp.speed.custom_kmh', String(v))
+    } catch { /* ignore */ }
+  }, [])
   const [speedMinKmh, setSpeedMinKmh] = useState<number | null>(null)
   const [speedMaxKmh, setSpeedMaxKmh] = useState<number | null>(null)
   // Global "straight-line path" toggle. When on, all nav modes bypass OSRM

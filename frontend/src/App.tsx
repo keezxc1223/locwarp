@@ -1304,24 +1304,25 @@ const App: React.FC = () => {
   // preview and as a very last fallback in the status bar before any
   // apply / sim start has happened.
   const speed = SPEED_MAP[sim.moveMode] || 10.8
-  // Status-bar display: always show what the backend is actually
-  // executing (effectiveSpeed, set on sim start / applySpeed /
-  // initialized to walking default). Selecting a preset or typing a
-  // custom km/h no longer changes the display until the user clicks
-  // 套用 (apply-speed) or starts a new sim, which matches the user's
-  // mental model of "what's running on the iPhone".
   const fmtSpeedFromInputs = (kmh: number | null, lo: number | null, hi: number | null): number | string => {
     if (lo != null && hi != null) return `${Math.min(lo, hi)}~${Math.max(lo, hi)}`
     if (kmh != null) return kmh
     return SPEED_MAP[sim.moveMode] || 10.8
   }
-  const displaySpeed: number | string = sim.effectiveSpeed
-    ? fmtSpeedFromInputs(sim.effectiveSpeed.kmh, sim.effectiveSpeed.min, sim.effectiveSpeed.max)
-    : SPEED_MAP[sim.moveMode] || 10.8
 
   // Determine running/paused state from status
   const isRunning = sim.status.running
   const isPaused = sim.status.paused
+
+  // Status-bar speed display:
+  //  - Idle: reflect the speed the user has *selected* (preset mode default
+  //    or custom km/h / range) so picking a speed updates the bar at once.
+  //  - Running: show what's actually applied on the device (effectiveSpeed);
+  //    changing the selector mid-route still needs 套用新速度 to take effect.
+  const selectedSpeedDisplay = fmtSpeedFromInputs(sim.customSpeedKmh, sim.speedMinKmh, sim.speedMaxKmh)
+  const displaySpeed: number | string = isRunning && sim.effectiveSpeed
+    ? fmtSpeedFromInputs(sim.effectiveSpeed.kmh, sim.effectiveSpeed.min, sim.effectiveSpeed.max)
+    : selectedSpeedDisplay
 
   return (
     <div className="app-layout">

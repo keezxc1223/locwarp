@@ -882,7 +882,7 @@ class DeviceManager:
                 await new_dvt.__aenter__()
             except Exception as exc:
                 last_exc = exc
-                remaining = deadline - loop.time()
+                remaining = deadline - time.monotonic()
                 if remaining <= 0:
                     logger.warning(
                         "get_fresh_dvt_provider exhausted for %s: %s", udid, exc,
