@@ -82,7 +82,13 @@ const App: React.FC = () => {
   const [cooldown, setCooldown] = useState(0)
   const [cooldownEnabled, setCooldownEnabled] = useState(false)
   const [randomWalkRadius, setRandomWalkRadius] = useState(500)
-  const [clickToAddWaypoint, setClickToAddWaypoint] = useState(false)
+  const [clickToAddWaypoint, setClickToAddWaypointRaw] = useState<boolean>(() => {
+    try { return localStorage.getItem('locwarp.click_to_add_waypoint') === '1' } catch { return false }
+  })
+  const setClickToAddWaypoint = useCallback((v: boolean) => {
+    setClickToAddWaypointRaw(v)
+    try { localStorage.setItem('locwarp.click_to_add_waypoint', v ? '1' : '0') } catch { /* ignore */ }
+  }, [])
   const [goldDittoA, setGoldDittoARaw] = useState<string>(() => {
     try { return localStorage.getItem('locwarp.goldditto.a') ?? '' } catch { return '' }
   })
