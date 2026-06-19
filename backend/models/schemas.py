@@ -17,6 +17,7 @@ class SimulationState(str, Enum):
     JOYSTICK = "joystick"
     RANDOM_WALK = "random_walk"
     MULTI_STOP = "multi_stop"
+    FLOWER = "flower"
     PAUSED = "paused"
     RECONNECTING = "reconnecting"
     DISCONNECTED = "disconnected"
@@ -108,6 +109,33 @@ class MultiStopRequest(BaseModel):
     jump_mode: bool = False
     jump_pre_delay: float = 2.0
     jump_post_delay: float = 4.0
+
+
+class FlowerRequest(BaseModel):
+    """種花模式 — visit each waypoint and walk a circle around it.
+
+    For every waypoint the device (optionally) travels there, waits, then
+    walks ``circles`` laps around a circle of radius ``radius_m`` made of
+    ``segments`` vertices. The whole list repeats ``rounds`` times.
+    """
+    waypoints: list[Coordinate]
+    mode: MovementMode = MovementMode.WALKING
+    speed_kmh: float | None = None
+    speed_min_kmh: float | None = None
+    speed_max_kmh: float | None = None
+    straight_line: bool = False
+    route_engine: str | None = None
+    udid: str | None = None
+    # Circle geometry / repetition.
+    radius_m: float = 30.0      # circle radius around each flower
+    segments: int = 8           # vertices per circle (higher = smoother)
+    circles: int = 1            # laps walked around each flower
+    rounds: int = 1             # times the whole waypoint list repeats
+    # Dwell either side of arriving at a flower (seconds).
+    pre_wait: float = 3.0       # wait before moving to the next flower
+    post_wait: float = 3.0      # wait after arriving, before circling
+    # When True, teleport between flowers instead of walking the route.
+    teleport: bool = False
 
 
 class RandomWalkRequest(BaseModel):

@@ -191,17 +191,6 @@ const modeIcons: Record<SimMode, JSX.Element> = {
       <path d="M21 13v2a4 4 0 01-4 4H3" />
     </svg>
   ),
-  [SimMode.MultiStop]: (
-    <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2">
-      <circle cx="6" cy="6" r="3" />
-      <circle cx="18" cy="6" r="3" />
-      <circle cx="6" cy="18" r="3" />
-      <circle cx="18" cy="18" r="3" />
-      <line x1="9" y1="6" x2="15" y2="6" />
-      <line x1="6" y1="9" x2="6" y2="15" />
-      <line x1="18" y1="9" x2="18" y2="15" />
-    </svg>
-  ),
   [SimMode.RandomWalk]: (
     <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2">
       <path d="M2 12c2-3 4-1 6-4s2-5 4-2 3 4 5 1 3-4 5-1" />
@@ -227,6 +216,15 @@ const modeIcons: Record<SimMode, JSX.Element> = {
       <circle cx="12" cy="12" r="1.6" fill="currentColor" stroke="none" />
     </svg>
   ),
+  [SimMode.Flower]: (
+    <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2">
+      <circle cx="12" cy="12" r="2" fill="currentColor" stroke="none" />
+      <path d="M12 12c0-3-2-5 0-7s4 0 0 7" />
+      <path d="M12 12c3 0 5-2 7 0s0 4-7 0" />
+      <path d="M12 12c0 3 2 5 0 7s-4 0 0-7" />
+      <path d="M12 12c-3 0-5 2-7 0s0-4 7 0" />
+    </svg>
+  ),
 };
 
 import type { StringKey } from '../i18n';
@@ -234,10 +232,10 @@ const modeLabelKeys: Record<SimMode, StringKey> = {
   [SimMode.Teleport]: 'mode.teleport',
   [SimMode.Navigate]: 'mode.navigate',
   [SimMode.Loop]: 'mode.loop',
-  [SimMode.MultiStop]: 'mode.multi_stop',
   [SimMode.RandomWalk]: 'mode.random_walk',
   [SimMode.Joystick]: 'mode.joystick',
   [SimMode.GoldDitto]: 'mode.goldditto',
+  [SimMode.Flower]: 'mode.flower',
 };
 
 const ControlPanel: React.FC<ControlPanelProps> = ({
@@ -506,10 +504,7 @@ const ControlPanel: React.FC<ControlPanelProps> = ({
               gap: 6,
             }}
           >
-            {/* 多點導航 (MultiStop) is merged into 路線 (Loop): the only real
-                difference users saw was the lap count, which 路線 already
-                exposes (1 圈 = single pass). Hide it from the picker. */}
-            {Object.values(SimMode).filter((mode) => mode !== SimMode.MultiStop).map((mode) => (
+            {Object.values(SimMode).map((mode) => (
               <button
                 key={mode}
                 className={`mode-btn${simMode === mode ? ' active' : ''}`}
@@ -554,7 +549,7 @@ const ControlPanel: React.FC<ControlPanelProps> = ({
                 disabled={straightLine}
               />
             )}
-            {onClickToAddWaypointChange && (simMode === SimMode.Loop || simMode === SimMode.MultiStop) && (
+            {onClickToAddWaypointChange && (simMode === SimMode.Loop || simMode === SimMode.Flower) && (
               <label
                 className="lw-checkbox"
                 title={t('panel.click_waypoint_tooltip')}
@@ -578,7 +573,7 @@ const ControlPanel: React.FC<ControlPanelProps> = ({
                 </span>
               </label>
             )}
-            {onKeepWaypointsChange && (simMode === SimMode.Loop || simMode === SimMode.MultiStop) && (
+            {onKeepWaypointsChange && (simMode === SimMode.Loop || simMode === SimMode.Flower) && (
               <label
                 className="lw-checkbox"
                 title={t('panel.keep_waypoints_tooltip')}
@@ -602,7 +597,7 @@ const ControlPanel: React.FC<ControlPanelProps> = ({
                 </span>
               </label>
             )}
-            {onJumpModeChange && (simMode === SimMode.Loop || simMode === SimMode.MultiStop) && (
+            {onJumpModeChange && simMode === SimMode.Loop && (
               <div
                 style={{
                   gridColumn: '1 / -1',
@@ -677,6 +672,137 @@ const ControlPanel: React.FC<ControlPanelProps> = ({
             )}
           </div>
         )}
+      </div>
+
+      {/* Speed Selector — kept directly under the Mode picker so the speed
+          controls aren't buried beneath the mode-specific sections below. */}
+      <div className="section">
+        <div
+          className="section-title"
+          onClick={() => toggleSection('speed')}
+          style={{ cursor: 'pointer', display: 'flex', alignItems: 'center', gap: 6 }}
+        >
+          {chevron(sections.speed)} {t('panel.speed')}
+        </div>
+        {sections.speed && (
+          <div className="section-content">
+            <div className="speed-selector">
+              {[
+                { labelKey: 'move.walking' as const, value: 10.8, mode: 'walking' as MoveMode },
+                { labelKey: 'move.running' as const, value: 19.8, mode: 'running' as MoveMode },
+                { labelKey: 'move.driving' as const, value: 60, mode: 'driving' as MoveMode },
+              ].map((opt) => (
+                <button
+                  key={opt.value}
+                  className={`speed-btn${(moveMode === opt.mode && customSpeedKmh == null && speedMinKmh == null && speedMaxKmh == null) ? ' active' : ''}`}
+                  onClick={() => {
+                    onMoveModeChange(opt.mode);
+                    onSpeedChange(opt.value);
+                    onCustomSpeedChange(null);
+                  }}
+                  style={{ padding: '4px 2px' }}
+                >
+                  <div style={{ fontSize: 11, fontWeight: 500 }}>{t(opt.labelKey)}</div>
+                  <div style={{ fontSize: 9, opacity: 0.6 }}>{opt.value} km/h</div>
+                </button>
+              ))}
+            </div>
+            <div style={{ display: 'flex', gap: 6, marginTop: 8, alignItems: 'center' }}>
+              <span style={{ fontSize: 12, opacity: 0.7, whiteSpace: 'nowrap' }}>{t('panel.custom_speed')}:</span>
+              <input
+                type="number"
+                className="search-input"
+                placeholder="km/h"
+                value={customSpeedKmh ?? ''}
+                onChange={(e) => {
+                  const v = e.target.value
+                  if (v === '') {
+                    onCustomSpeedChange(null)
+                  } else {
+                    const n = parseFloat(v)
+                    if (!isNaN(n) && n > 0) onCustomSpeedChange(n)
+                  }
+                }}
+                style={{ flex: 1, maxWidth: 80 }}
+                min="0.1"
+                step="0.5"
+              />
+              <span style={{ fontSize: 11, opacity: 0.5 }}>km/h</span>
+              {customSpeedKmh && (
+                <button
+                  className="action-btn"
+                  style={{ padding: '2px 8px', fontSize: 11 }}
+                  onClick={() => onCustomSpeedChange(null)}
+                >
+                  {t('generic.clear')}
+                </button>
+              )}
+            </div>
+            {customSpeedKmh && (
+              <div style={{ fontSize: 11, color: '#4caf50', marginTop: 4 }}>
+                {t('panel.custom_speed_active')}: {customSpeedKmh} km/h ({(customSpeedKmh / 3.6).toFixed(1)} m/s)
+              </div>
+            )}
+
+            {/* Random range (overrides fixed) */}
+            <div style={{ marginTop: 8 }}>
+              <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', marginBottom: 4 }}>
+                <span style={{ fontSize: 12, opacity: 0.7 }}>{t('panel.speed_range')}:</span>
+                {(speedMinKmh != null || speedMaxKmh != null) && (
+                  <button
+                    className="action-btn"
+                    style={{ padding: '2px 8px', fontSize: 11 }}
+                    onClick={() => { onSpeedMinChange(null); onSpeedMaxChange(null); }}
+                  >
+                    {t('generic.clear')}
+                  </button>
+                )}
+              </div>
+              <div style={{ display: 'flex', gap: 6, alignItems: 'center' }}>
+                <input
+                  type="number"
+                  className="search-input"
+                  placeholder={t('panel.speed_range_min')}
+                  value={speedMinKmh ?? ''}
+                  onChange={(e) => {
+                    const v = e.target.value
+                    if (v === '') return onSpeedMinChange(null)
+                    const n = parseFloat(v)
+                    if (!isNaN(n) && n > 0) onSpeedMinChange(n)
+                  }}
+                  style={{ flex: 1, fontSize: 12 }}
+                  min="0.1"
+                  step="1"
+                />
+                <span style={{ fontSize: 12, opacity: 0.5 }}>~</span>
+                <input
+                  type="number"
+                  className="search-input"
+                  placeholder={t('panel.speed_range_max')}
+                  value={speedMaxKmh ?? ''}
+                  onChange={(e) => {
+                    const v = e.target.value
+                    if (v === '') return onSpeedMaxChange(null)
+                    const n = parseFloat(v)
+                    if (!isNaN(n) && n > 0) onSpeedMaxChange(n)
+                  }}
+                  style={{ flex: 1, fontSize: 12 }}
+                  min="0.1"
+                  step="1"
+                />
+              </div>
+            </div>
+            {speedMinKmh != null && speedMaxKmh != null && (
+              <div style={{ fontSize: 11, color: '#ffb74d', marginTop: 4 }}>
+                {t('panel.speed_range_active')}: {Math.min(speedMinKmh, speedMaxKmh)}~{Math.max(speedMinKmh, speedMaxKmh)} km/h ({t('panel.speed_range_hint')})
+              </div>
+            )}
+          </div>
+        )}
+
+        {/* Apply-speed button — only visible while a route is running so the
+            user can hot-swap speed mid-nav without stopping / restarting. */}
+        {isRunning && onApplySpeed && <ApplySpeedButton onApply={onApplySpeed} t={t} />}
       </div>
 
       {modeExtraSection}
@@ -861,136 +987,6 @@ const ControlPanel: React.FC<ControlPanelProps> = ({
           </div>
         </div>
       )}
-
-      {/* Speed Selector */}
-      <div className="section">
-        <div
-          className="section-title"
-          onClick={() => toggleSection('speed')}
-          style={{ cursor: 'pointer', display: 'flex', alignItems: 'center', gap: 6 }}
-        >
-          {chevron(sections.speed)} {t('panel.speed')}
-        </div>
-        {sections.speed && (
-          <div className="section-content">
-            <div className="speed-selector">
-              {[
-                { labelKey: 'move.walking' as const, value: 10.8, mode: 'walking' as MoveMode },
-                { labelKey: 'move.running' as const, value: 19.8, mode: 'running' as MoveMode },
-                { labelKey: 'move.driving' as const, value: 60, mode: 'driving' as MoveMode },
-              ].map((opt) => (
-                <button
-                  key={opt.value}
-                  className={`speed-btn${(moveMode === opt.mode && customSpeedKmh == null && speedMinKmh == null && speedMaxKmh == null) ? ' active' : ''}`}
-                  onClick={() => {
-                    onMoveModeChange(opt.mode);
-                    onSpeedChange(opt.value);
-                    onCustomSpeedChange(null);
-                  }}
-                  style={{ padding: '4px 2px' }}
-                >
-                  <div style={{ fontSize: 11, fontWeight: 500 }}>{t(opt.labelKey)}</div>
-                  <div style={{ fontSize: 9, opacity: 0.6 }}>{opt.value} km/h</div>
-                </button>
-              ))}
-            </div>
-            <div style={{ display: 'flex', gap: 6, marginTop: 8, alignItems: 'center' }}>
-              <span style={{ fontSize: 12, opacity: 0.7, whiteSpace: 'nowrap' }}>{t('panel.custom_speed')}:</span>
-              <input
-                type="number"
-                className="search-input"
-                placeholder="km/h"
-                value={customSpeedKmh ?? ''}
-                onChange={(e) => {
-                  const v = e.target.value
-                  if (v === '') {
-                    onCustomSpeedChange(null)
-                  } else {
-                    const n = parseFloat(v)
-                    if (!isNaN(n) && n > 0) onCustomSpeedChange(n)
-                  }
-                }}
-                style={{ flex: 1, maxWidth: 80 }}
-                min="0.1"
-                step="0.5"
-              />
-              <span style={{ fontSize: 11, opacity: 0.5 }}>km/h</span>
-              {customSpeedKmh && (
-                <button
-                  className="action-btn"
-                  style={{ padding: '2px 8px', fontSize: 11 }}
-                  onClick={() => onCustomSpeedChange(null)}
-                >
-                  {t('generic.clear')}
-                </button>
-              )}
-            </div>
-            {customSpeedKmh && (
-              <div style={{ fontSize: 11, color: '#4caf50', marginTop: 4 }}>
-                {t('panel.custom_speed_active')}: {customSpeedKmh} km/h ({(customSpeedKmh / 3.6).toFixed(1)} m/s)
-              </div>
-            )}
-
-            {/* Random range (overrides fixed) */}
-            <div style={{ marginTop: 8 }}>
-              <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', marginBottom: 4 }}>
-                <span style={{ fontSize: 12, opacity: 0.7 }}>{t('panel.speed_range')}:</span>
-                {(speedMinKmh != null || speedMaxKmh != null) && (
-                  <button
-                    className="action-btn"
-                    style={{ padding: '2px 8px', fontSize: 11 }}
-                    onClick={() => { onSpeedMinChange(null); onSpeedMaxChange(null); }}
-                  >
-                    {t('generic.clear')}
-                  </button>
-                )}
-              </div>
-              <div style={{ display: 'flex', gap: 6, alignItems: 'center' }}>
-                <input
-                  type="number"
-                  className="search-input"
-                  placeholder={t('panel.speed_range_min')}
-                  value={speedMinKmh ?? ''}
-                  onChange={(e) => {
-                    const v = e.target.value
-                    if (v === '') return onSpeedMinChange(null)
-                    const n = parseFloat(v)
-                    if (!isNaN(n) && n > 0) onSpeedMinChange(n)
-                  }}
-                  style={{ flex: 1, fontSize: 12 }}
-                  min="0.1"
-                  step="1"
-                />
-                <span style={{ fontSize: 12, opacity: 0.5 }}>~</span>
-                <input
-                  type="number"
-                  className="search-input"
-                  placeholder={t('panel.speed_range_max')}
-                  value={speedMaxKmh ?? ''}
-                  onChange={(e) => {
-                    const v = e.target.value
-                    if (v === '') return onSpeedMaxChange(null)
-                    const n = parseFloat(v)
-                    if (!isNaN(n) && n > 0) onSpeedMaxChange(n)
-                  }}
-                  style={{ flex: 1, fontSize: 12 }}
-                  min="0.1"
-                  step="1"
-                />
-              </div>
-            </div>
-            {speedMinKmh != null && speedMaxKmh != null && (
-              <div style={{ fontSize: 11, color: '#ffb74d', marginTop: 4 }}>
-                {t('panel.speed_range_active')}: {Math.min(speedMinKmh, speedMaxKmh)}~{Math.max(speedMinKmh, speedMaxKmh)} km/h ({t('panel.speed_range_hint')})
-              </div>
-            )}
-          </div>
-        )}
-
-        {/* Apply-speed button — only visible while a route is running so the
-            user can hot-swap speed mid-nav without stopping / restarting. */}
-        {isRunning && onApplySpeed && <ApplySpeedButton onApply={onApplySpeed} t={t} />}
-      </div>
 
       {/* Start / Stop / Pause moved to the bottom-left of the map (sits
           above the coord-input strip). See MapView's TransportButtons

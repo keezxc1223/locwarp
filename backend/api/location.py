@@ -9,6 +9,7 @@ from models.schemas import (
     NavigateRequest,
     LoopRequest,
     MultiStopRequest,
+    FlowerRequest,
     RandomWalkRequest,
     JoystickStartRequest,
     GoldDittoCycleRequest,
@@ -411,6 +412,23 @@ async def multi_stop(req: MultiStopRequest):
         jump_mode=req.jump_mode, jump_pre_delay=req.jump_pre_delay, jump_post_delay=req.jump_post_delay,
     ))
     return {"status": "started", "stops": len(req.waypoints), "mode": req.mode}
+
+
+@router.post("/flower")
+async def flower(req: FlowerRequest):
+    engine = await _engine(getattr(req, "udid", None) if 'req' in dir() else None)
+    _spawn(engine.flower(
+        req.waypoints, req.mode,
+        radius_m=req.radius_m, segments=req.segments,
+        circles=req.circles, rounds=req.rounds,
+        pre_wait=req.pre_wait, post_wait=req.post_wait,
+        teleport=req.teleport,
+        speed_kmh=req.speed_kmh,
+        speed_min_kmh=req.speed_min_kmh, speed_max_kmh=req.speed_max_kmh,
+        straight_line=req.straight_line,
+        route_engine=req.route_engine,
+    ))
+    return {"status": "started", "flowers": len(req.waypoints), "mode": req.mode}
 
 
 class InsertWaypointRequest(BaseModel):

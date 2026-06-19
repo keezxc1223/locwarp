@@ -1,4 +1,4 @@
-import React, { useState, useCallback, useEffect, useRef } from 'react'
+import React, { useState, useCallback, useEffect, useRef, useMemo } from 'react'
 import { createPortal } from 'react-dom'
 import { useT } from './i18n'
 import { useWebSocket } from './hooks/useWebSocket'
@@ -518,7 +518,7 @@ const App: React.FC = () => {
       // inserted in a past / current leg the new wp is recorded for
       // the route list but the iPhone keeps walking forward without
       // backtracking. See SimulationEngine.live_insert_waypoint.
-      const isRouteMode = sim.mode === SimMode.Loop || sim.mode === SimMode.MultiStop
+      const isRouteMode = sim.mode === SimMode.Loop
       if (isRouteMode && sim.status?.running) {
         const udids = device.connectedDevices.map((d) => d.udid)
         if (udids.length > 0) {
@@ -536,7 +536,7 @@ const App: React.FC = () => {
     // waypoint-based mode, append to the waypoint list. Otherwise a map
     // click is a no-op (teleport / navigate live on right-click menu).
     if (!clickToAddWaypoint) return
-    if (sim.mode !== SimMode.Loop && sim.mode !== SimMode.MultiStop) return
+    if (sim.mode !== SimMode.Loop && sim.mode !== SimMode.Flower) return
     sim.setWaypoints((prev: any[]) => {
       if (prev.length === 0 && sim.currentPosition) {
         return [
@@ -943,6 +943,29 @@ const App: React.FC = () => {
     }
   }, [sim, device, showToast, t])
 
+  // 種花模式 start: circle every placed waypoint. Independent from the
+  // 多點路徑 (Loop) start path — it has its own backend handler / settings.
+  const handleStartFlower = useCallback(async () => {
+    const route = sim.waypoints
+    if (route.length < 1) {
+      showToast(t('toast.no_waypoints'))
+      return
+    }
+    // Walking to the first flower needs a current position; teleport mode
+    // doesn't (it jumps straight onto each flower).
+    if (!sim.flowerTeleport && !sim.currentPosition) {
+      showToast(t('toast.no_position_random'))
+      return
+    }
+    const udids = device.connectedDevices.map((d) => d.udid)
+    if (udids.length >= 2) {
+      const outcome = await sim.flowerAll(udids, route)
+      showToast(toastForFanout(t, t('mode.flower'), outcome, device.connectedDevices))
+    } else {
+      sim.flower(route)
+    }
+  }, [sim, device, showToast, t])
+
   // -- ControlPanel handlers --
   const handleStart = useCallback(async () => {
     const udids = device.connectedDevices.map((d) => d.udid)
@@ -970,12 +993,14 @@ const App: React.FC = () => {
       } else {
         sim.randomWalk(sim.currentPosition, randomWalkRadius)
       }
-    } else if (sim.mode === SimMode.Loop || sim.mode === SimMode.MultiStop) {
+    } else if (sim.mode === SimMode.Loop) {
       handleStartWaypointRoute()
+    } else if (sim.mode === SimMode.Flower) {
+      handleStartFlower()
     } else if (sim.mode === SimMode.GoldDitto) {
       handleGoldDittoStart()
     }
-  }, [sim, device, randomWalkRadius, handleStartWaypointRoute, handleGoldDittoStart, showToast, t])
+  }, [sim, device, randomWalkRadius, handleStartWaypointRoute, handleStartFlower, handleGoldDittoStart, showToast, t])
 
   const handleStop = useCallback(async () => {
     // Stop the active movement only — keep the simulated location in place
@@ -1320,6 +1345,27 @@ const App: React.FC = () => {
   const destPos = sim.destination
     ? { lat: sim.destination.lat, lng: sim.destination.lng }
     : null
+
+  // 種花模式 map preview: one segmented polygon per waypoint, matching the
+  // backend's circle geometry (radius + segment count) so the user sees
+  // exactly what will be walked. Recomputed when the points / settings change.
+  const flowerPreview = useMemo(() => {
+    if (sim.mode !== SimMode.Flower) return []
+    const R = sim.flowerRadius
+    const N = Math.max(3, Math.round(sim.flowerSegments))
+    return sim.waypoints.map((wp: { lat: number; lng: number }) => {
+      const coslat = Math.max(Math.cos((wp.lat * Math.PI) / 180), 1e-6)
+      const pts: { lat: number; lng: number }[] = []
+      for (let k = 0; k < N; k++) {
+        const ang = (2 * Math.PI * k) / N
+        pts.push({
+          lat: wp.lat + (R * Math.cos(ang)) / 111320,
+          lng: wp.lng + (R * Math.sin(ang)) / (111320 * coslat),
+        })
+      }
+      return pts
+    })
+  }, [sim.mode, sim.waypoints, sim.flowerRadius, sim.flowerSegments])
 
   // Mode default km/h, used only for ControlPanel's in-panel preset
   // preview and as a very last fallback in the status bar before any
@@ -1693,7 +1739,7 @@ const App: React.FC = () => {
           jumpPostDelay={sim.jumpPostDelay}
           onJumpPostDelayChange={sim.setJumpPostDelay}
           openLibraryToken={openLibraryToken}
-          modeExtraSection={sim.mode === SimMode.Loop ? (
+          modeExtraSection={(sim.mode === SimMode.Loop || sim.mode === SimMode.Flower) ? (
           <div className="section" style={{ margin: '0 0 8px 0' }}>
             <div className="section-title" style={{ display: 'flex', alignItems: 'center', gap: 6 }}>
               <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2">
@@ -1701,16 +1747,64 @@ const App: React.FC = () => {
                 <line x1="12" y1="5" x2="12" y2="1" />
                 <line x1="12" y1="23" x2="12" y2="19" />
               </svg>
-              {t('panel.waypoints')} ({sim.waypoints.length})
+              {sim.mode === SimMode.Flower ? t('mode.flower') : t('panel.waypoints')} ({sim.waypoints.length})
               <span style={{ fontSize: 10, opacity: 0.5, marginLeft: 4 }}>{t('panel.waypoints_hint')}</span>
             </div>
             <div className="section-content">
-              <PauseControl
-                labelKey="pause.loop"
-                value={sim.pauseLoop}
-                onChange={sim.setPauseLoop}
-              />
-              {(() => {
+              {sim.mode === SimMode.Loop && (
+                <PauseControl
+                  labelKey="pause.loop"
+                  value={sim.pauseLoop}
+                  onChange={sim.setPauseLoop}
+                />
+              )}
+              {sim.mode === SimMode.Flower && (
+                <div style={{
+                  marginBottom: 8, padding: '8px 10px',
+                  background: 'rgba(108, 140, 255, 0.06)',
+                  border: '1px solid rgba(108, 140, 255, 0.18)',
+                  borderRadius: 6, fontSize: 11,
+                }}>
+                  <div style={{ opacity: 0.6, marginBottom: 8, lineHeight: 1.4 }}>{t('flower.hint')}</div>
+                  {/* teleport vs walk approach */}
+                  <label className="lw-checkbox" title={t('flower.teleport_hint')} style={{ marginBottom: 8 }}>
+                    <input
+                      type="checkbox"
+                      checked={sim.flowerTeleport}
+                      onChange={(e) => sim.setFlowerTeleport(e.target.checked)}
+                    />
+                    <span className="lw-checkbox-box"></span>
+                    <span className="lw-checkbox-label" style={{ lineHeight: 1.15 }}>{t('flower.teleport')}</span>
+                  </label>
+                  {([
+                    { label: t('flower.radius'), value: sim.flowerRadius, set: sim.setFlowerRadius, unit: 'm', min: 1, step: 5 },
+                    { label: t('flower.segments'), value: sim.flowerSegments, set: sim.setFlowerSegments, unit: t('flower.seg_unit'), min: 3, step: 1 },
+                    { label: t('flower.circles'), value: sim.flowerCircles, set: sim.setFlowerCircles, unit: t('flower.circle_unit'), min: 1, step: 1 },
+                    { label: t('flower.rounds'), value: sim.flowerRounds, set: sim.setFlowerRounds, unit: t('flower.round_unit'), min: 1, step: 1 },
+                    { label: t('flower.pre_wait'), value: sim.flowerPreWait, set: sim.setFlowerPreWait, unit: t('flower.seconds'), min: 0, step: 1 },
+                    { label: t('flower.post_wait'), value: sim.flowerPostWait, set: sim.setFlowerPostWait, unit: t('flower.seconds'), min: 0, step: 1 },
+                  ] as const).map((row, ri) => (
+                    <div key={ri} style={{ display: 'flex', gap: 6, alignItems: 'center', marginBottom: 6 }}>
+                      <span style={{ opacity: 0.75, flex: 1, whiteSpace: 'nowrap' }}>{row.label}</span>
+                      <input
+                        type="number"
+                        className="lw-input"
+                        min={row.min}
+                        step={row.step}
+                        value={row.value}
+                        onChange={(e) => {
+                          const n = parseFloat(e.target.value)
+                          if (Number.isFinite(n)) row.set(n)
+                        }}
+                        style={{ width: 64 }}
+                      />
+                      <span style={{ opacity: 0.5, width: 18, textAlign: 'left' }}>{row.unit}</span>
+                    </div>
+                  ))}
+                  <div style={{ opacity: 0.45, fontSize: 10, marginTop: 2 }}>{t('flower.segments_hint')}</div>
+                </div>
+              )}
+              {sim.mode === SimMode.Loop && (() => {
                 const lap = sim.loopLapCount // null = 無限, 0 = 單程(原多點), N = N 圈
                 return (
                 <div style={{
@@ -1748,6 +1842,10 @@ const App: React.FC = () => {
                 )
               })()}
               <div style={{ marginBottom: 6, fontSize: 11 }}>
+                {/* Random-waypoint generator (半徑 / 數量 / 隨機產生 / 全隨機) is
+                    for 多點路徑 only; 種花模式 places flowers by click / paste. */}
+                {sim.mode === SimMode.Loop && (
+                <>
                 <div style={{ display: 'flex', gap: 6, alignItems: 'center', marginBottom: 4 }}>
                   <span style={{ opacity: 0.7, width: 36 }}>{t('panel.waypoints_radius')}</span>
                   <input
@@ -1787,6 +1885,8 @@ const App: React.FC = () => {
                     title={t('panel.waypoints_gen_all_tooltip')}
                   >{t('panel.waypoints_generate_all')}</button>
                 </div>
+                </>
+                )}
                 {/* Bulk paste button — Variant D from the mockup: gradient pill
                     with an animated shimmer that hints "this is the eye-catcher". */}
                 <button
@@ -2138,9 +2238,10 @@ const App: React.FC = () => {
           destination={destPos}
           waypoints={sim.waypoints.map((w, i) => ({ ...w, index: i }))}
           routePath={sim.routePath}
+          flowerPreview={flowerPreview}
           randomWalkRadius={
             sim.mode === SimMode.RandomWalk ? randomWalkRadius :
-            (sim.mode === SimMode.Loop || sim.mode === SimMode.MultiStop) ? wpGenRadius :
+            sim.mode === SimMode.Loop ? wpGenRadius :
             null
           }
           randomWalkCenter={sim.mode === SimMode.RandomWalk ? sim.randomWalkCenter : null}
@@ -2154,7 +2255,7 @@ const App: React.FC = () => {
           onRemoveWaypoint={handleRemoveWaypoint}
           onInsertAfterWp={handleInsertAfterWp}
           insertAfterActive={insertAfterIndex !== null}
-          showWaypointOption={sim.mode === SimMode.Loop || sim.mode === SimMode.MultiStop || sim.mode === SimMode.Navigate}
+          showWaypointOption={sim.mode === SimMode.Loop || sim.mode === SimMode.Flower || sim.mode === SimMode.Navigate}
           deviceConnected={device.connectedDevice !== null}
           onShowToast={showToast}
           userAvatarHtml={avatarToHtml(userAvatar, customPng)}
@@ -2180,7 +2281,7 @@ const App: React.FC = () => {
           onStop={handleStop}
           onPause={handlePause}
           onResume={handleResume}
-          showBulkPasteOnMap={sim.mode === SimMode.Loop || sim.mode === SimMode.MultiStop}
+          showBulkPasteOnMap={sim.mode === SimMode.Loop || sim.mode === SimMode.Flower}
           onBulkPasteOpen={() => { setRoutePasteText(''); setRoutePasteOpen(true); }}
         />
         {avatarPickerOpen && (

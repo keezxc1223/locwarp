@@ -145,10 +145,27 @@ export const STRINGS = {
   'mode.teleport': { zh: '瞬間移動', en: 'Teleport' },
   'mode.navigate': { zh: '導航移動', en: 'Navigate' },
   'mode.loop': { zh: '多點路徑', en: 'Multi-point Route' },
-  'mode.multi_stop': { zh: '多點導航', en: 'Multi-stop' },
   'mode.random_walk': { zh: '隨機漫步', en: 'Random Walk' },
   'mode.joystick': { zh: '搖桿操控', en: 'Joystick' },
   'mode.goldditto': { zh: '拉金盆', en: 'Gold Flower' },
+  'mode.flower': { zh: '種花模式', en: 'Flower Mode' },
+
+  // ── 種花模式 (Flower mode) ───────────────────
+  'flower.title': { zh: '種花設定', en: 'Flower settings' },
+  'flower.hint': { zh: '在每個路徑點周圍繞圈圈,可走過去或瞬移過去', en: 'Circle around each waypoint, walking or teleporting there' },
+  'flower.radius': { zh: '繞圈距離', en: 'Circle radius' },
+  'flower.segments': { zh: '每圈段數', en: 'Segments per circle' },
+  'flower.segments_hint': { zh: '越大越圓滑,越小越省座標', en: 'Higher = smoother, lower = fewer points' },
+  'flower.circles': { zh: '每點圈數', en: 'Circles per flower' },
+  'flower.rounds': { zh: '總輪數', en: 'Rounds' },
+  'flower.pre_wait': { zh: '移動前等待', en: 'Wait before moving' },
+  'flower.post_wait': { zh: '到點後等待', en: 'Wait after arriving' },
+  'flower.teleport': { zh: '瞬移到路徑點', en: 'Teleport to waypoints' },
+  'flower.teleport_hint': { zh: '開啟後瞬移過去,關閉則走過去', en: 'On: teleport between flowers; off: walk there' },
+  'flower.seconds': { zh: '秒', en: 's' },
+  'flower.circle_unit': { zh: '圈', en: '' },
+  'flower.round_unit': { zh: '輪', en: '' },
+  'flower.seg_unit': { zh: '段', en: '' },
 
   // ── Gold Ditto (Pikmin Bloom 拉金盆) mode ─────
   'goldditto.a_label': { zh: 'A 座標', en: 'A coordinate' },
@@ -710,7 +727,6 @@ export const STRINGS = {
   'map.avatar_picker': { zh: '地圖釘', en: 'Map pin' },
 
   // ── Pause settings ──────────────────────────
-  'pause.multi_stop': { zh: '每站隨機暫停', en: 'Random pause at each stop' },
   'pause.loop': { zh: '每站隨機暫停', en: 'Random pause at each stop' },
   'loop.lap_count_label': { zh: '圈數', en: 'Laps' },
   'loop.lap_count_placeholder': { zh: '無限', en: '∞' },

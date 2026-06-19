@@ -23,6 +23,7 @@ from core.navigator import Navigator
 from core.route_loop import RouteLooper
 from core.joystick import JoystickHandler
 from core.multi_stop import MultiStopNavigator
+from core.flower import FlowerHandler
 from core.random_walk import RandomWalkHandler
 from core.restore import RestoreHandler
 from core.goldditto import GoldDittoHandler
@@ -120,6 +121,7 @@ class SimulationEngine:
         self._looper = RouteLooper(self)
         self._joystick = JoystickHandler(self)
         self._multi_stop = MultiStopNavigator(self)
+        self._flower = FlowerHandler(self)
         self._random_walk = RandomWalkHandler(self)
         self._restore_handler = RestoreHandler(self)
         self._goldditto_handler = GoldDittoHandler(self)
@@ -328,6 +330,46 @@ class SimulationEngine:
                 jump_mode=jump_mode, jump_pre_delay=jump_pre_delay, jump_post_delay=jump_post_delay,
             ),
             "Multi-stop",
+        )
+
+    async def flower(
+        self,
+        waypoints: list[Coordinate],
+        mode: MovementMode,
+        radius_m: float = 30.0,
+        segments: int = 8,
+        circles: int = 1,
+        rounds: int = 1,
+        pre_wait: float = 3.0,
+        post_wait: float = 3.0,
+        teleport: bool = False,
+        speed_kmh: float | None = None,
+        speed_min_kmh: float | None = None,
+        speed_max_kmh: float | None = None,
+        straight_line: bool = False,
+        route_engine: str | None = None,
+    ) -> None:
+        """種花模式: circle around each waypoint."""
+        await self._ensure_stopped()
+        self._stop_event.clear()
+        self._pause_event.set()
+        self._last_sim_kind = "flower"
+        self._last_sim_args = dict(
+            waypoints=waypoints, mode=mode, radius_m=radius_m, segments=segments,
+            circles=circles, rounds=rounds, pre_wait=pre_wait, post_wait=post_wait,
+            teleport=teleport, speed_kmh=speed_kmh,
+            speed_min_kmh=speed_min_kmh, speed_max_kmh=speed_max_kmh,
+            straight_line=straight_line, route_engine=route_engine,
+        )
+        await self._run_handler(
+            self._flower.start(
+                waypoints, mode, radius_m=radius_m, segments=segments,
+                circles=circles, rounds=rounds, pre_wait=pre_wait, post_wait=post_wait,
+                teleport=teleport, speed_kmh=speed_kmh,
+                speed_min_kmh=speed_min_kmh, speed_max_kmh=speed_max_kmh,
+                straight_line=straight_line, route_engine=route_engine,
+            ),
+            "Flower",
         )
 
     async def random_walk(

@@ -182,6 +182,27 @@ export const startLoop = (waypoints: { lat: number; lng: number }[], mode: strin
   request<any>('POST', '/api/location/loop', { waypoints, mode, ...sp(speed), ...pp(pause), ...sl(straightLine), ...re(routeEngine), ...ud(udid), ...(lapCount != null && lapCount > 0 ? { lap_count: lapCount } : {}), ...jm(jump) })
 export const multiStop = (waypoints: { lat: number; lng: number }[], mode: string, stop_duration: number, loop: boolean, speed?: SpeedOpts, pause?: PauseOpts, udid?: string, straightLine?: boolean, routeEngine?: string, jump?: JumpOpts) =>
   request<any>('POST', '/api/location/multistop', { waypoints, mode, stop_duration, loop, ...sp(speed), ...pp(pause), ...sl(straightLine), ...re(routeEngine), ...ud(udid), ...jm(jump) })
+export interface FlowerOpts {
+  radius_m?: number
+  segments?: number
+  circles?: number
+  rounds?: number
+  pre_wait?: number
+  post_wait?: number
+  teleport?: boolean
+}
+export const flower = (waypoints: { lat: number; lng: number }[], mode: string, opts: FlowerOpts, speed?: SpeedOpts, udid?: string, straightLine?: boolean, routeEngine?: string) =>
+  request<any>('POST', '/api/location/flower', {
+    waypoints, mode,
+    radius_m: opts.radius_m ?? 30,
+    segments: opts.segments ?? 8,
+    circles: opts.circles ?? 1,
+    rounds: opts.rounds ?? 1,
+    pre_wait: opts.pre_wait ?? 3,
+    post_wait: opts.post_wait ?? 3,
+    teleport: opts.teleport ?? false,
+    ...sp(speed), ...sl(straightLine), ...re(routeEngine), ...ud(udid),
+  })
 export const randomWalk = (center: { lat: number; lng: number }, radius_m: number, mode: string, speed?: SpeedOpts, pause?: PauseOpts, udid?: string, seed?: number | null, straightLine?: boolean, routeEngine?: string, centerMode?: string, forward?: { enabled: boolean; turnDeg: number }) =>
   request<any>('POST', '/api/location/randomwalk', { center, radius_m, mode, ...sp(speed), ...pp(pause), ...sl(straightLine), ...re(routeEngine), ...ud(udid), ...(seed != null ? { seed } : {}), ...(centerMode ? { center_mode: centerMode } : {}), ...(forward?.enabled ? { forward_enabled: true, forward_turn_deg: forward.turnDeg } : {}) })
 export const joystickStart = (mode: string, udid?: string) =>
