@@ -166,6 +166,8 @@ export const STRINGS = {
   'flower.circle_unit': { zh: '圈', en: '' },
   'flower.round_unit': { zh: '輪', en: '' },
   'flower.seg_unit': { zh: '段', en: '' },
+  'flower.est_total': { zh: '預估總時長', en: 'Est. total time' },
+  'flower.est_hint': { zh: '依目前設定估算,實際時間視路況略有差異', en: 'Estimated from current settings; actual time varies with routing' },
 
   // ── Gold Ditto (Pikmin Bloom 拉金盆) mode ─────
   'goldditto.a_label': { zh: 'A 座標', en: 'A coordinate' },

@@ -1367,6 +1367,60 @@ const App: React.FC = () => {
     })
   }, [sim.mode, sim.waypoints, sim.flowerRadius, sim.flowerSegments])
 
+  // 種花模式 estimated total trip time (seconds): every pre/post wait + the
+  // walked approach between flowers (straight-line approximation; teleport
+  // approaches cost no travel time) + the walked circle length, across all
+  // rounds. Shown live in the panel so the user knows roughly how long the
+  // whole run will take, circling included.
+  const flowerEstimateSec = useMemo(() => {
+    if (sim.mode !== SimMode.Flower) return null
+    const wps = sim.waypoints
+    if (wps.length < 1) return null
+    const N = Math.max(3, Math.round(sim.flowerSegments))
+    const R = sim.flowerRadius
+    const circles = Math.max(1, Math.round(sim.flowerCircles))
+    const rounds = Math.max(1, Math.round(sim.flowerRounds))
+    const preW = Math.max(0, sim.flowerPreWait)
+    const postW = Math.max(0, sim.flowerPostWait)
+    const defKmh = sim.moveMode === MoveMode.Running ? 19.8 : sim.moveMode === MoveMode.Driving ? 60 : 10.8
+    const kmh = (sim.speedMinKmh != null && sim.speedMaxKmh != null)
+      ? (sim.speedMinKmh + sim.speedMaxKmh) / 2
+      : (sim.customSpeedKmh ?? defKmh)
+    const speed = Math.max(kmh / 3.6, 0.1) // m/s
+    // Walked length per flower circle: out to the first vertex (radius) plus
+    // `circles` laps of the N-gon perimeter (matches backend _circle_path).
+    const chord = 2 * R * Math.sin(Math.PI / N)
+    const circleLen = R + circles * N * chord
+    const hav = (a: { lat: number; lng: number }, b: { lat: number; lng: number }) => {
+      const dlat = ((b.lat - a.lat) * Math.PI) / 180
+      const dlng = ((b.lng - a.lng) * Math.PI) / 180 * Math.cos(((a.lat + b.lat) / 2) * Math.PI / 180)
+      return 6371000 * Math.sqrt(dlat * dlat + dlng * dlng)
+    }
+    let total = 0
+    let prev: { lat: number; lng: number } | null = sim.currentPosition
+    for (let r = 0; r < rounds; r++) {
+      for (let i = 0; i < wps.length; i++) {
+        const wp = wps[i]
+        total += preW
+        if (!sim.flowerTeleport && prev) total += hav(prev, wp) / speed
+        total += postW
+        total += circleLen / speed
+        prev = wp
+      }
+    }
+    return total
+  }, [sim.mode, sim.waypoints, sim.flowerSegments, sim.flowerRadius, sim.flowerCircles, sim.flowerRounds, sim.flowerPreWait, sim.flowerPostWait, sim.flowerTeleport, sim.customSpeedKmh, sim.speedMinKmh, sim.speedMaxKmh, sim.moveMode, sim.currentPosition])
+
+  // Compact H:MM:SS / M:SS duration formatter for the flower estimate.
+  const fmtDuration = (sec: number) => {
+    const s = Math.max(0, Math.round(sec))
+    const h = Math.floor(s / 3600)
+    const m = Math.floor((s % 3600) / 60)
+    const ss = s % 60
+    const pad = (n: number) => String(n).padStart(2, '0')
+    return h > 0 ? `${h}:${pad(m)}:${pad(ss)}` : `${m}:${pad(ss)}`
+  }
+
   // Mode default km/h, used only for ControlPanel's in-panel preset
   // preview and as a very last fallback in the status bar before any
   // apply / sim start has happened.
@@ -1802,6 +1856,21 @@ const App: React.FC = () => {
                     </div>
                   ))}
                   <div style={{ opacity: 0.45, fontSize: 10, marginTop: 2 }}>{t('flower.segments_hint')}</div>
+                  {flowerEstimateSec != null && sim.waypoints.length > 0 && (
+                    <div style={{
+                      marginTop: 8, paddingTop: 8,
+                      borderTop: '1px solid rgba(255,255,255,0.08)',
+                      display: 'flex', alignItems: 'baseline', gap: 8,
+                    }}>
+                      <span style={{ opacity: 0.75 }}>{t('flower.est_total')}</span>
+                      <span style={{ fontWeight: 700, fontSize: 13, color: '#ffd266' }}>
+                        {fmtDuration(flowerEstimateSec)}
+                      </span>
+                      <span style={{ opacity: 0.4, fontSize: 9, marginLeft: 'auto', textAlign: 'right', lineHeight: 1.3 }}>
+                        {t('flower.est_hint')}
+                      </span>
+                    </div>
+                  )}
                 </div>
               )}
               {sim.mode === SimMode.Loop && (() => {
