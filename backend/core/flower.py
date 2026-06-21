@@ -16,7 +16,7 @@ def _circle_points(center: Coordinate, radius_m: float, segments: int) -> list[C
     """Return ``segments`` evenly-spaced points on a circle of ``radius_m``
     metres around ``center``. A simple equirectangular offset is accurate
     enough at the small (tens of metres) radii this mode uses."""
-    segments = max(3, int(segments))
+    segments = min(10, max(2, int(segments)))
     radius_m = max(1.0, float(radius_m))
     coslat = max(math.cos(math.radians(center.lat)), 1e-6)
     pts: list[Coordinate] = []
@@ -75,7 +75,7 @@ class FlowerHandler:
             )
 
         radius_m = max(1.0, float(radius_m))
-        segments = max(3, int(segments))
+        segments = min(10, max(2, int(segments)))
         circles = max(1, int(circles))
         rounds = max(1, int(rounds))
         pre_wait = max(0.0, float(pre_wait))

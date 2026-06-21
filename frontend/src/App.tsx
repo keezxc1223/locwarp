@@ -1832,7 +1832,7 @@ const App: React.FC = () => {
                   </label>
                   {([
                     { label: t('flower.radius'), value: sim.flowerRadius, set: sim.setFlowerRadius, unit: 'm', min: 1, step: 5 },
-                    { label: t('flower.segments'), value: sim.flowerSegments, set: sim.setFlowerSegments, unit: t('flower.seg_unit'), min: 3, step: 1 },
+                    { label: t('flower.segments'), value: sim.flowerSegments, set: sim.setFlowerSegments, unit: t('flower.seg_unit'), min: 2, max: 10, step: 1 },
                     { label: t('flower.circles'), value: sim.flowerCircles, set: sim.setFlowerCircles, unit: t('flower.circle_unit'), min: 1, step: 1 },
                     { label: t('flower.rounds'), value: sim.flowerRounds, set: sim.setFlowerRounds, unit: t('flower.round_unit'), min: 1, step: 1 },
                     { label: t('flower.pre_wait'), value: sim.flowerPreWait, set: sim.setFlowerPreWait, unit: t('flower.seconds'), min: 0, step: 1 },
@@ -1844,6 +1844,7 @@ const App: React.FC = () => {
                         type="number"
                         className="lw-input"
                         min={row.min}
+                        max={(row as { max?: number }).max}
                         step={row.step}
                         value={row.value}
                         onChange={(e) => {

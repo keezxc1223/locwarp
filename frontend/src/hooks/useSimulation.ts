@@ -316,9 +316,9 @@ export function useSimulation(subscribe?: WsSubscribe, primaryUdid?: string | nu
     setFlowerRadiusRaw(c)
     try { localStorage.setItem('locwarp.flower.radius', String(c)) } catch { /* ignore */ }
   }, [])
-  const [flowerSegments, setFlowerSegmentsRaw] = useState<number>(() => loadNum('locwarp.flower.segments', 8, 3))
+  const [flowerSegments, setFlowerSegmentsRaw] = useState<number>(() => loadNum('locwarp.flower.segments', 8, 2))
   const setFlowerSegments = useCallback((v: number) => {
-    const c = Number.isFinite(v) && v >= 3 ? Math.round(v) : 8
+    const c = Number.isFinite(v) ? Math.min(10, Math.max(2, Math.round(v))) : 8
     setFlowerSegmentsRaw(c)
     try { localStorage.setItem('locwarp.flower.segments', String(c)) } catch { /* ignore */ }
   }, [])

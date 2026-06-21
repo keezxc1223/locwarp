@@ -155,7 +155,7 @@ export const STRINGS = {
   'flower.hint': { zh: '在每個路徑點周圍繞圈圈,可走過去或瞬移過去', en: 'Circle around each waypoint, walking or teleporting there' },
   'flower.radius': { zh: '繞圈距離', en: 'Circle radius' },
   'flower.segments': { zh: '每圈段數', en: 'Segments per circle' },
-  'flower.segments_hint': { zh: '越大越圓滑,越小越省座標', en: 'Higher = smoother, lower = fewer points' },
+  'flower.segments_hint': { zh: '可輸入 2 到 10,越大越圓滑,越小越省座標', en: 'Enter 2 to 10. Higher = smoother, lower = fewer points' },
   'flower.circles': { zh: '每點圈數', en: 'Circles per flower' },
   'flower.rounds': { zh: '總輪數', en: 'Rounds' },
   'flower.pre_wait': { zh: '移動前等待', en: 'Wait before moving' },
