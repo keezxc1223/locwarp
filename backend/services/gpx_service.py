@@ -115,3 +115,31 @@ class GpxService:
             segment.points.append(track_point)
 
         return gpx.to_xml()
+
+    @staticmethod
+    def generate_gpx_waypoints(
+        points: list[dict],
+        name: str = "LocWarp Bookmarks",
+    ) -> str:
+        """Generate a GPX XML string of named waypoints from point dicts.
+
+        Unlike :meth:`generate_gpx` (which emits a ``<trk>`` path), this emits
+        standalone ``<wpt>`` elements -- the correct representation for saved
+        coordinates / POIs, which are individual locations rather than a route.
+
+        Each dict should contain ``lat`` and ``lng``; optional ``name`` and
+        ``description`` are written as the waypoint's name/desc elements.
+        """
+        gpx = gpxpy.gpx.GPX()
+        gpx.name = name
+
+        for pt in points:
+            waypoint = gpxpy.gpx.GPXWaypoint(
+                latitude=pt["lat"],
+                longitude=pt["lng"],
+                name=pt.get("name") or None,
+                description=pt.get("description") or None,
+            )
+            gpx.waypoints.append(waypoint)
+
+        return gpx.to_xml()

@@ -138,6 +138,30 @@ async def export_bookmarks():
                     headers={"Content-Disposition": 'attachment; filename="bookmarks.json"'})
 
 
+@router.get("/gpx/export/{bookmark_id}")
+async def export_bookmark_gpx(bookmark_id: str):
+    """Export a single saved coordinate as a GPX waypoint file."""
+    bm = _bm()
+    mark = next((b for b in bm.list_bookmarks() if b.id == bookmark_id), None)
+    if mark is None:
+        raise HTTPException(status_code=404, detail="Bookmark not found")
+
+    from services.gpx_service import GpxService
+    import urllib.parse
+
+    gpx_xml = GpxService.generate_gpx_waypoints(
+        [{"lat": mark.lat, "lng": mark.lng, "name": mark.name,
+          "description": mark.address or None}],
+        name=mark.name or "LocWarp Bookmark",
+    )
+    base = mark.name or "bookmark"
+    safe_name = "".join(ch if ord(ch) < 128 and ch not in '"\\/' else "_" for ch in base) or "bookmark"
+    utf8_encoded = urllib.parse.quote(f"{base}.gpx", safe="")
+    disposition = f'attachment; filename="{safe_name}.gpx"; filename*=UTF-8\'\'{utf8_encoded}'
+    return Response(content=gpx_xml, media_type="application/gpx+xml",
+                    headers={"Content-Disposition": disposition})
+
+
 @router.post("/import")
 async def import_bookmarks(data: dict):
     import json

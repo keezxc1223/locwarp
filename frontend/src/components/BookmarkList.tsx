@@ -1,7 +1,7 @@
 import React, { useState, useEffect, useRef } from 'react';
 import { createPortal } from 'react-dom';
 import { useT } from '../i18n';
-import { getBookmarkUiState, setBookmarkUiState } from '../services/api';
+import { getBookmarkUiState, setBookmarkUiState, bookmarkGpxExportUrl } from '../services/api';
 
 const AUTO_COLLAPSE_THRESHOLD = 30;
 
@@ -1520,6 +1520,24 @@ const BookmarkList: React.FC<BookmarkListProps> = ({
               </svg>
               {t('bm.copy')}
             </div>
+            {contextMenu.bm.id && (
+              <div
+                style={ctxItemStyle}
+                onMouseEnter={ctxHighlight}
+                onMouseLeave={ctxUnhighlight}
+                onClick={() => {
+                  if (contextMenu.bm.id) window.open(bookmarkGpxExportUrl(contextMenu.bm.id), '_blank');
+                  setContextMenu(null);
+                }}
+              >
+                <svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" style={{ marginRight: 6 }}>
+                  <path d="M21 15v4a2 2 0 01-2 2H5a2 2 0 01-2-2v-4" />
+                  <polyline points="7 10 12 15 17 10" />
+                  <line x1="12" y1="15" x2="12" y2="3" />
+                </svg>
+                {t('bm.export_gpx')}
+              </div>
+            )}
             <div
               style={ctxItemStyle}
               onMouseEnter={ctxHighlight}

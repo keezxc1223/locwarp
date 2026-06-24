@@ -631,6 +631,7 @@ export const STRINGS = {
   'bm.manage_categories': { zh: '管理分類', en: 'Manage Categories' },
   'bm.export': { zh: '匯出', en: 'Export' },
   'bm.export_tooltip': { zh: '匯出所有收藏與分類為 JSON', en: 'Export all bookmarks and categories as JSON' },
+  'bm.export_gpx': { zh: '匯出 GPX', en: 'Export GPX' },
   'bm.import': { zh: '匯入', en: 'Import' },
   'bm.import_tooltip': { zh: '從 JSON 匯入收藏與分類(合併,不覆蓋既有)', en: 'Import bookmarks and categories from JSON (merge, does not overwrite existing)' },
   'bm.import_success': { zh: '匯入成功:共 {n} 筆', en: 'Imported {n} entries' },

@@ -318,6 +318,7 @@ export const reorderBookmarkCategories = (categoryIds: string[]) =>
   request<{ reordered: number }>('POST', '/api/bookmarks/categories/reorder', { category_ids: categoryIds })
 
 export const bookmarksExportUrl = () => `${API}/api/bookmarks/export`
+export const bookmarkGpxExportUrl = (id: string) => `${API}/api/bookmarks/gpx/export/${id}`
 
 // Recent places: last 20 flights.
 // kind distinguishes the entry point AND the action, so the UI can show
