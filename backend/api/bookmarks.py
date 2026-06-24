@@ -162,6 +162,31 @@ async def export_bookmark_gpx(bookmark_id: str):
                     headers={"Content-Disposition": disposition})
 
 
+@router.get("/gpx/export/category/{category_id}")
+async def export_category_gpx(category_id: str):
+    """Export every saved coordinate in a category as a single GPX waypoint file."""
+    bm = _bm()
+    cat = next((c for c in bm.list_categories() if c.id == category_id), None)
+    marks = [b for b in bm.list_bookmarks() if (b.category_id or "default") == category_id]
+    if not marks:
+        raise HTTPException(status_code=404, detail="No bookmarks in category")
+
+    from services.gpx_service import GpxService
+    import urllib.parse
+
+    cat_name = (cat.name if cat else "") or "LocWarp Bookmarks"
+    gpx_xml = GpxService.generate_gpx_waypoints(
+        [{"lat": m.lat, "lng": m.lng, "name": m.name,
+          "description": m.address or None} for m in marks],
+        name=cat_name,
+    )
+    safe_name = "".join(ch if ord(ch) < 128 and ch not in '"\\/' else "_" for ch in cat_name) or "bookmarks"
+    utf8_encoded = urllib.parse.quote(f"{cat_name}.gpx", safe="")
+    disposition = f'attachment; filename="{safe_name}.gpx"; filename*=UTF-8\'\'{utf8_encoded}'
+    return Response(content=gpx_xml, media_type="application/gpx+xml",
+                    headers={"Content-Disposition": disposition})
+
+
 @router.post("/import")
 async def import_bookmarks(data: dict):
     import json

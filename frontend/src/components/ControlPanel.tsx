@@ -95,6 +95,7 @@ interface ControlPanelProps {
   onCategoryRecolor?: (name: string, color: string) => void;
   onCategoryReorder?: (orderedNames: string[]) => void;
   onBookmarkReorder?: (categoryName: string, orderedIds: string[]) => void;
+  onCategoryExportGpx?: (name: string) => void;
   bookmarkShowOnMap?: boolean;
   onBookmarkShowOnMapChange?: (v: boolean) => void;
   onBookmarkImport?: (file: File) => Promise<void>;
@@ -278,6 +279,7 @@ const ControlPanel: React.FC<ControlPanelProps> = ({
   onCategoryRecolor,
   onCategoryReorder,
   onBookmarkReorder,
+  onCategoryExportGpx,
   bookmarkShowOnMap,
   onBookmarkShowOnMapChange,
   onBookmarkImport,
@@ -1113,6 +1115,7 @@ const ControlPanel: React.FC<ControlPanelProps> = ({
                   onCategoryRecolor={onCategoryRecolor}
                   onCategoryReorder={onCategoryReorder}
                   onBookmarkReorder={onBookmarkReorder}
+                  onCategoryExportGpx={onCategoryExportGpx}
                   showOnMap={bookmarkShowOnMap}
                   onShowOnMapChange={onBookmarkShowOnMapChange}
                   onImport={onBookmarkImport}

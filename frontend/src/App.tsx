@@ -1774,6 +1774,11 @@ const App: React.FC = () => {
             if (!cat) return
             bm.reorderBookmarksInCategory(cat.id, orderedIds)
           }}
+          onCategoryExportGpx={(name: string) => {
+            const cat = bm.categories.find((c) => c.name === name)
+            if (!cat) return
+            window.open(api.bookmarkCategoryGpxExportUrl(cat.id), '_blank')
+          }}
           bookmarkShowOnMap={showBookmarkPins}
           onBookmarkShowOnMapChange={setShowBookmarkPins}
           onBookmarkImport={handleBookmarkImport}

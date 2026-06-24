@@ -49,6 +49,9 @@ interface BookmarkListProps {
   // Persist a new bookmark order within a single category. Receives the
   // category name and the ordered list of bookmark IDs in that category.
   onBookmarkReorder?: (categoryName: string, orderedIds: string[]) => void;
+  // Export every coordinate in a category as a single GPX waypoint file.
+  // Receives the category name; App resolves the id and triggers the download.
+  onCategoryExportGpx?: (name: string) => void;
   showOnMap?: boolean;
   onShowOnMapChange?: (v: boolean) => void;
   onImport?: (file: File) => Promise<void>;
@@ -103,6 +106,7 @@ const BookmarkList: React.FC<BookmarkListProps> = ({
   onCategoryRecolor,
   onCategoryReorder,
   onBookmarkReorder,
+  onCategoryExportGpx,
   showOnMap = false,
   onShowOnMapChange,
   onImport,
@@ -977,6 +981,26 @@ const BookmarkList: React.FC<BookmarkListProps> = ({
                 />
               ) : (
                 <span style={{ flex: 1 }}>{displayCat(cat)}</span>
+              )}
+              {onCategoryExportGpx && editingCategory !== cat && (
+                <button
+                  onClick={() => onCategoryExportGpx(cat)}
+                  title={t('bm.export_category_gpx')}
+                  style={{
+                    background: 'none',
+                    border: 'none',
+                    color: 'var(--fg-muted, #888)',
+                    cursor: 'pointer',
+                    padding: '2px 4px',
+                    fontSize: 11,
+                  }}
+                >
+                  <svg width="10" height="10" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
+                    <path d="M21 15v4a2 2 0 01-2 2H5a2 2 0 01-2-2v-4" />
+                    <polyline points="7 10 12 15 17 10" />
+                    <line x1="12" y1="15" x2="12" y2="3" />
+                  </svg>
+                </button>
               )}
               {cat !== 'Default' && cat !== '預設' && onCategoryRename && editingCategory !== cat && (
                 <button
