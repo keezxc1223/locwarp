@@ -1423,7 +1423,7 @@ const App: React.FC = () => {
     if (wps.length < 1) return null
     const N = Math.max(3, Math.round(sim.flowerSegments))
     const R = sim.flowerRadius
-    const circles = Math.max(1, Math.round(sim.flowerCircles))
+    const circles = Math.max(0.5, Math.round(sim.flowerCircles * 2) / 2)
     const rounds = Math.max(1, Math.round(sim.flowerRounds))
     const preW = Math.max(0, sim.flowerPreWait)
     const postW = Math.max(0, sim.flowerPostWait)
@@ -1890,7 +1890,7 @@ const App: React.FC = () => {
                   {([
                     { label: t('flower.radius'), value: sim.flowerRadius, set: sim.setFlowerRadius, unit: 'm', min: 1, step: 5 },
                     { label: t('flower.segments'), value: sim.flowerSegments, set: sim.setFlowerSegments, unit: t('flower.seg_unit'), min: 3, max: 20, step: 1 },
-                    { label: t('flower.circles'), value: sim.flowerCircles, set: sim.setFlowerCircles, unit: t('flower.circle_unit'), min: 1, step: 1 },
+                    { label: t('flower.circles'), value: sim.flowerCircles, set: sim.setFlowerCircles, unit: t('flower.circle_unit'), min: 0.5, step: 0.5 },
                     { label: t('flower.rounds'), value: sim.flowerRounds, set: sim.setFlowerRounds, unit: t('flower.round_unit'), min: 1, step: 1 },
                     { label: t('flower.pre_wait'), value: sim.flowerPreWait, set: sim.setFlowerPreWait, unit: t('flower.seconds'), min: 0, step: 1 },
                     { label: t('flower.post_wait'), value: sim.flowerPostWait, set: sim.setFlowerPostWait, unit: t('flower.seconds'), min: 0, step: 1 },

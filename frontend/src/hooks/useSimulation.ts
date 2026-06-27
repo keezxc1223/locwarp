@@ -322,9 +322,10 @@ export function useSimulation(subscribe?: WsSubscribe, primaryUdid?: string | nu
     setFlowerSegmentsRaw(c)
     try { localStorage.setItem('locwarp.flower.segments', String(c)) } catch { /* ignore */ }
   }, [])
-  const [flowerCircles, setFlowerCirclesRaw] = useState<number>(() => loadNum('locwarp.flower.circles', 1, 1))
+  const [flowerCircles, setFlowerCirclesRaw] = useState<number>(() => loadNum('locwarp.flower.circles', 1, 0.5))
   const setFlowerCircles = useCallback((v: number) => {
-    const c = Number.isFinite(v) && v >= 1 ? Math.round(v) : 1
+    // Allow half-laps: snap to the nearest 0.5, floor 0.5.
+    const c = Number.isFinite(v) && v >= 0.5 ? Math.round(v * 2) / 2 : 0.5
     setFlowerCirclesRaw(c)
     try { localStorage.setItem('locwarp.flower.circles', String(c)) } catch { /* ignore */ }
   }, [])

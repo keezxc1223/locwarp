@@ -28,15 +28,16 @@ def _circle_points(center: Coordinate, radius_m: float, segments: int) -> list[C
     return pts
 
 
-def _circle_path(center: Coordinate, pts: list[Coordinate], circles: int) -> list[Coordinate]:
-    """Build the walked path: out to the first vertex, then ``circles`` full
-    laps around the polygon, each closing back on the first vertex."""
-    circles = max(1, int(circles))
+def _circle_path(center: Coordinate, pts: list[Coordinate], circles: float) -> list[Coordinate]:
+    """Build the walked path: out to the first vertex, then ``circles`` laps
+    around the polygon. ``circles`` may be fractional (e.g. 0.5 = half a lap),
+    in which case only that fraction of the polygon edges is walked."""
+    circles = max(0.5, float(circles))
+    n = len(pts)
+    total_edges = max(1, round(circles * n))
     seq: list[Coordinate] = [center, pts[0]]
-    for _ in range(circles):
-        for k in range(1, len(pts)):
-            seq.append(pts[k])
-        seq.append(pts[0])  # close this lap
+    for e in range(1, total_edges + 1):
+        seq.append(pts[e % n])  # cycle around the polygon
     return seq
 
 
@@ -53,7 +54,7 @@ class FlowerHandler:
         *,
         radius_m: float = 30.0,
         segments: int = 8,
-        circles: int = 1,
+        circles: float = 1.0,
         rounds: int = 1,
         pre_wait: float = 3.0,
         post_wait: float = 3.0,
@@ -76,7 +77,7 @@ class FlowerHandler:
 
         radius_m = max(1.0, float(radius_m))
         segments = min(20, max(3, int(segments)))
-        circles = max(1, int(circles))
+        circles = max(0.5, round(float(circles) * 2) / 2)  # snap to 0.5 steps
         rounds = max(1, int(rounds))
         pre_wait = max(0.0, float(pre_wait))
         post_wait = max(0.0, float(post_wait))
@@ -117,7 +118,7 @@ class FlowerHandler:
         await engine._emit("route_path", {"coords": display})
 
         logger.info(
-            "Flower mode started: %d flowers, radius=%.0fm, seg=%d, circles=%d, rounds=%d, "
+            "Flower mode started: %d flowers, radius=%.0fm, seg=%d, circles=%.1f, rounds=%d, "
             "pre=%.1fs post=%.1fs, %s [%s]",
             len(waypoints), radius_m, segments, circles, rounds,
             pre_wait, post_wait, "teleport" if teleport else "walk", profile_name,

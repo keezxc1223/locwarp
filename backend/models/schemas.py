@@ -129,7 +129,7 @@ class FlowerRequest(BaseModel):
     # Circle geometry / repetition.
     radius_m: float = 30.0      # circle radius around each flower
     segments: int = 8           # vertices per circle (higher = smoother)
-    circles: int = 1            # laps walked around each flower
+    circles: float = 1.0        # laps walked around each flower (0.5 = half)
     rounds: int = 1             # times the whole waypoint list repeats
     # Dwell either side of arriving at a flower (seconds).
     pre_wait: float = 3.0       # wait before moving to the next flower

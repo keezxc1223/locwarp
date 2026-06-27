@@ -338,7 +338,7 @@ class SimulationEngine:
         mode: MovementMode,
         radius_m: float = 30.0,
         segments: int = 8,
-        circles: int = 1,
+        circles: float = 1.0,
         rounds: int = 1,
         pre_wait: float = 3.0,
         post_wait: float = 3.0,
