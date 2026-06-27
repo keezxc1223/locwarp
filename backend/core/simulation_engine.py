@@ -635,6 +635,7 @@ class SimulationEngine:
             SimulationState.LOOPING,
             SimulationState.MULTI_STOP,
             SimulationState.RANDOM_WALK,
+            SimulationState.FLOWER,
         ):
             return None
         if not self._last_sim_kind or not self._last_sim_args:
