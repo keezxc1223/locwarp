@@ -773,6 +773,20 @@ class SimulationEngine:
             self._speed_was_applied = True
             return True
         if not self._active_route_coords:
+            # Between legs (stop pause / OSRM fetch) there is no live
+            # movement loop to hot-swap, but a route mode is still running.
+            # Record the profile directly so the next leg starts with it
+            # instead of rejecting the request (issue #40).
+            if self.state in (
+                SimulationState.NAVIGATING,
+                SimulationState.LOOPING,
+                SimulationState.MULTI_STOP,
+                SimulationState.RANDOM_WALK,
+                SimulationState.FLOWER,
+            ):
+                self._active_speed_profile = dict(speed_profile)
+                self._speed_was_applied = True
+                return True
             return False
         self._pending_speed_profile = dict(speed_profile)
         self._speed_was_applied = True
@@ -801,7 +815,13 @@ class SimulationEngine:
         # Expose these as instance state so apply_speed can read/swap them
         # mid-flight without racing the handler's local variables.
         self._active_route_coords = list(coords)
-        self._active_speed_profile = dict(speed_profile)
+        # A mid-flight apply_speed outlives handler-local profiles: legs
+        # started after the apply must keep the user's speed, not the
+        # profile the handler captured when its lap/route began. Without
+        # this guard route_loop's per-lap profile clobbered the applied
+        # speed at every waypoint (issue #40).
+        if not (self._speed_was_applied and self._active_speed_profile is not None):
+            self._active_speed_profile = dict(speed_profile)
         self._pending_speed_profile = None
         self.total_segments = max(len(coords) - 1, 0)
 
@@ -1077,7 +1097,12 @@ class SimulationEngine:
                     "total": len(user_wps),
                 })
 
-        self._pending_speed_profile = None
+        # Consume an apply_speed that landed too late in the leg for the
+        # tick loop to hot-swap (e.g. during the final point): promote it
+        # so the next leg starts with the new speed instead of dropping it.
+        if self._pending_speed_profile is not None:
+            self._active_speed_profile = self._pending_speed_profile
+            self._pending_speed_profile = None
         self._active_route_coords = []
         self._current_speed_mps = 0.0
 
