@@ -284,7 +284,7 @@ When reporting a problem, include the iOS version, the connection type, and `~/.
 | Frontend | [Leaflet](https://leafletjs.com/) 1.9 | Interactive map, custom markers, animated route lines |
 | Frontend | [MapLibre GL](https://maplibre.org/) 6 | Vector layer rendering, attached to Leaflet through maplibre-gl-leaflet |
 | Backend | Python 3.13 + [FastAPI](https://fastapi.tiangolo.com/) + [uvicorn](https://www.uvicorn.org/) | REST API and WebSocket (`:8777`) |
-| Backend | [pymobiledevice3](https://github.com/doronz88/pymobiledevice3) 11.26+ | iOS device protocols (DVT / RemoteServices / lockdown / LegacyLocationService) and the Wi-Fi tunnel |
+| Backend | [pymobiledevice3](https://github.com/doronz88/pymobiledevice3) 11.49+ | iOS device protocols (DVT / RemoteServices / lockdown / LegacyLocationService) and the Wi-Fi tunnel |
 | Backend | [httpx](https://www.python-httpx.org/), [pydantic](https://docs.pydantic.dev/), [gpxpy](https://github.com/tkrajina/gpxpy) | External service calls, validation, GPX parsing |
 | Packaging | [PyInstaller](https://pyinstaller.org/), [electron-builder](https://www.electron.build/) (NSIS) | Backend exe and the Windows installer |
 
