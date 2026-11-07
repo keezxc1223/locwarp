@@ -315,38 +315,189 @@ def _get_primary_local_ip() -> str | None:
         return None
 
 
-async def _tcp_probe(ip: str, port: int, timeout: float = 0.4) -> bool:
+# ── LAN scanning safety limits (issue #49) ──────────────
+# Every outgoing probe in this module holds one slot of this process-wide
+# semaphore, so no combination of discover / find_port / tunnel-start
+# re-scan can have more than this many connects in flight. Windows'
+# default ephemeral range is 16384 ports; the old per-host 1024 limit
+# multiplied by "every candidate host at once" could exceed it many times.
+PROBE_CONCURRENCY = 256
+_PROBE_SEM = asyncio.Semaphore(PROBE_CONCURRENCY)
+
+# A real iPhone has only a handful of listeners in 49152-65535. A host that
+# accepts more than this is a VPN / proxy that answers SYN for every
+# address and port, and continuing would just pile up TIME_WAIT sockets.
+MAX_OPEN_PORTS_PER_HOST = 32
+
+# Upper bound on hosts that get the full-range port scan in one discover.
+MAX_SCAN_HOSTS = 8
+
+# Unverified hosts (62078 accepted but lockdownd fingerprint did not answer)
+# are only kept when the subnet looks like a normal LAN with this many or
+# fewer such hosts; an accept-everything VPN produces ~253.
+MAX_UNVERIFIED_HOSTS = 4
+
+LOCKDOWN_PORT = 62078
+
+
+class _TooManyOpenPorts(Exception):
+    """Raised when a host accepts so many ports it cannot be an iPhone."""
+
+
+# Single-flight: concurrent callers asking for the same scan share one run
+# instead of stacking scans (auto-connect + manual click, or find_port +
+# tunnel-start re-scan of the same IP).
+_scan_inflight: dict[str, asyncio.Future] = {}
+
+
+async def _single_flight(key: str, factory):
+    fut = _scan_inflight.get(key)
+    if fut is None or fut.done():
+        fut = asyncio.ensure_future(factory())
+        _scan_inflight[key] = fut
+
+        def _done(f: asyncio.Future, k: str = key) -> None:
+            if _scan_inflight.get(k) is f:
+                _scan_inflight.pop(k, None)
+            # Mark the exception as retrieved even when every awaiter left.
+            if not f.cancelled():
+                f.exception()
+
+        fut.add_done_callback(_done)
+    # shield: one caller going away (HTTP client closed) must not cancel the
+    # scan another caller is still waiting on. The scan is bounded anyway.
+    return await asyncio.shield(fut)
+
+
+async def _close_writer(writer) -> None:
+    if writer is None:
+        return
     try:
-        reader, writer = await asyncio.wait_for(
-            asyncio.open_connection(ip, port), timeout=timeout,
-        )
         writer.close()
+        await writer.wait_closed()
+    except Exception:
+        pass
+
+
+async def _tcp_probe(ip: str, port: int, timeout: float = 0.4) -> bool:
+    """TCP connect probe. Holds a global probe slot for its whole lifetime."""
+    async with _PROBE_SEM:
+        writer = None
         try:
-            await writer.wait_closed()
-        except (OSError, ConnectionError):
-            pass
-        return True
-    except (OSError, ConnectionError, asyncio.TimeoutError):
-        return False
+            _reader, writer = await asyncio.wait_for(
+                asyncio.open_connection(ip, port), timeout=timeout,
+            )
+            return True
+        except (OSError, ConnectionError, asyncio.TimeoutError):
+            return False
+        finally:
+            await _close_writer(writer)
 
 
-async def _scan_subnet_for_port(port: int = 49152) -> list[str]:
-    """Scan the local /24 subnet for hosts responding on the given TCP port."""
+async def _probe_lockdownd(ip: str, timeout: float = 1.5) -> str:
+    """Check whether `ip` runs lockdownd on 62078.
+
+    Returns "lockdown" when the host answers a QueryType request the way only
+    lockdownd does (no pairing needed for QueryType), "open" when TCP connects
+    but the reply is missing or wrong, and "closed" otherwise. VPNs / proxies
+    that accept every SYN land in "open", so they never pass as an iPhone.
+    """
+    import plistlib
+    import struct
+
+    async with _PROBE_SEM:
+        writer = None
+        try:
+            try:
+                reader, writer = await asyncio.wait_for(
+                    asyncio.open_connection(ip, LOCKDOWN_PORT), timeout=timeout,
+                )
+            except (OSError, ConnectionError, asyncio.TimeoutError):
+                return "closed"
+            try:
+                payload = plistlib.dumps({"Label": "LocWarp", "Request": "QueryType"})
+                writer.write(struct.pack(">I", len(payload)) + payload)
+                await asyncio.wait_for(writer.drain(), timeout=timeout)
+                hdr = await asyncio.wait_for(reader.readexactly(4), timeout=timeout)
+                (size,) = struct.unpack(">I", hdr)
+                if size <= 0 or size > 64 * 1024:
+                    return "open"
+                body = await asyncio.wait_for(reader.readexactly(size), timeout=timeout)
+                reply = plistlib.loads(body)
+            except Exception:
+                return "open"
+            if isinstance(reply, dict) and reply.get("Type") == "com.apple.mobile.lockdown":
+                return "lockdown"
+            return "open"
+        finally:
+            await _close_writer(writer)
+
+
+async def _find_lockdown_hosts() -> list[str]:
+    """Probe the primary /24 for iPhones, verified by the lockdownd reply."""
     my_ip = _get_primary_local_ip()
     if not my_ip:
         return []
     try:
-        parts = my_ip.split(".")
-        prefix = ".".join(parts[:3])
+        prefix = ".".join(my_ip.split(".")[:3])
     except (AttributeError, IndexError):
         return []
 
-    candidates = [f"{prefix}.{i}" for i in range(1, 255) if f"{prefix}.{i}" != my_ip]
-    results = await asyncio.gather(
-        *[_tcp_probe(ip, port, 0.4) for ip in candidates],
-        return_exceptions=True,
+    hosts = [f"{prefix}.{i}" for i in range(1, 255) if f"{prefix}.{i}" != my_ip]
+    states = await asyncio.gather(*[_probe_lockdownd(ip) for ip in hosts])
+    verified = [ip for ip, s in zip(hosts, states) if s == "lockdown"]
+    unverified = [ip for ip, s in zip(hosts, states) if s == "open"]
+    _tunnel_logger.info(
+        "Subnet probe %s.0/24 (local %s): %d lockdownd host(s), %d host(s) "
+        "accepted 62078 without a lockdownd reply",
+        prefix, my_ip, len(verified), len(unverified),
     )
-    hits = [ip for ip, ok in zip(candidates, results) if ok is True]
+    if len(unverified) > MAX_UNVERIFIED_HOSTS:
+        # Accept-everything network path (VPN TUN / fake-ip / proxy). Those
+        # hosts are not iPhones; scanning them is what caused issue #49.
+        _tunnel_logger.warning(
+            "Ignoring %d unverified host(s) on %s.0/24: looks like a VPN or "
+            "proxy answering every address", len(unverified), prefix,
+        )
+        unverified = []
+    return (verified + unverified)[:MAX_SCAN_HOSTS]
+
+
+async def _scan_ports_for_ip_impl(
+    ip: str, start: int, end: int, workers: int, timeout: float,
+) -> list[int]:
+    ports = iter(range(start, end + 1))
+    hits: list[int] = []
+    too_many = False
+
+    async def _worker() -> None:
+        nonlocal too_many
+        for p in ports:
+            if too_many:
+                return
+            if await _tcp_probe(ip, p, timeout):
+                hits.append(p)
+                if len(hits) > MAX_OPEN_PORTS_PER_HOST:
+                    too_many = True
+                    return
+
+    tasks = [asyncio.create_task(_worker()) for _ in range(workers)]
+    try:
+        await asyncio.gather(*tasks)
+    finally:
+        # Cancelled or failed: make sure no probe outlives the scan.
+        for t in tasks:
+            if not t.done():
+                t.cancel()
+        await asyncio.gather(*tasks, return_exceptions=True)
+
+    if too_many:
+        _tunnel_logger.warning(
+            "Port scan of %s stopped: more than %d open ports, not an iPhone "
+            "(VPN / proxy answering every port)", ip, MAX_OPEN_PORTS_PER_HOST,
+        )
+        raise _TooManyOpenPorts(ip)
+    hits.sort()
     return hits
 
 
@@ -354,34 +505,21 @@ async def _scan_ports_for_ip(
     ip: str,
     start: int = 49152,
     end: int = 65535,
-    concurrency: int = 1024,
+    workers: int = PROBE_CONCURRENCY,
     timeout: float = 0.35,
 ) -> list[int]:
     """Scan the IANA dynamic / ephemeral range on a single IP for open TCP ports.
 
     iOS picks the RemotePairing port from this range at boot / network rebind,
     so the actual port on a given iPhone is rarely the legacy 49152 default.
-    Scanning one host across 16k ports finishes in a few seconds because most
-    closed ports return RST immediately on a same-LAN probe.
+    Most closed ports return RST immediately on a same-LAN probe, so a fixed
+    pool of workers (sharing the global probe limit) finishes in seconds.
+    Raises _TooManyOpenPorts when the host is clearly not an iPhone.
     """
-    sem = asyncio.Semaphore(concurrency)
-
-    async def _probe_one(p: int) -> int | None:
-        async with sem:
-            ok = await _tcp_probe(ip, p, timeout)
-            return p if ok else None
-
-    tasks = [asyncio.create_task(_probe_one(p)) for p in range(start, end + 1)]
-    hits: list[int] = []
-    for fut in asyncio.as_completed(tasks):
-        try:
-            res = await fut
-        except (OSError, ConnectionError, asyncio.TimeoutError):
-            res = None
-        if res is not None:
-            hits.append(res)
-    hits.sort()
-    return hits
+    return await _single_flight(
+        f"ports:{ip}:{start}-{end}",
+        lambda: _scan_ports_for_ip_impl(ip, start, end, workers, timeout),
+    )
 
 
 class WifiTunnelFindPortRequest(BaseModel):
@@ -399,16 +537,61 @@ async def wifi_tunnel_find_port(req: WifiTunnelFindPortRequest):
         raise HTTPException(status_code=400, detail="ip required")
     try:
         ports = await _scan_ports_for_ip(ip)
+    except _TooManyOpenPorts:
+        return {"ip": ip, "ports": [], "proxy_suspected": True}
     except Exception as e:
         raise HTTPException(status_code=500, detail=str(e))
     return {"ip": ip, "ports": ports}
 
 
+async def _discover_by_scan() -> list[dict]:
+    """TCP fallback for discover when mDNS finds nothing.
+
+    a) probe the /24 on 62078 and keep only hosts that answer like lockdownd
+       (see _find_lockdown_hosts for the unverified-host rule)
+    b) full-range scan (49152-65535) on each of those, one host at a time,
+       to find the port iOS actually picked this boot
+    """
+    found: list[dict] = []
+    candidates = await _find_lockdown_hosts()
+    if not candidates:
+        return found
+    _tunnel_logger.info(
+        "Smart scan: full-range scanning %d candidate(s): %s",
+        len(candidates), candidates,
+    )
+    for ip in candidates:
+        try:
+            ports = await _scan_ports_for_ip(ip)
+        except Exception as e:
+            _tunnel_logger.warning("port scan for %s failed: %s", ip, e)
+            continue
+        ports = _filter_remotepairing_ports(ports)
+        if not ports:
+            continue
+        # One entry per IP; `port` is the primary guess and `ports` carries
+        # the rest as fallbacks. A scan can't tell RemotePairing apart from
+        # any other listener in the dynamic range, so the tunnel start loop
+        # is what actually decides, by trying the handshake on each.
+        found.append({
+            "ip": ip,
+            "port": ports[0],
+            "ports": ports[:8],
+            "host": ip,
+            "name": ip,
+            "method": "tcp_scan",
+        })
+    return found
+
+
 @router.get("/wifi/tunnel/discover")
-async def wifi_tunnel_discover():
+async def wifi_tunnel_discover(scan: bool = True):
     """Find iPhones on the local network. First tries mDNS (Bonjour RemotePairing
-    broadcast); if that yields nothing, falls back to a /24 subnet TCP scan on the
-    standard RemotePairing port (49152)."""
+    broadcast); if that yields nothing and `scan` is true, falls back to a
+    lockdownd-verified /24 scan plus a port scan of the verified hosts.
+
+    Background auto-connect passes scan=false: it must never run a LAN scan
+    the user did not ask for (issue #49)."""
     results: list[dict] = []
 
     # --- 1) mDNS / Bonjour broadcast ---
@@ -441,72 +624,15 @@ async def wifi_tunnel_discover():
     except Exception as e:
         _tunnel_logger.warning("mDNS browse failed: %s", e)
 
-    # --- 2) Fallback: smart /24 scan ---
-    # Old behavior tested only port 49152 across /24, which missed any iPhone
-    # that bound RemotePairing higher in the 49152-65535 dynamic range (most
-    # of them, after the first reboot). Two-phase replacement:
-    #   a) probe every host on /24 against a small set of "iPhone tells"
-    #      (49152 legacy port + 62078 lockdown) to find live candidates
-    #   b) full-range scan (49152-65535) on each candidate to find the
-    #      port iOS actually picked this boot
-    if not results:
-        _tunnel_logger.info(
-            "mDNS empty; falling back to smart /24 scan (probe + full-range)",
-        )
+    # --- 2) Fallback: lockdownd-verified /24 scan (manual detect only) ---
+    if not results and scan:
+        _tunnel_logger.info("mDNS empty; falling back to verified /24 scan")
         try:
-            my_ip = _get_primary_local_ip()
-            candidates: set[str] = set()
-            if my_ip:
-                # Phase a: probe a few likely ports across the /24 in
-                # parallel. ANY hit means "host is alive and probably
-                # interesting" — we'll full-range scan it next.
-                probe_ports = (49152, 62078)
-                for p in probe_ports:
-                    try:
-                        hits = await _scan_subnet_for_port(p)
-                        candidates.update(hits)
-                    except Exception as e:
-                        _tunnel_logger.warning("probe scan port %d failed: %s", p, e)
-
-            if candidates:
-                _tunnel_logger.info(
-                    "Smart scan found %d live host(s); full-range scanning each",
-                    len(candidates),
-                )
-                # Phase b: full 49152-65535 scan in parallel across all
-                # candidate IPs. RemotePairing answers immediately on the
-                # right port, so the first hit per IP is what we want.
-                async def _scan_one(ip: str) -> tuple[str, list[int]]:
-                    try:
-                        ports = await _scan_ports_for_ip(ip)
-                    except Exception as e:
-                        _tunnel_logger.warning("port scan for %s failed: %s", ip, e)
-                        return ip, []
-                    return ip, ports
-
-                scan_results = await asyncio.gather(
-                    *[_scan_one(ip) for ip in candidates],
-                )
-                for ip, ports in scan_results:
-                    ports = _filter_remotepairing_ports(ports)
-                    if not ports:
-                        continue
-                    # One entry per IP; `port` is the primary guess and
-                    # `ports` carries the rest as fallbacks. A scan can't
-                    # tell RemotePairing apart from any other listener in
-                    # the dynamic range, so the lowest open port is only a
-                    # guess — the tunnel start loop is what actually
-                    # decides, by trying the handshake on each.
-                    results.append({
-                        "ip": ip,
-                        "port": ports[0],
-                        "ports": ports[:8],
-                        "host": ip,
-                        "name": ip,
-                        "method": "tcp_scan",
-                    })
+            results.extend(await _single_flight("discover_scan", _discover_by_scan))
         except Exception as e:
             _tunnel_logger.warning("Smart fallback scan failed: %s", e)
+    elif not results:
+        _tunnel_logger.info("mDNS empty; LAN scan skipped (scan=false)")
 
     # De-dupe on (ip, port)
     seen = set()

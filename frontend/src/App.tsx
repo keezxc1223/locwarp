@@ -389,6 +389,10 @@ const App: React.FC = () => {
   // (USB plug, or backend already brought a tunnel back up via its own
   // restart logic) so we don't fight with an existing USB connection.
   const wifiAutoConnectAttemptedRef = useRef(false)
+  // The effect below only re-runs on ws.connected, so its timer would read a
+  // stale device list. Read the live count through a ref instead.
+  const connectedCountRef = useRef(0)
+  connectedCountRef.current = device.connectedDevices.length
   useEffect(() => {
     if (!ws.connected) return
     if (wifiAutoConnectAttemptedRef.current) return
@@ -423,7 +427,7 @@ const App: React.FC = () => {
         try {
           // Skip if a device is already connected (USB plug, or backend
           // already brought a tunnel back up via its own restart logic).
-          if (device.connectedDevices.length > 0) return
+          if (connectedCountRef.current > 0) return
           const status = await api.wifiTunnelStatus()
           const alreadyTunneled = new Set(
             (status?.tunnels || [])
@@ -482,9 +486,12 @@ const App: React.FC = () => {
           // Skip mDNS discover when user has pins — avoids connecting to
           // unintended devices on the same network. Discover only runs
           // when no pins are set so new users can still auto-connect.
-          if (!hasPins) {
+          // scan:false = mDNS only. A background pass must never run the
+          // LAN port scan; that is reserved for the manual detect button
+          // (issue #49: it exhausted Windows TCP ports behind a VPN).
+          if (!hasPins && connectedCountRef.current === 0) {
             try {
-              const dres = await api.wifiTunnelDiscover()
+              const dres = await api.wifiTunnelDiscover({ scan: false })
               for (const d of (dres?.devices || [])) {
                 // d.ports is the full open-port list from the TCP-scan
                 // fallback; a scan can't tell which one is RemotePairing,
@@ -497,6 +504,8 @@ const App: React.FC = () => {
           // would 409 anyway.
           const limited = uniq.slice(0, 3)
           if (limited.length === 0) return
+          // USB may have come up while savedips / mDNS were being checked.
+          if (connectedCountRef.current > 0) return
           // Parallel: every iPhone gets a tunnel attempt at the same
           // time so the user doesn't wait sequentially for unreachable
           // ones to time out (~10s each). Pass entry.udid so the backend

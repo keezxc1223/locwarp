@@ -868,7 +868,9 @@ const DeviceStatus: React.FC<DeviceStatusProps> = ({
                             setPortScanning(true);
                             try {
                               const res = await wifiTunnelFindPort(ip);
-                              if (!res.ports || res.ports.length === 0) {
+                              if (res.proxy_suspected) {
+                                setTunnelError(t('wifi.port_scan_proxy'));
+                              } else if (!res.ports || res.ports.length === 0) {
                                 setTunnelError(t('wifi.port_scan_no_hit'));
                               } else {
                                 setTunnelPort(String(res.ports[0]));

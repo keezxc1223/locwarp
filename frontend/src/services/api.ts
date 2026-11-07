@@ -131,9 +131,13 @@ export const wifiTunnelStatus = () =>
   request<{ tunnels: TunnelInfo[]; running: boolean; rsd_address?: string; rsd_port?: number }>(
     'GET', '/api/device/wifi/tunnel/status',
   )
-export const wifiTunnelDiscover = () => request<{ devices: { ip: string; port: number; ports?: number[]; host: string; name: string }[] }>('GET', '/api/device/wifi/tunnel/discover')
+// scan=false: mDNS only, no LAN scan. Background auto-connect must use it.
+export const wifiTunnelDiscover = (opts?: { scan?: boolean }) =>
+  request<{ devices: { ip: string; port: number; ports?: number[]; host: string; name: string }[] }>(
+    'GET', `/api/device/wifi/tunnel/discover${opts?.scan === false ? '?scan=false' : ''}`,
+  )
 export const wifiTunnelFindPort = (ip: string) =>
-  request<{ ip: string; ports: number[] }>('POST', '/api/device/wifi/tunnel/find_port', { ip })
+  request<{ ip: string; ports: number[]; proxy_suspected?: boolean }>('POST', '/api/device/wifi/tunnel/find_port', { ip })
 // udid: stop one specific tunnel; omit to stop all (legacy stop-all)
 export const wifiTunnelStop = (udid?: string) =>
   request<{ status: string; udid?: string; udids?: string[] }>(

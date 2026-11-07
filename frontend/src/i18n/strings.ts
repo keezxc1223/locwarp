@@ -294,6 +294,10 @@ export const STRINGS = {
     en: 'No open port found. Check the IP, unlock the iPhone, and confirm both devices are on the same subnet',
   },
   'wifi.port_scan_failed': { zh: '掃描 port 失敗', en: 'Port scan failed' },
+  'wifi.port_scan_proxy': {
+    zh: '這個 IP 每個 port 都有回應,不是 iPhone。通常是 VPN 或代理軟體造成,請關閉後再試,或確認 IP 是否正確',
+    en: 'This IP answers on every port, so it is not an iPhone. This is usually caused by a VPN or proxy. Turn it off and retry, or check the IP',
+  },
   'wifi.ip_required_for_scan': { zh: '請先手動填入 IP', en: 'Please enter the iPhone IP first' },
   'wifi.tunnel_stop': { zh: 'Stop Tunnel', en: 'Stop Tunnel' },
   'wifi.recent_ips_button': { zh: '最近 {n}', en: 'Recent {n}' },
