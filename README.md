@@ -119,7 +119,7 @@
 - **WiFi Tunnel**(iOS 17+,需先用 USB 配對過一次):
   - 「自動偵測」會先用 mDNS 尋找裝置,找不到再掃描區域網路,只列出確認是 iPhone 的裝置。
   - 啟動時的自動連線只用 mDNS 和連過的 IP,不會在背景掃描區域網路;USB 已連線時直接略過。
-  - 連過的 IP 會記住,也可以「釘選」裝置,之後每次啟動自動連上,斷線自動重試。
+  - 連過的 IP 會記住,也可以「釘選」裝置,之後每次啟動自動連上,斷線自動重試。只要釘選了任何裝置,啟動時就只會自動連線已釘選的那些;連線中的裝置若沒有釘選,連線頁會提示。
   - 「螢幕暗掉維持連線」(實驗功能)會持續補送位置,降低 iPhone 鎖定螢幕後斷線的機率。
   - 「重新配對」可在配對記錄損毀時,透過 USB 一鍵重建。
   - 停止 Tunnel 時若 USB 還插著,會自動切回 USB。
@@ -139,21 +139,31 @@
 - 路徑點以 S / 1 / 2 / 3 標示,路徑線有流動箭頭可以看出方向。
 - 左上角按鈕可一鍵置中目前的模擬位置。選「只顯示路徑」時地圖會自動縮放到整條路線。
 - 地圖上的使用者圖示可以換成內建的 6 組角色,或上傳自己的 PNG(自動去除透明邊界)。
-- 座標格式可在 DD、DMS、DM 之間切換。
+- **座標格式**(設定頁):座標系統可選 WGS84 / CGCS2000(預設)、GCJ02(高德、騰訊)、BD09(百度),經緯度順序可選緯度在前或經度在前。設定套用於座標的顯示、複製與輸入,手機網頁操控同步套用;地圖、已儲存的座標與路線、GPX 與備份檔一律維持 WGS84。GCJ02 只在中國大陸與港澳有偏移,BD09 另外包含台灣,其他地區等同 WGS84。
+
+### 收藏視窗
+
+上方導覽列的「收藏」會開啟一個可拖曳的浮動視窗,分成「座標」與「路線」兩個分頁,操作方式相同:
+
+- 搜尋框固定在最上方。單擊座標即移動 GPS,單擊路線即載入。
+- 在項目上按右鍵,或按每列右側的「⋯」,會出現同一份選單:重新命名、編輯、複製、匯出、移動到分類、刪除。分類標題同樣可以按右鍵改名、換顏色、匯出或刪除。
+- 按住 Ctrl 或 Shift 點擊可以一次選取多個,再一起移動或刪除。
+- 直接拖曳項目即可調整順序,拖到另一個分類上就是移過去;分類本身也能拖曳排序。
+- 排序可選手動、名稱、新增時間、最後使用(路線為更新時間)。
 
 ### 座標收藏
 
-- 新增座標時自動帶入地名與國旗,編輯後座標改變會自動更新國旗。
-- 分類可自訂顏色,支援搜尋、排序(名稱 / 日期 / 最後使用)、拖曳排序、多選刪除。
+- 「新增」可以儲存目前位置、輸入座標新增、批次貼上多筆座標,或從檔案匯入。新增時自動帶入國旗。
+- 刪除座標後視窗下方會出現「復原」。
 - 匯入與匯出:JSON(全部資料,匯入為合併不覆蓋)、GPX(單筆、整個分類,或多個分類一次匯出成 ZIP)。
-- 可把所有收藏顯示在地圖上,數萬筆也不會卡頓,密集的點會自動聚合。
-- 「點擊也要飛 GPS」可以決定點座標時是真的瞬移過去,還是只把地圖畫面移過去看看。
+- 可把所有座標顯示在地圖上,數萬筆也不會卡頓,密集的點會自動聚合。
+- 「點擊座標時移動 GPS」關閉後,單擊座標只會把地圖畫面移過去,不會移動 GPS。
 
 ### 儲存路線
 
-- 路線可以分類、拖曳排序,並從清單直接載入開始跑。
+- 「新增」可以把地圖上目前的路線存起來;同名時可選擇覆蓋或另存。
 - 支援 GPX 與 JSON 的匯入匯出。
-- 可以把路徑點依目前順序複製成一行一筆的 `lat, lng` 文字。
+- 可以把路徑點依目前順序複製成一行一筆的座標文字。
 
 ### 地址搜尋
 
@@ -164,7 +174,7 @@
 
 ### 手機網頁操控
 
-人不在電腦旁時,可以用手機瀏覽器操控。按狀態列的「手機操控」會顯示區域網路網址與 6 位數 PIN,手機輸入後就能使用行動版地圖:瞬移、導航到指定點(走路 / 腳踏車 / 開車或自訂速度)、搜尋地址、輸入座標、停止與還原,並即時顯示桌面上同一條路徑。
+人不在電腦旁時,可以用手機瀏覽器操控。按狀態列的「手機操控」會顯示區域網路網址與 6 位數 PIN,手機輸入後就能使用行動版地圖:瞬移、導航到指定點(走路 / 腳踏車 / 開車或自訂速度)、搜尋地址、輸入座標、停止與還原,並即時顯示桌面上同一條路徑。移動中會顯示進度、剩餘距離與時間,可以暫停、繼續或變更速度。電腦上儲存的座標與最近紀錄可以直接取用。頁面可以加到手機主畫面,像 app 一樣全螢幕開啟,配色與座標格式跟隨電腦端的設定。
 
 > 手機必須跟電腦連在**同一個 WiFi**,電腦防火牆需放行 8777 port。按「重新產生」可立刻更換 PIN,讓之前配對過的手機失效。
 
@@ -173,13 +183,15 @@
 - 目前模擬位置的**國旗、地名、當地天氣與溫度**。
 - 跨時區時顯示時差,點開可看完整時區資訊。
 - **一鍵還原**:清除虛擬定位。注意「停止」只會結束移動,虛擬定位仍然保留,要恢復真實 GPS 請按還原。
-- 版本號:有新版本時旁邊出現 `NEW` 標示,點擊前往下載頁。
+- 版本號:有新版本時旁邊出現 `NEW` 標示。點擊後可以按「下載更新」在程式內下載(顯示進度),完成後按「重新啟動」即為新版;也可以改從 GitHub 或 Google 雲端自行下載安裝檔。程式不會自動下載,按了才會開始。
 - 「Log 資料夾」按鈕:一鍵開啟 `~/.locwarp/logs/`,方便把 backend.log 附到 Issue。
 
 ### 其他
 
 - **Cooldown**:依瞬移距離自動計算冷卻時間,降低被偵測為異常移動的風險。
 - 介面語言可在繁體中文與 English 之間即時切換。
+- **外觀**(設定頁):六種主題色、三段玻璃效果(液態 / 霧面 / 關閉)、動畫開關。畫面卡頓時可把玻璃效果改為霧面或關閉。
+- 設定頁的外觀、座標格式與提示音變更,需按「儲存設定」才會保留。
 - 路線完成提示音、硬體加速開關(部分顯示卡驅動下關閉可解決殘影或黑畫面,見 [Issue #24](https://github.com/keezxc1223/locwarp/issues/24))。
 - 所有資料(座標收藏、路線、設定)都存在 `~/.locwarp/`,重新安裝不會遺失。
 
@@ -243,6 +255,7 @@ iOS 17 以上需要 iPhone 上掛有 Personalized DDI 才能模擬定位。LocWa
 | 開啟後顯示後端程式不存在 | 防毒軟體把未簽章的後端 exe 隔離了。把安裝資料夾加入排除清單後重新安裝 |
 | Tunnel 啟動後連不上 | 確認以系統管理員身分啟動;暫時關閉 VPN 或第三方防火牆再試 |
 | WiFi 自動偵測找不到裝置 | 確認在同一個 WiFi 網段、路由器沒有開啟裝置隔離(AP isolation);可改為手動輸入 IP |
+| WiFi 每次啟動都要手動連線 | 到「連線」頁確認目前這台裝置是否已釘選。只要釘選了其他裝置,啟動時就只會自動連線已釘選的那些 |
 | port 掃描提示「每個 port 都有回應」 | VPN 或代理軟體正在攔截連線,關閉後再試。開著 VPN 時「自動偵測」也可能找不到裝置 |
 | `No such service: com.apple.instruments.dtservicehub`,或提示「未偵測到 DDI」 | 依[步驟 4](#4-掛載-developer-disk-imageios-17)掛載 DDI。仍失敗時,先把開發者模式關閉、重開機、再次開啟,然後重新掛載 |
 | iPhone 設定裡找不到開發者模式 | LocWarp 連上裝置後,到上方的「設定」頁按「開啟開發者模式」,再依[步驟 3](#3-開啟開發者模式)關掉並重開 iPhone 的「設定」App。按鈕無效時改用[側載方式](#附錄用側載方式讓開發者模式出現) |
@@ -281,16 +294,17 @@ iOS 17 以上需要 iPhone 上掛有 Personalized DDI 才能模擬定位。LocWa
 
 | 層 | 技術 | 用途 |
 | --- | --- | --- |
-| Frontend | [Electron](https://www.electronjs.org/) 44 | 桌面外殼,負責視窗、啟動 backend、改寫圖磚請求的 User-Agent |
+| Frontend | [Electron](https://www.electronjs.org/) 45 | 桌面外殼,負責視窗、啟動 backend、改寫圖磚請求的 User-Agent |
+| Frontend | [electron-updater](https://www.electron.build/auto-update) | 程式內更新,從 GitHub Releases 下載 |
 | Frontend | [React](https://react.dev/) 19 + [TypeScript](https://www.typescriptlang.org/) 7 + [Vite](https://vitejs.dev/) 8 | UI 與打包(`base: './'` 供 `file://` 載入) |
 | Frontend | [Leaflet](https://leafletjs.com/) 1.9 | 互動地圖、自訂標記、動畫路徑線 |
 | Frontend | [MapLibre GL](https://maplibre.org/) 6 | 向量圖層渲染,經 maplibre-gl-leaflet 掛進 Leaflet |
 | Backend | Python 3.13 + [FastAPI](https://fastapi.tiangolo.com/) + [uvicorn](https://www.uvicorn.org/) | REST API 與 WebSocket(`:8777`) |
-| Backend | [pymobiledevice3](https://github.com/doronz88/pymobiledevice3) 11.49+ | iOS 裝置協議(DVT / RemoteServices / lockdown / LegacyLocationService)與 WiFi tunnel |
+| Backend | [pymobiledevice3](https://github.com/doronz88/pymobiledevice3) 11.50+ | iOS 裝置協議(DVT / RemoteServices / lockdown / LegacyLocationService)與 WiFi tunnel |
 | Backend | [httpx](https://www.python-httpx.org/)、[pydantic](https://docs.pydantic.dev/)、[gpxpy](https://github.com/tkrajina/gpxpy) | 外部服務呼叫、資料驗證、GPX 解析 |
 | 打包 | [PyInstaller](https://pyinstaller.org/)、[electron-builder](https://www.electron.build/)(NSIS) | backend exe 與 Windows 安裝檔 |
 
-介面圖示全部是 inline SVG,樣式是手寫的單一 `styles.css`,沒有使用第三方 icon 或 UI 套件。
+介面圖示全部是 inline SVG,樣式是手寫的 CSS(`styles.css` 為版面,`appearance.css` 為主題、玻璃與動畫,`library.css` 為收藏視窗),沒有使用第三方 icon 或 UI 套件。
 
 ### 外部服務
 
@@ -305,7 +319,7 @@ iOS 17 以上需要 iPhone 上掛有 Personalized DDI 才能模擬定位。LocWa
 | [TimezoneDB](https://timezonedb.com/) | backend | 座標轉時區(內建 key) |
 | [flagcdn.com](https://flagcdn.com/) | frontend | 國旗圖片 |
 | OpenStreetMap、Google、[ESRI](https://www.esri.com/)、[OpenFreeMap](https://openfreemap.org/)、[VersaTiles](https://versatiles.org/)、[NLSC](https://maps.nlsc.gov.tw/)、[GSI](https://www.gsi.go.jp/) | frontend | 地圖圖磚 |
-| [GitHub Releases](https://github.com/keezxc1223/locwarp/releases) | frontend | 啟動時檢查新版本(無遙測) |
+| [GitHub Releases](https://github.com/keezxc1223/locwarp/releases) | frontend | 啟動時檢查新版本(無遙測);使用者按下「下載更新」後才下載新版 |
 
 反向地理編碼不使用 Nominatim 公共伺服器,因為它的使用政策以應用程式為單位計算流量上限,不適合散佈型的桌面程式。地址搜尋的預設選項若被 Nominatim 拒絕,會自動改用 Photon。
 
@@ -380,6 +394,8 @@ build-installer.bat
 
 注意 `npm run dist` 只執行第 3 步。改過 backend 要重跑 PyInstaller,改過前端或版本號要重跑 `npx vite build`,否則安裝檔會帶到舊的內容。
 
+發布新版時,`frontend/release/` 裡的三個檔都要上傳到 GitHub release:`LocWarp-Setup-X.Y.Z.exe`、`LocWarp-Setup-X.Y.Z.exe.blockmap`、`latest.yml`。程式內更新靠 `latest.yml` 得知最新版本,`.blockmap` 讓它只下載有變動的部分;缺少 `latest.yml` 時使用者只能手動下載。
+
 ### 專案結構
 
 ```
@@ -398,7 +414,7 @@ locwarp/
 │   ├── electron/main.js     # Electron 進入點,打包模式下啟動 backend
 │   ├── src/
 │   │   ├── App.tsx
-│   │   ├── components/      # MapView, ControlPanel, BookmarkList, StatusBar...
+│   │   ├── components/      # MapView, ControlPanel, LibraryPanel, StatusBar...
 │   │   ├── hooks/           # useSimulation, useDevice, useBookmarks
 │   │   ├── i18n/            # 中英文字串
 │   │   └── services/api.ts

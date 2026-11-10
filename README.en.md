@@ -119,7 +119,7 @@ When an engine fails, that leg falls back to a straight line and the next leg tr
 - **Wi-Fi Tunnel** (iOS 17+, requires one prior USB pairing):
   - "Auto-detect" looks for the device over mDNS first, then scans the local network, and lists only devices confirmed to be iPhones.
   - Auto-connect at startup uses only mDNS and previously connected IPs. It never scans the local network in the background, and it is skipped when USB is already connected.
-  - Previously used IPs are remembered. You can also pin a device so that it connects on every launch and retries after a drop.
+  - Previously used IPs are remembered. You can also pin a device so that it connects on every launch and retries after a drop. Once any device is pinned, only pinned devices auto-connect on launch; the connection page points it out when the device in use is not pinned.
   - "Keep connection alive when the screen dims" (experimental) keeps re-sending the position to reduce drops after the iPhone locks.
   - "Re-pair" rebuilds a damaged pairing record over USB in one click.
   - Stopping the tunnel while USB is still plugged in switches back to USB automatically.
@@ -139,21 +139,31 @@ Connect **up to three** devices at once. Teleport, Navigate, every movement mode
 - Waypoints are labelled S / 1 / 2 / 3, and the route line has flowing arrows that show direction.
 - The top-left button recentres the map on the current simulated position. In "show route only" view the map zooms to fit the whole route.
 - The map marker can be swapped for one of six built-in characters or your own PNG (transparent borders are trimmed automatically).
-- Coordinates can be shown as DD, DMS, or DM.
+- **Coordinate format** (Settings): the coordinate system can be WGS84 / CGCS2000 (default), GCJ02 (Amap, Tencent) or BD09 (Baidu), and the axis order can be latitude first or longitude first. The setting applies to coordinates that are shown, copied and typed in, and phone web control follows it. The map, saved coordinates and routes, GPX and backup files always stay in WGS84. GCJ02 is only offset in mainland China, Hong Kong and Macau; BD09 additionally covers Taiwan; elsewhere both equal WGS84.
+
+### Library window
+
+"Library" in the top navigation opens a draggable floating window with two tabs, Coordinates and Routes, that work the same way:
+
+- The search box stays at the top. One click on a coordinate moves the GPS; one click on a route loads it.
+- Right-click an item, or press the "..." at the end of its row, for the same menu: rename, edit, copy, export, move to category, delete. Category headers have a right-click menu too: rename, colour, export, delete.
+- Ctrl-click or Shift-click selects several items, which can then be moved or deleted together.
+- Drag an item to reorder it, or onto another category to move it there. Categories can be dragged into a new order as well.
+- Sort manually, by name, by date added, or by last used (last updated for routes).
 
 ### Saved coordinates
 
-- New entries pick up a place name and a country flag automatically, and the flag refreshes when the coordinates are edited.
-- Categories with custom colours, plus search, sorting (name / date / last used), drag-and-drop ordering, and multi-select delete.
+- "Add" saves the current position, adds an entry from typed coordinates, bulk-pastes many coordinates, or imports a file. New entries pick up a country flag automatically.
+- After deleting a coordinate, an Undo offer appears at the bottom of the window.
 - Import and export: JSON (everything, imports merge rather than overwrite) and GPX (a single entry, a whole category, or several categories as one ZIP).
 - Show every saved coordinate on the map. Tens of thousands stay smooth, and dense areas cluster automatically.
-- "Click also moves GPS" decides whether clicking an entry actually teleports there or only pans the map for a look.
+- With "Clicking a coordinate moves GPS" turned off, a click only pans the map and the GPS stays put.
 
 ### Saved routes
 
-- Routes can be categorised, reordered by dragging, and started straight from the list.
+- "Add" saves the route currently on the map. If the name already exists you can overwrite it or save a new one.
 - GPX and JSON import and export.
-- Copy the waypoints in their current order as `lat, lng` text, one per line.
+- Copy the waypoints in their current order as coordinate text, one per line.
 
 ### Address search
 
@@ -164,7 +174,7 @@ Connect **up to three** devices at once. Teleport, Navigate, every movement mode
 
 ### Phone web control
 
-Control LocWarp from a phone browser when you are away from the PC. The "Phone control" button in the status bar shows a LAN address and a 6-digit PIN. Enter them on the phone to get a mobile map with teleport, navigate to a point (walk / bike / drive or a custom speed), address search, coordinate input, stop, and restore, plus a live view of the route running on the desktop.
+Control LocWarp from a phone browser when you are away from the PC. The "Phone control" button in the status bar shows a LAN address and a 6-digit PIN. Enter them on the phone to get a mobile map with teleport, navigate to a point (walk / bike / drive or a custom speed), address search, coordinate input, stop, and restore, plus a live view of the route running on the desktop. While moving it shows progress, remaining distance and time, and lets you pause, resume or change the speed. The coordinates saved on the PC and the recent list are available directly. The page can be added to the phone's home screen to open full screen like an app, and it follows the desktop's theme colour and coordinate format.
 
 > The phone must be on the **same Wi-Fi** as the PC, and the PC firewall must allow port 8777. "Regenerate" issues a new PIN at once and invalidates phones paired earlier.
 
@@ -173,13 +183,15 @@ Control LocWarp from a phone browser when you are away from the PC. The "Phone c
 - **Country flag, place name, local weather, and temperature** for the current simulated position.
 - A time difference indicator after crossing time zones. Click it for full time zone details.
 - **Restore**: clears the simulated location. Note that "Stop" only ends the movement and keeps the simulated location in place. Press Restore to return to the real GPS.
-- Version number, with a `NEW` badge when an update is available. Click it to open the download page.
+- Version number, with a `NEW` badge when an update is available. Click it and press Download update to fetch the new version inside the app with a progress bar, then press Restart to switch to it. You can also get the installer yourself from GitHub or Google Drive. Nothing is downloaded until you ask for it.
 - "Log folder" button: opens `~/.locwarp/logs/` so you can attach backend.log to an issue.
 
 ### Other
 
 - **Cooldown**: a cooldown based on teleport distance, to lower the risk of being flagged for impossible movement.
 - The interface switches between Traditional Chinese and English on the fly.
+- **Appearance** (Settings): six theme colours, three glass styles (Liquid / Frosted / Off) and an animation switch. If the window stutters, set the glass style to Frosted or Off.
+- Changes to appearance, coordinate format and the alert sound on the Settings page are kept only after pressing Save settings.
 - Route completion sound, and a hardware acceleration switch (turning it off fixes ghosting or a black window on some GPU drivers, see [Issue #24](https://github.com/keezxc1223/locwarp/issues/24)).
 - All data (saved coordinates, routes, settings) lives in `~/.locwarp/` and survives a reinstall.
 
@@ -242,6 +254,7 @@ With the Wi-Fi Tunnel, set Settings → Display & Brightness → Auto-Lock to **
 | --- | --- |
 | A dialog says the backend program is missing | Antivirus quarantined the unsigned backend exe. Add the install folder to the exclusion list and reinstall |
 | The tunnel starts but nothing connects | Make sure LocWarp runs as administrator, and try again with VPN or third-party firewall software turned off |
+| Wi-Fi has to be connected by hand on every launch | On the Connection page, check whether this device is pinned. Once any other device is pinned, only pinned devices auto-connect on launch |
 | Wi-Fi auto-detect finds no device | Check that both are on the same Wi-Fi subnet and that the router has no client or AP isolation. Entering the IP by hand also works |
 | The port scan says the IP answers on every port | A VPN or proxy is intercepting connections. Turn it off and retry. Auto-detect may also find nothing while a VPN is on |
 | `No such service: com.apple.instruments.dtservicehub`, or "No DDI detected" | Mount the DDI as described in [step 4](#4-mount-the-developer-disk-image-ios-17). If it still fails, turn Developer Mode off, reboot, turn it back on, and mount again |
@@ -281,16 +294,17 @@ When reporting a problem, include the iOS version, the connection type, and `~/.
 
 | Layer | Technology | Purpose |
 | --- | --- | --- |
-| Frontend | [Electron](https://www.electronjs.org/) 44 | Desktop shell: windows, spawning the backend, rewriting the User-Agent on tile requests |
+| Frontend | [Electron](https://www.electronjs.org/) 45 | Desktop shell: windows, spawning the backend, rewriting the User-Agent on tile requests |
+| Frontend | [electron-updater](https://www.electron.build/auto-update) | In-app update, downloading from GitHub Releases |
 | Frontend | [React](https://react.dev/) 19 + [TypeScript](https://www.typescriptlang.org/) 7 + [Vite](https://vitejs.dev/) 8 | UI and bundling (`base: './'` for `file://` loading) |
 | Frontend | [Leaflet](https://leafletjs.com/) 1.9 | Interactive map, custom markers, animated route lines |
 | Frontend | [MapLibre GL](https://maplibre.org/) 6 | Vector layer rendering, attached to Leaflet through maplibre-gl-leaflet |
 | Backend | Python 3.13 + [FastAPI](https://fastapi.tiangolo.com/) + [uvicorn](https://www.uvicorn.org/) | REST API and WebSocket (`:8777`) |
-| Backend | [pymobiledevice3](https://github.com/doronz88/pymobiledevice3) 11.49+ | iOS device protocols (DVT / RemoteServices / lockdown / LegacyLocationService) and the Wi-Fi tunnel |
+| Backend | [pymobiledevice3](https://github.com/doronz88/pymobiledevice3) 11.50+ | iOS device protocols (DVT / RemoteServices / lockdown / LegacyLocationService) and the Wi-Fi tunnel |
 | Backend | [httpx](https://www.python-httpx.org/), [pydantic](https://docs.pydantic.dev/), [gpxpy](https://github.com/tkrajina/gpxpy) | External service calls, validation, GPX parsing |
 | Packaging | [PyInstaller](https://pyinstaller.org/), [electron-builder](https://www.electron.build/) (NSIS) | Backend exe and the Windows installer |
 
-All icons are inline SVG and the styling is a single hand-written `styles.css`. No third-party icon or UI kit is used.
+All icons are inline SVG and the styling is hand-written CSS (`styles.css` for layout, `appearance.css` for themes, glass and motion, `library.css` for the library window). No third-party icon or UI kit is used.
 
 ### External services
 
@@ -305,7 +319,7 @@ All free. Only Google Geocoding needs a key, which the user supplies. Nothing el
 | [TimezoneDB](https://timezonedb.com/) | backend | Coordinate to time zone (built-in key) |
 | [flagcdn.com](https://flagcdn.com/) | frontend | Flag images |
 | OpenStreetMap, Google, [ESRI](https://www.esri.com/), [OpenFreeMap](https://openfreemap.org/), [VersaTiles](https://versatiles.org/), [NLSC](https://maps.nlsc.gov.tw/), [GSI](https://www.gsi.go.jp/) | frontend | Map tiles |
-| [GitHub Releases](https://github.com/keezxc1223/locwarp/releases) | frontend | Update check at launch (no telemetry) |
+| [GitHub Releases](https://github.com/keezxc1223/locwarp/releases) | frontend | Update check at launch (no telemetry); the new version is downloaded only after the user presses Download update |
 
 Reverse geocoding does not use the public Nominatim server. Its usage policy counts traffic per application, which does not suit a distributed desktop app. If the default address search option is refused by Nominatim, it falls back to Photon automatically.
 
@@ -380,6 +394,8 @@ build-installer.bat
 
 Note that `npm run dist` only runs step 3. Re-run PyInstaller after changing the backend, and re-run `npx vite build` after changing the frontend or the version number. Otherwise the installer ships stale content.
 
+When publishing a release, upload all three files from `frontend/release/` to the GitHub release: `LocWarp-Setup-X.Y.Z.exe`, `LocWarp-Setup-X.Y.Z.exe.blockmap` and `latest.yml`. The in-app update reads `latest.yml` to learn the latest version, and the `.blockmap` lets it download only what changed. Without `latest.yml`, users can only download manually.
+
 ### Project layout
 
 ```
@@ -398,7 +414,7 @@ locwarp/
 │   ├── electron/main.js     # Electron entry, spawns the backend when packaged
 │   ├── src/
 │   │   ├── App.tsx
-│   │   ├── components/      # MapView, ControlPanel, BookmarkList, StatusBar...
+│   │   ├── components/      # MapView, ControlPanel, LibraryPanel, StatusBar...
 │   │   ├── hooks/           # useSimulation, useDevice, useBookmarks
 │   │   ├── i18n/            # Chinese and English strings
 │   │   └── services/api.ts
