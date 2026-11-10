@@ -1,4 +1,4 @@
-import React, { useState } from 'react';
+import React, { useEffect, useRef, useState } from 'react';
 import { createPortal } from 'react-dom';
 import { describePipiError } from '../services/api';
 import type { PipiCookieResult, PipiKind, PipiStatusResponse } from '../services/api';
@@ -22,7 +22,7 @@ interface Props {
   onMarkerSizeChange: (s: PipiMarkerSize) => void;
   status: PipiLayerStatus;
   configured: boolean | null;
-  cookieInfo: Pick<PipiStatusResponse, 'source' | 'updated_at'>;
+  cookieInfo: Pick<PipiStatusResponse, 'source' | 'updated_at' | 'logged_in'>;
   onRefresh: () => void;
   onSaveCookie: (cookie: string) => Promise<PipiCookieResult>;
   onClearCookie: () => Promise<void>;
@@ -102,6 +102,9 @@ const PipiMushroomPanel: React.FC<Props> = ({
   mushroomFilter, onMushroomFilterChange, facets, markerSize, onMarkerSizeChange,
   status, configured, cookieInfo, onRefresh, onSaveCookie, onClearCookie, onClose, t,
 }) => {
+  // A stored cookie is not the same as being logged in: the login runs out.
+  const expired = !!configured && cookieInfo.logged_in === false;
+  const loggedIn = !!configured && !expired;
   const cookieBadge = !configured
     ? t('map.pipi_cookie_unset')
     : cookieInfo.updated_at
@@ -173,23 +176,86 @@ const PipiMushroomPanel: React.FC<Props> = ({
   const openSite = () => window.open('https://pipimushroom.com/', '_blank', 'noopener');
   const openExtFolder = () => { void window.electronAPI?.openPipiExtensionFolder?.(); };
 
+  // The panel floats over the map, so it has to get out of the way: drag it
+  // by the header, or fold it down to just the header. Position and fold
+  // state are remembered.
+  const rootRef = useRef<HTMLDivElement>(null);
+  const [pos, setPos] = useState<{ x: number; y: number }>(() => {
+    try {
+      const v = JSON.parse(localStorage.getItem('locwarp.pipi_panel_pos') || 'null');
+      if (v && Number.isFinite(v.x) && Number.isFinite(v.y)) return { x: v.x, y: v.y };
+    } catch { /* fall back to the default spot */ }
+    return { x: 56, y: 150 };
+  });
+  const [folded, setFolded] = useState<boolean>(() => {
+    try { return localStorage.getItem('locwarp.pipi_panel_folded') === '1'; } catch { return false; }
+  });
+  useEffect(() => {
+    try {
+      localStorage.setItem('locwarp.pipi_panel_pos', JSON.stringify(pos));
+      localStorage.setItem('locwarp.pipi_panel_folded', folded ? '1' : '0');
+    } catch { /* ignore */ }
+  }, [pos, folded]);
+  // Keep it inside the map area, also after the window is resized.
+  const clamp = (x: number, y: number) => {
+    const el = rootRef.current;
+    const host = el?.offsetParent as HTMLElement | null;
+    if (!el || !host) return { x, y };
+    return {
+      x: Math.max(4, Math.min(x, host.clientWidth - el.offsetWidth - 4)),
+      y: Math.max(4, Math.min(y, host.clientHeight - 44)),
+    };
+  };
+  useEffect(() => {
+    const fix = () => setPos((p0) => { const c = clamp(p0.x, p0.y); return c.x === p0.x && c.y === p0.y ? p0 : c; });
+    fix();
+    window.addEventListener('resize', fix);
+    return () => window.removeEventListener('resize', fix);
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, []);
+  const startDrag = (e: React.MouseEvent) => {
+    if ((e.target as HTMLElement).closest('button')) return;
+    e.preventDefault();
+    const start = { mx: e.clientX, my: e.clientY, x: pos.x, y: pos.y };
+    const move = (ev: MouseEvent) => setPos(clamp(start.x + ev.clientX - start.mx, start.y + ev.clientY - start.my));
+    const up = () => {
+      window.removeEventListener('mousemove', move);
+      window.removeEventListener('mouseup', up);
+    };
+    window.addEventListener('mousemove', move);
+    window.addEventListener('mouseup', up);
+  };
+
   return (
     <div
+      ref={rootRef}
       onContextMenu={(e) => e.stopPropagation()}
       onMouseDown={(e) => e.stopPropagation()}
       onClick={(e) => e.stopPropagation()}
       onWheel={(e) => e.stopPropagation()}
       onDoubleClick={(e) => e.stopPropagation()}
-      className="pipi-panel"
+      className={`pipi-panel${folded ? ' folded' : ''}`}
+      style={{ left: pos.x, top: pos.y }}
     >
-      <div className="pipi-panel-head">
+      <div className="pipi-panel-head" onMouseDown={startDrag} onDoubleClick={() => setFolded((f) => !f)} title={t('map.pipi_drag_hint')}>
         <span>{t('map.pipi_title')}</span>
-        <button type="button" className="pipi-panel-close" onClick={onClose} aria-label="close">
-          <svg width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.4" strokeLinecap="round">
-            <line x1="18" y1="6" x2="6" y2="18" /><line x1="6" y1="6" x2="18" y2="18" />
-          </svg>
-        </button>
+        <span className="pipi-panel-head-actions">
+          <button type="button" className="pipi-panel-close" onClick={() => setFolded((f) => !f)}
+            title={folded ? t('map.pipi_unfold') : t('map.pipi_fold')} aria-label={folded ? t('map.pipi_unfold') : t('map.pipi_fold')}
+          >
+            <svg width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.4" strokeLinecap="round" strokeLinejoin="round">
+              {folded ? <polyline points="6 9 12 15 18 9" /> : <line x1="6" y1="12" x2="18" y2="12" />}
+            </svg>
+          </button>
+          <button type="button" className="pipi-panel-close" onClick={onClose} title={t('generic.close')} aria-label={t('generic.close')}>
+            <svg width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.4" strokeLinecap="round">
+              <line x1="18" y1="6" x2="6" y2="18" /><line x1="6" y1="6" x2="18" y2="18" />
+            </svg>
+          </button>
+        </span>
       </div>
+
+      <div className="pipi-panel-body">
 
       <div className="pipi-panel-row">
         <span>{t('map.pipi_layer_on')}</span>
@@ -325,13 +391,15 @@ const PipiMushroomPanel: React.FC<Props> = ({
       {/* Login: only the state and one button live here. The how-to opens
           in its own dialog, so the panel stays about the map. */}
       <div className="pipi-login-row">
-        <span className={`pipi-login-dot${configured ? ' on' : ''}`} />
+        <span className={`pipi-login-dot${loggedIn ? ' on' : expired ? ' warn' : ''}`} />
         <span className="pipi-login-text">
-          <b>{configured ? t('map.pipi_login_state_on') : t('map.pipi_login_state_off')}</b>
-          <small>{cookieBadge}</small>
+          <b>{loggedIn ? t('map.pipi_login_state_on') : expired ? t('map.pipi_login_state_expired') : t('map.pipi_login_state_off')}</b>
+          <small>{expired ? t('map.pipi_login_expired_hint') : cookieBadge}</small>
         </span>
-        <button type="button" className={`pipi-panel-btn${configured ? '' : ' primary'}`} onClick={() => setGuideOpen(true)}>
-          {t('map.pipi_guide_button')}
+        <button type="button" className={`pipi-panel-btn${loggedIn ? '' : ' primary'}`}
+          onClick={expired ? openSite : () => setGuideOpen(true)}
+        >
+          {expired ? t('map.pipi_open_site') : t('map.pipi_guide_button')}
         </button>
       </div>
       {cookieMsg && !guideOpen && (
@@ -345,7 +413,7 @@ const PipiMushroomPanel: React.FC<Props> = ({
           <div className="lib-dialog pipi-guide" onClick={(e) => e.stopPropagation()} role="dialog" aria-modal="true">
             <div className="pipi-guide-head">
               <div className="lib-dialog-title">{t('map.pipi_guide_title')}</div>
-              <span className={`pipi-guide-state${configured ? ' on' : ''}`}>{cookieBadge}</span>
+              <span className={`pipi-guide-state${loggedIn ? ' on' : ''}`}>{expired ? t('map.pipi_login_state_expired') : cookieBadge}</span>
             </div>
             <div className="pipi-guide-intro">{t('map.pipi_guide_intro')}</div>
 
@@ -425,6 +493,7 @@ const PipiMushroomPanel: React.FC<Props> = ({
         document.body,
       )}
 
+      </div>
     </div>
   );
 };

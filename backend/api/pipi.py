@@ -53,6 +53,10 @@ async def status():
         "configured": configured,
         "source": app_state._pipi_cookie_source if configured else None,
         "updated_at": app_state._pipi_cookie_updated_at if configured else None,
+        # True / False once the site has answered with this cookie, None
+        # before that. False means the login expired: the extension sends
+        # a fresh cookie when it sees it, and the panel says so.
+        "logged_in": _client().login_ok if configured else None,
     }
 
 
@@ -101,6 +105,10 @@ async def set_cookie(body: CookieBody, request: Request):
                 return {"configured": True, "logged_in": False, "error": error, "adopted": False}
             # stored cookie is dead too; the new one is no worse
     client.set_cookie(header)
+    # The check above was made with this very cookie.
+    client.login_ok = error is None
+    if error is None:
+        client.last_ok_at = time.monotonic()
     app_state._pipi_cookie = header
     app_state._pipi_cookie_source = body.source
     app_state._pipi_cookie_updated_at = int(time.time() * 1000)

@@ -39,9 +39,10 @@ LocWarp 的「蘑菇地圖」圖層需要 pipimushroom.com 的登入 Cookie。�
 
 - 安裝或重新載入時、Chrome 啟動時、點工具列圖示時
 - pipimushroom.com 的登入 Cookie 變動 (重新登入、session 換新) 後約 3 秒，最多每分鐘一次
-- 每分鐘檢查一次：只有上次沒成功，或 LocWarp 回報沒有 Cookie 時才重新同步
+- 每分鐘檢查一次：上次沒成功、LocWarp 回報沒有 Cookie，或 LocWarp 回報登入已過期時會重新同步
+- 已同步時每 5 分鐘向網站確認一次登入狀態，讓 Chrome 這邊的登入不會因為閒置而過期
 
-以下情況不會連到 pipimushroom.com：已經同步好、LocWarp 沒在執行、Chrome 沒有登入 (等你登入後才同步)。
+以下情況不會連到 pipimushroom.com：LocWarp 沒在執行、Chrome 沒有登入 (等你登入後才同步)。
 
 ## 權限與隱私
 

@@ -1948,12 +1948,6 @@ const MapView: React.FC<MapViewProps> = ({
   }, [s2Enabled, s2Level]);
 
   // ── Mushroom map overlay (pipimushroom.com) ─────────────────────────
-  // The status bar has its own 蘑菇地圖 button; it reaches the panel here.
-  useEffect(() => {
-    const open = () => setPipiPanelOpen(true);
-    window.addEventListener('locwarp:open-pipi-panel', open);
-    return () => window.removeEventListener('locwarp:open-pipi-panel', open);
-  }, []);
   const pipi = usePipiMushroomLayer({
     mapRef,
     enabled: pipiEnabled,

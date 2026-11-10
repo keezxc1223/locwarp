@@ -596,7 +596,7 @@ export const STRINGS = {
   // Settings page groups + rows.
   'settings.group_general': { zh: '一般', en: 'General' },
   // Mushroom map layer (pipimushroom.com)
-  'map.pipi_toggle': { zh: '蘑菇地圖 (點擊開啟面板,右鍵快速開關圖層)', en: 'Mushroom map (click for the panel, right-click to toggle the layer)' },
+  'map.pipi_toggle': { zh: '蘑菇地圖:顯示蘑菇、花與煙霧點位 (點擊開啟面板,右鍵快速開關圖層)', en: 'Mushroom map: mushroom, flower and smoke spots (click for the panel, right-click to toggle the layer)' },
   'map.pipi_login_label': { zh: '登入 pipimushroom.com', en: 'Log in to pipimushroom.com' },
   'map.pipi_step_1': { zh: '開啟隨程式附上的擴充功能資料夾,記下它的位置。', en: 'Open the extension folder that ships with the app and note where it is.' },
   'map.pipi_step_2': { zh: '在 Chrome 網址列輸入 chrome://extensions,打開右上角的「開發人員模式」,按「載入未封裝項目」並選擇剛才的資料夾。', en: 'In Chrome go to chrome://extensions, turn on Developer mode at the top right, press Load unpacked and pick that folder.' },
@@ -605,7 +605,6 @@ export const STRINGS = {
   'map.pipi_open_site': { zh: '開啟網站', en: 'Open site' },
   'map.pipi_manual_title': { zh: '不用 Chrome:手動貼上 Cookie', en: 'Without Chrome: paste the cookie by hand' },
   'map.pipi_logout': { zh: '清除登入資料', en: 'Clear login data' },
-  'map.pipi_toggle_short': { zh: '顯示蘑菇、花與煙霧點位 (資料來源: pipimushroom.com)', en: 'Show mushroom, flower and smoke spots (data: pipimushroom.com)' },
   'map.pipi_mush_filter_title': { zh: '蘑菇篩選 (大小、種類、剩餘時間)', en: 'Mushroom filters (size, type, time left)' },
   'map.pipi_mush_filter_on': { zh: '篩選中', en: 'Active' },
   'map.pipi_mush_size': { zh: '大小', en: 'Size' },
@@ -627,6 +626,11 @@ export const STRINGS = {
   'map.pipi_popup_note': { zh: '資料來源 pipimushroom.com,僅供參考', en: 'Data from pipimushroom.com, for reference only' },
   'map.pipi_step_store': { zh: '從 Chrome 線上應用程式商店安裝「LocWarp 蘑菇地圖 Cookie 同步」。', en: 'Install "LocWarp Mushroom Map Cookie Sync" from the Chrome Web Store.' },
   'map.pipi_open_store': { zh: '前往商店', en: 'Open store' },
+  'map.pipi_login_state_expired': { zh: '登入已過期', en: 'Login expired' },
+  'map.pipi_login_expired_hint': { zh: '請在 Chrome 開啟網站重新登入,約一分鐘內會自動恢復', en: 'Log in again on the site in Chrome. It recovers by itself within about a minute' },
+  'map.pipi_drag_hint': { zh: '拖曳標題可移動面板,連按兩下可收起', en: 'Drag the title to move the panel, double-click to fold it' },
+  'map.pipi_fold': { zh: '收起', en: 'Fold' },
+  'map.pipi_unfold': { zh: '展開', en: 'Unfold' },
   'map.pipi_title': { zh: '蘑菇地圖', en: 'Mushroom map' },
   'map.pipi_layer_on': { zh: '顯示圖層', en: 'Show layer' },
   'map.pipi_kind_mushroom': { zh: '蘑菇', en: 'Mushrooms' },

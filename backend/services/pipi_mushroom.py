@@ -216,6 +216,14 @@ class PipiMushroomClient:
         self._last_call = 0.0
         self._blocked_until = 0.0
         self._cache: dict[tuple, tuple[float, dict]] = {}
+        # Whether the stored login works: None until something has been
+        # asked of the site, then the outcome of the latest request. The
+        # status endpoint reports it, so the UI does not say "logged in"
+        # about a cookie that has expired, and the extension knows when to
+        # send a fresh one.
+        self.login_ok: bool | None = None
+        # time.monotonic() of the last request the site accepted.
+        self.last_ok_at: float | None = None
 
     # ── configuration ────────────────────────────────────────────────
     @property
@@ -235,6 +243,8 @@ class PipiMushroomClient:
         self._session = None
         self._cache.clear()
         self._blocked_until = 0.0
+        self.login_ok = None
+        self.last_ok_at = None
         old, self._client = self._client, None
         if old is not None:
             try:
@@ -364,8 +374,20 @@ class PipiMushroomClient:
         return r.status_code, j if isinstance(j, dict) else {}
 
     async def request(self, endpoint: str, payload: dict) -> dict:
-        """Send one encrypted request. Serialised + rate limited; retries
-        once with a fresh API session on 401 (expired token)."""
+        """Send one encrypted request and record whether the login held."""
+        try:
+            j = await self._request(endpoint, payload)
+        except PipiError as e:
+            if e.code == "pipi_login_required":
+                self.login_ok = False
+            raise
+        self.login_ok = True
+        self.last_ok_at = time.monotonic()
+        return j
+
+    async def _request(self, endpoint: str, payload: dict) -> dict:
+        """Serialised + rate limited; retries once with a fresh API session
+        on 401 (expired token)."""
         if not self.configured:
             raise PipiError("pipi_no_cookie", 400)
         async with self._lock:

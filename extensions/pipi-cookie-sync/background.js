@@ -26,7 +26,11 @@ const SITE_DOMAIN = 'pipimushroom.com';
 const LOCWARP = 'http://127.0.0.1:8777';
 const ALARM = 'pipi-cookie-check';
 const DEBOUNCE_MS = 3000;
-const MIN_CHANGE_GAP_MS = 60000;
+const MIN_CHANGE_GAP_MS = 15000;
+// While in sync, still ask the site this often: the login lasts about 15
+// minutes and is extended on use, so without it Chrome's own login runs
+// out and the user has to sign in again.
+const KEEPALIVE_MS = 5 * 60000;
 // The probe's own response may set cookies; that isn't a change to react to.
 const SELF_CHANGE_MS = 5000;
 const CAPTURE_WAIT_MS = 2000;
@@ -81,7 +85,9 @@ async function show(text, color, message) {
 async function locwarpHasCookie() {
   const r = await fetch(`${LOCWARP}/api/pipi/status`, { cache: 'no-store' });
   const j = await r.json();
-  return !!j.configured;
+  // logged_in === false: LocWarp has a cookie but the site no longer
+  // accepts it. That needs a fresh one just as much as having none.
+  return !!j.configured && j.logged_in !== false;
 }
 
 // Ask the site who we are, and capture the Cookie header Chrome sent with it.
@@ -120,10 +126,10 @@ async function doSync(reason) {
     await retryLater('×', GREY, `LocWarp 沒有在執行，啟動後一分鐘內會自動同步 (${now()})`);
     return;
   }
-  const { state, lastHash, dirty } = await chrome.storage.local.get(['state', 'lastHash', 'dirty']);
+  const { state, lastHash, dirty, lastProbeAt } = await chrome.storage.local.get(['state', 'lastHash', 'dirty', 'lastProbeAt']);
   if (reason === 'alarm' && !dirty) {
     if (state === 'logged_out' || state === 'rejected') return; // wait for a cookie change
-    if (state === 'synced' && locwarpHas) return;
+    if (state === 'synced' && locwarpHas && Date.now() - (lastProbeAt || 0) < KEEPALIVE_MS) return;
   }
 
   await show('…', BLUE, '同步中…');
@@ -135,6 +141,7 @@ async function doSync(reason) {
     await retryLater('?', ORANGE, `連不到 pipimushroom.com，一分鐘後重試 (${now()})`);
     return;
   }
+  await chrome.storage.local.set({ lastProbeAt: Date.now() });
   if (probe.status === 429) {
     await retryLater('?', ORANGE, `pipimushroom.com 暫時限流，一分鐘後重試 (${now()})`);
     return;

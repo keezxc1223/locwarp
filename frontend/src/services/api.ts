@@ -62,7 +62,7 @@ const ERROR_I18N: Record<string, { zh: string; en: string }> = {
   pipi_no_cookie: { zh: '尚未設定 Pipi Mushroom 的 Cookie', en: 'Pipi Mushroom cookie is not set' },
   pipi_local_only: { zh: '只能在這台電腦上設定 Cookie', en: 'The cookie can only be set from this PC' },
   pipi_cookie_invalid: { zh: 'Cookie 格式不正確, 應為 name=value; name2=value2', en: 'Invalid cookie, expected name=value; name2=value2' },
-  pipi_login_required: { zh: 'Pipi Mushroom 回應未登入, Cookie 可能已失效, 請重新複製貼上', en: 'Pipi Mushroom says not logged in. The cookie may have expired, paste a fresh one' },
+  pipi_login_required: { zh: 'pipimushroom.com 的登入已過期, 請在 Chrome 開啟該網站重新登入, 之後會自動恢復', en: 'The pipimushroom.com login has expired. Open the site in Chrome and log in again; it recovers by itself' },
   pipi_rate_limited: { zh: 'Pipi Mushroom 請求太頻繁, 稍後會自動重試', en: 'Pipi Mushroom rate limit hit, will retry automatically' },
   pipi_unavailable: { zh: 'Pipi Mushroom 暫時無法連線, 或網站格式已變更', en: 'Pipi Mushroom is unreachable, or the site format changed' },
   pipi_zoom_too_low: { zh: '請放大地圖後再載入蘑菇地圖', en: 'Zoom in to load the mushroom map' },
@@ -519,6 +519,8 @@ export interface PipiStatusResponse {
   configured: boolean
   source: 'manual' | 'extension' | null
   updated_at: number | null
+  // false: a cookie is stored but the site no longer accepts it.
+  logged_in?: boolean | null
 }
 export const pipiStatus = () => pipiRequest<PipiStatusResponse>('GET', '/api/pipi/status')
 export const pipiSetCookie = (cookie: string) => pipiRequest<PipiCookieResult>('PUT', '/api/pipi/cookie', { cookie })

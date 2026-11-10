@@ -241,7 +241,7 @@ Connect **up to three** devices at once. Teleport, Navigate, every movement mode
 <details>
 <summary><b>Mushroom map</b></summary>
 
-Shows the mushroom, flower and smoke spots from [pipimushroom.com](https://pipimushroom.com/) on the map (Taiwan, Hong Kong and Malaysia at the moment). Press **Mushroom map** in the status bar at the bottom, or the mushroom button in the toolbar on the left of the map, to open its panel.
+Shows the mushroom, flower and smoke spots from [pipimushroom.com](https://pipimushroom.com/) on the map (Taiwan, Hong Kong and Malaysia at the moment). Press the mushroom button in the toolbar on the left of the map to open its panel. The panel can be dragged by its title and folded down to the title alone.
 
 - Mushrooms, flowers and smoke can be switched on and off separately.
 - **Mushroom filters** (click to expand): filter by size, type and minimum time left. The choices come from the loaded data, and each group has Select all and None.
@@ -251,7 +251,7 @@ Shows the mushroom, flower and smoke spots from [pipimushroom.com](https://pipim
 
 **Logging in**: the site only serves data to logged-in users. **How to log in** in the panel opens the steps. There are two ways:
 
-1. **Chrome extension (recommended)**: press Open folder in the guide to find the extension that ships with the app, go to `chrome://extensions` in Chrome, turn on Developer mode and Load unpacked, then log in to pipimushroom.com in the same Chrome. The login syncs by itself and is renewed automatically afterwards.
+1. **Chrome extension (recommended)**: press Open folder in the guide to find the extension that ships with the app, go to `chrome://extensions` in Chrome, turn on Developer mode and Load unpacked, then log in to pipimushroom.com in the same Chrome. The login syncs by itself. The site's login expires after about 15 minutes without use; LocWarp while it is running, and the extension, both renew it on a timer. If it still expires (after the PC sleeps, for example), the panel shows Login expired, and logging in again on the site in Chrome restores it within about a minute.
 2. **Paste the cookie by hand**: without Chrome, copy the cookie from your browser as the guide describes and paste it in.
 
 LocWarp never handles your Google password. The login data stays on this PC (`~/.locwarp/settings.json`) and is only ever sent to pipimushroom.com. The extension's privacy notes are in [docs/pipi-extension-privacy.md](docs/pipi-extension-privacy.md).
@@ -373,7 +373,7 @@ Nothing is downloaded until you ask for it. You can also get the installer yours
 | A dialog says the backend program is missing | Antivirus quarantined the unsigned backend exe. Add the install folder to the exclusion list and reinstall |
 | The tunnel starts but nothing connects | Make sure LocWarp runs as administrator, and try again with VPN or third-party firewall software turned off |
 | Wi-Fi has to be connected by hand on every launch | On the Connection page, check whether this device is pinned. Once any other device is pinned, only pinned devices auto-connect on launch |
-| The mushroom map shows no spots | Check in order: the panel says Logged in (otherwise press How to log in), the map is at zoom 15 or closer, and the location is in Taiwan, Hong Kong or Malaysia. The login expires after about 15 minutes; the Chrome extension renews it by itself, while a cookie pasted by hand has to be pasted again |
+| The mushroom map shows no spots | Check in order: the panel says Logged in (otherwise press How to log in), the map is at zoom 15 or closer, and the location is in Taiwan, Hong Kong or Malaysia. When the panel shows Login expired, open the site in Chrome and log in again; the extension syncs by itself. A cookie pasted by hand has to be pasted again once it expires |
 | Wi-Fi auto-detect finds no device | Check that both are on the same Wi-Fi subnet and that the router has no client or AP isolation. Entering the IP by hand also works |
 | The port scan says the IP answers on every port | A VPN or proxy is intercepting connections. Turn it off and retry. Auto-detect may also find nothing while a VPN is on |
 | `No such service: com.apple.instruments.dtservicehub`, or "No DDI detected" | Mount the DDI as described in [step 4](#4-mount-the-developer-disk-image-ios-17). If it still fails, turn Developer Mode off, reboot, turn it back on, and mount again |

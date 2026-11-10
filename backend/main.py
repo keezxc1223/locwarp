@@ -710,6 +710,40 @@ def _install_windows_connreset_filter() -> None:
     loop.set_exception_handler(_handler)
 
 
+# The site's login lasts about 15 minutes and is extended each time it is
+# used. Left alone (layer off, map zoomed out, user doing something else)
+# it simply runs out, and the user has to log in on the site again. One
+# small authenticated request every few minutes keeps it alive for as long
+# as LocWarp is running.
+PIPI_KEEPALIVE_EVERY = 5 * 60.0
+
+
+async def _pipi_login_keepalive():
+    from services.pipi_mushroom import PipiError
+    import time as _time
+    client = app_state.pipi_client
+    first = True
+    while True:
+        # Soon after start: find out whether the stored login still works,
+        # so a dead one is reported (and replaced by the extension) before
+        # the user opens the layer.
+        await asyncio.sleep(10.0 if first else 60.0)
+        first = False
+        try:
+            if not client.configured or client.login_ok is False:
+                continue
+            last = client.last_ok_at
+            if last is not None and _time.monotonic() - last < PIPI_KEEPALIVE_EVERY:
+                continue
+            await client.check_login()
+        except PipiError:
+            pass  # recorded on the client; rate limits and outages just wait
+        except asyncio.CancelledError:
+            raise
+        except Exception:
+            logger.debug("pipi keepalive iteration failed", exc_info=True)
+
+
 @asynccontextmanager
 async def lifespan(application: FastAPI):
     import asyncio
@@ -731,12 +765,14 @@ async def lifespan(application: FastAPI):
 
     watchdog_task = asyncio.create_task(_usbmux_presence_watchdog())
     keepalive_task = asyncio.create_task(_wifi_tunnel_keepalive())
+    pipi_keepalive_task = asyncio.create_task(_pipi_login_keepalive())
 
     yield
 
     # ── Shutdown ──
     watchdog_task.cancel()
     keepalive_task.cancel()
+    pipi_keepalive_task.cancel()
     for _t in (watchdog_task, keepalive_task):
         try:
             await _t

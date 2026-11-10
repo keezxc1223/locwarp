@@ -193,18 +193,24 @@ export function usePipiMushroomLayer({
   // effect and null whenever no layer is up; the fetch loop calls it.
   const reselectRef = useRef<(() => void) | null>(null);
 
-  const [cookieInfo, setCookieInfo] = useState<Pick<PipiStatusResponse, 'source' | 'updated_at'>>({
-    source: null, updated_at: null,
+  const [cookieInfo, setCookieInfo] = useState<Pick<PipiStatusResponse, 'source' | 'updated_at' | 'logged_in'>>({
+    source: null, updated_at: null, logged_in: null,
   });
+  const loggedInRef = useRef<boolean | null | undefined>(undefined);
   // updated_at of the cookie the fetch loop is currently using; undefined
   // until the first status answer.
   const cookieStampRef = useRef<number | null | undefined>(undefined);
 
   const applyStatus = useCallback((r: PipiStatusResponse) => {
     setConfigured(r.configured);
-    setCookieInfo({ source: r.source, updated_at: r.updated_at });
+    setCookieInfo({ source: r.source, updated_at: r.updated_at, logged_in: r.logged_in ?? null });
     const prev = cookieStampRef.current;
     cookieStampRef.current = r.updated_at;
+    // The login came back without a new cookie (the backend's own check
+    // succeeded again): restart the fetch loop the same way.
+    const wasOut = loggedInRef.current === false;
+    loggedInRef.current = r.logged_in ?? null;
+    if (wasOut && r.logged_in === true && r.updated_at === prev) setReloadToken((x) => x + 1);
     // A different cookie arrived (extension push / another window): restart
     // the fetch loop, which also clears a "login required" stop.
     if (prev !== undefined && r.configured && r.updated_at !== prev) setReloadToken((x) => x + 1);
