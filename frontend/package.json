@@ -1,6 +1,6 @@
 {
   "name": "locwarp",
-  "version": "0.2.207",
+  "version": "0.2.208",
   "description": "iOS Virtual Location Simulator",
   "author": "keezxc1223",
   "main": "electron/main.js",
@@ -53,6 +53,13 @@
       {
         "from": "../dist-py/locwarp-backend",
         "to": "backend",
+        "filter": [
+          "**/*"
+        ]
+      },
+      {
+        "from": "../extensions/pipi-cookie-sync",
+        "to": "extensions/pipi-cookie-sync",
         "filter": [
           "**/*"
         ]

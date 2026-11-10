@@ -1,0 +1,177 @@
+/* Mushroom map layer (pipimushroom.com): markers, popup, panel. */
+/* Pipi Mushroom 蘑菇地圖 markers */
+.pipi-pin {
+  background: transparent;
+  border: none;
+}
+
+/* Sizes come from the hook's MARKER_PX (標記大小) as inline --pipi-* custom
+   properties; the fallbacks are the 小 size. */
+.pipi-pin-inner {
+  width: var(--pipi-box, 30px);
+  height: var(--pipi-box, 30px);
+  box-sizing: border-box;
+  border-radius: 50%;
+  border: var(--pipi-ring, 2px) solid #fff;
+  background: #fff;
+  box-shadow: 0 1px 4px rgba(0, 0, 0, 0.4);
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  overflow: hidden;
+  cursor: pointer;
+}
+
+.pipi-pin-inner img {
+  width: calc(var(--pipi-box, 30px) - 2 * var(--pipi-ring, 2px));
+  height: calc(var(--pipi-box, 30px) - 2 * var(--pipi-ring, 2px));
+  object-fit: contain;
+  pointer-events: none;
+}
+
+.pipi-pin-inner.pipi-mushroom { border-color: #ff9f43; }
+.pipi-pin-inner.pipi-flower { border-color: #ff6fa8; }
+.pipi-pin-inner.pipi-smoke { border-color: #9aa3b2; }
+
+/* 彩帶花: rainbow ring instead of the pink border, same box and ring width. Painted as
+   the element's own border-box background behind a transparent border; a
+   pseudo-element ring would be clipped by overflow: hidden. */
+.pipi-pin-inner.pipi-flower.pipi-ribbon {
+  border-color: transparent;
+  background:
+    linear-gradient(#fff, #fff) padding-box,
+    conic-gradient(#ff4d4d, #ffa13d, #ffe03d, #4cd964, #3db8ff, #8a6cff, #e04dff, #ff4d4d) border-box;
+}
+
+.pipi-pin-dot {
+  width: var(--pipi-dot, 10px);
+  height: var(--pipi-dot, 10px);
+  border-radius: 50%;
+  background: #9aa3b2;
+}
+
+/* The popup wrapper already draws the frame; drop .map-popup's own. */
+.pipi-popup-body {
+  border: none;
+  box-shadow: none;
+  background: transparent;
+}
+
+
+
+/* Panel: opens from the toolbar button, same glass as the other popovers. */
+.pipi-panel {
+  position: absolute; left: 56px; top: 150px; z-index: 851; width: 300px;
+  max-height: calc(100% - 260px); overflow-y: auto;
+  padding: 12px 13px; font-size: 12px; color: var(--text-primary);
+  background: var(--glass-pop);
+  backdrop-filter: var(--glass-blur); -webkit-backdrop-filter: var(--glass-blur);
+  border: 1px solid var(--glass-border); border-radius: 14px;
+  box-shadow: var(--shadow-pop); animation: var(--anim-pop);
+}
+.pipi-panel-head { display: flex; align-items: center; justify-content: space-between; margin-bottom: 8px; font-size: 13px; font-weight: 700; }
+.pipi-panel-close {
+  width: 24px; height: 24px; display: grid; place-items: center; padding: 0; cursor: pointer;
+  color: rgba(255, 255, 255, 0.6); background: transparent; border: none; border-radius: 7px;
+}
+.pipi-panel-close:hover { color: #fff; background: rgba(255, 255, 255, 0.1); }
+.pipi-panel-row { display: flex; align-items: center; justify-content: space-between; margin-bottom: 10px; }
+.pipi-panel-rule { height: 1px; margin: 10px 0 8px; background: rgba(255, 255, 255, 0.08); }
+.pipi-panel-btn {
+  padding: 4px 10px; font-size: 11px; font-weight: 600; cursor: pointer; flex-shrink: 0;
+  color: var(--text-primary); background: rgba(255, 255, 255, 0.07);
+  border: 1px solid rgba(255, 255, 255, 0.14); border-radius: 8px;
+  transition: background var(--transition-fast);
+}
+.pipi-panel-btn:hover:not(:disabled) { background: rgba(255, 255, 255, 0.14); }
+.pipi-panel-btn:disabled { opacity: 0.4; cursor: default; }
+.pipi-panel-btn.primary { color: #fff; background: var(--accent-blue); border-color: rgba(255, 255, 255, 0.22); }
+.pipi-panel-input {
+  flex: 1; min-width: 0; padding: 4px 7px; font-size: 11px; outline: none;
+  color: var(--text-primary); background: rgba(0, 0, 0, 0.3);
+  border: 1px solid rgba(255, 255, 255, 0.14); border-radius: 8px;
+}
+.pipi-panel-steps { margin: 0 0 8px; padding-left: 18px; font-size: 11px; line-height: 1.6; color: #c7d0e4; }
+.pipi-panel-details { margin-top: 8px; font-size: 11px; }
+.pipi-panel-details summary { cursor: pointer; color: var(--accent-soft); }
+.pipi-panel-sub {
+  display: flex; flex-direction: column; gap: 6px; margin: 0 0 8px 4px; padding-left: 10px;
+  border-left: 2px solid rgba(255, 255, 255, 0.12); font-size: 11px;
+}
+.pipi-panel-facet { display: flex; align-items: center; gap: 5px; flex-wrap: wrap; }
+.pipi-panel-facet > span { color: #c7d0e4; margin-right: 2px; flex-shrink: 0; }
+.pipi-panel-filter { margin: 0 0 8px; }
+.pipi-panel-badge {
+  margin-left: 6px; padding: 0 6px; font-size: 10px; border-radius: 8px;
+  color: #ffb866; background: rgba(255, 159, 67, 0.16); border: 1px solid rgba(255, 159, 67, 0.4);
+}
+.pipi-panel-facet.nowrap { flex-wrap: nowrap; gap: 4px; }
+.pipi-panel-facet.nowrap > span { white-space: nowrap; }
+.pipi-panel-facet.nowrap .unit { margin: 0 0 0 1px; color: #8a90a6; }
+.pipi-panel-mini { padding: 3px 7px !important; min-width: 0; white-space: nowrap; }
+/* Below the coordinate bar's row of banners, clear of the top-right controls. */
+.pipi-zoom-banner { top: 14px; z-index: 860; pointer-events: none; }
+
+/* Mushroom filter: labelled groups of equal-width options. */
+.pipi-filter { display: flex; flex-direction: column; gap: 10px; margin-top: 8px; padding: 10px;
+  background: rgba(0, 0, 0, 0.22); border: 1px solid rgba(255, 255, 255, 0.08); border-radius: 10px; }
+.pipi-filter-empty { font-size: 11px; color: #7d8399; }
+.pipi-filter-group { display: flex; flex-direction: column; gap: 6px; }
+.pipi-filter-head { display: flex; align-items: center; gap: 6px; font-size: 11px; }
+.pipi-filter-head > span { flex: 1; font-weight: 600; color: #dfe4f0; }
+.pipi-filter-head small { margin-left: 6px; font-weight: 400; color: #8a90a6; font-variant-numeric: tabular-nums; }
+.pipi-filter-head button {
+  padding: 0; font-size: 10.5px; cursor: pointer; color: var(--accent-soft);
+  background: transparent; border: none;
+}
+.pipi-filter-head button:hover:not(:disabled) { text-decoration: underline; }
+.pipi-filter-head button:disabled { color: #5d6378; cursor: default; }
+.pipi-filter-grid { display: grid; gap: 4px; max-height: 128px; overflow-y: auto; padding-right: 2px; }
+.pipi-opt {
+  min-width: 0; height: 26px; padding: 0 8px; font-size: 11px; cursor: pointer;
+  overflow: hidden; text-overflow: ellipsis; white-space: nowrap; text-align: center;
+  color: #7d8399; background: rgba(255, 255, 255, 0.03);
+  border: 1px solid rgba(255, 255, 255, 0.1); border-radius: 7px;
+  transition: background var(--transition-fast), color var(--transition-fast), border-color var(--transition-fast);
+}
+.pipi-opt:hover { color: #dfe4f0; border-color: rgba(255, 255, 255, 0.24); }
+.pipi-opt.on { color: #fff; font-weight: 600; background: rgba(255, 159, 67, 0.20); border-color: rgba(255, 159, 67, 0.65); }
+
+/* Login status row in the panel. */
+.pipi-login-row { display: flex; align-items: center; gap: 8px; }
+.pipi-login-dot { width: 8px; height: 8px; border-radius: 50%; flex-shrink: 0; background: #6b7089; }
+.pipi-login-dot.on { background: #4ecdc4; box-shadow: 0 0 6px #4ecdc4; }
+.pipi-login-text { flex: 1; min-width: 0; display: flex; flex-direction: column; line-height: 1.35; }
+.pipi-login-text b { font-size: 12px; font-weight: 600; }
+.pipi-login-text small { font-size: 10.5px; color: #8a90a6; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+
+/* Login how-to dialog. */
+.pipi-guide { width: 440px; gap: 12px; }
+.pipi-guide-head { display: flex; align-items: center; justify-content: space-between; gap: 10px; }
+.pipi-guide-state { font-size: 10.5px; padding: 2px 8px; border-radius: 9px; color: #9499ac; background: rgba(255, 255, 255, 0.06); white-space: nowrap; }
+.pipi-guide-state.on { color: #4ecdc4; background: rgba(78, 205, 196, 0.15); }
+.pipi-guide-intro { font-size: 12px; line-height: 1.6; color: rgba(255, 255, 255, 0.68); }
+.pipi-guide-card { padding: 12px; background: rgba(0, 0, 0, 0.22); border: 1px solid rgba(255, 255, 255, 0.08); border-radius: 12px; }
+.pipi-guide-card-title { font-size: 12.5px; font-weight: 700; }
+.pipi-guide-card-title span {
+  margin-left: 8px; padding: 1px 7px; font-size: 10px; font-weight: 600; border-radius: 8px;
+  color: var(--accent-soft); background: rgba(var(--accent-rgb), 0.18);
+}
+summary.pipi-guide-card-title { cursor: pointer; }
+.pipi-guide-step { display: flex; align-items: center; gap: 10px; margin-top: 10px; }
+.pipi-guide-step i {
+  width: 22px; height: 22px; display: grid; place-items: center; flex-shrink: 0;
+  font-style: normal; font-size: 11px; font-weight: 700; color: #fff;
+  background: rgba(var(--accent-rgb), 0.42); border-radius: 50%;
+}
+.pipi-guide-step p { flex: 1; min-width: 0; margin: 0; font-size: 12px; line-height: 1.55; color: #dfe4f0; }
+.pipi-guide-help { margin-top: 8px; font-size: 11px; line-height: 1.6; color: #8a90a6; }
+
+/* Where the data comes from and how far to trust it. */
+.pipi-panel-notice {
+  display: flex; align-items: flex-start; gap: 7px; margin-bottom: 10px; padding: 7px 9px;
+  font-size: 10.5px; line-height: 1.5; color: #ffd27a;
+  background: rgba(255, 180, 60, 0.09); border: 1px solid rgba(255, 180, 60, 0.28); border-radius: 9px;
+}
+.pipi-panel-notice svg { flex-shrink: 0; margin-top: 1px; }
+.pipi-popup-note { margin-top: 6px; font-size: 10px; line-height: 1.4; color: var(--text-muted); }

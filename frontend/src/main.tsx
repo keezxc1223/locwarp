@@ -4,6 +4,7 @@ import 'leaflet/dist/leaflet.css'
 import App from './App'
 import './styles.css'
 import './appearance.css'
+import './pipi.css'
 import { I18nProvider } from './i18n'
 import { applyAppearance, loadSavedAppearance } from './utils/appearance'
 

@@ -99,7 +99,8 @@ class TunnelRunner:
         """Start the tunnel and wait until RSD info is ready.
 
         Raises asyncio.TimeoutError on timeout or the underlying exception
-        if the tunnel setup failed before becoming ready.
+        if the tunnel setup failed before becoming ready. If start() itself
+        is cancelled, the tunnel task is cancelled too before re-raising.
         """
         self._stop = asyncio.Event()
         self._ready = asyncio.Event()
@@ -118,8 +119,23 @@ class TunnelRunner:
                 pass
             self.task = None
             raise
+        except asyncio.CancelledError:
+            # The caller is gone and nobody else holds this runner, so a
+            # tunnel that came up after this would never be stopped.
+            self.task.cancel()
+            try:
+                await self.task
+            except (asyncio.CancelledError, Exception):
+                pass
+            self.task = None
+            raise
         if self._error is not None:
             exc = self._error
+            # _run re-raises right after setting _error, so the task is done
+            # by now. Retrieve its exception, or asyncio logs "Task exception
+            # was never retrieved" with the whole traceback when the task is
+            # garbage-collected.
+            self.task.exception()
             self.task = None
             raise exc
         return dict(self.info or {})

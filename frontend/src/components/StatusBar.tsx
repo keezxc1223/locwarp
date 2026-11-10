@@ -521,6 +521,30 @@ const StatusBar: React.FC<StatusBarProps> = ({
               {t('status.avatar')}
             </button>
           )}
+          {/* 蘑菇地圖: opens the mushroom map panel. The panel lives in MapView
+              (it belongs to the map), so this only asks it to open. */}
+          <button
+            onClick={() => window.dispatchEvent(new CustomEvent('locwarp:open-pipi-panel'))}
+            title={t('map.pipi_toggle_short')}
+            style={{
+              display: 'inline-flex',
+              alignItems: 'center',
+              gap: 4,
+              padding: '2px 8px',
+              fontSize: 12,
+              background: 'rgba(240, 147, 43, 0.12)',
+              border: '1px solid rgba(240, 147, 43, 0.45)',
+              color: '#f5a94e',
+              borderRadius: 4,
+              cursor: 'pointer',
+            }}
+          >
+            <svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
+              <path d="M3 12a9 8 0 0 1 18 0z" />
+              <path d="M9 12v5a3 3 0 0 0 6 0v-5" />
+            </svg>
+            {t('map.pipi_title')}
+          </button>
           {/* 設定 moved to the top navigation bar's 設定 tab (issue #34). */}
         </>
       )}

@@ -484,12 +484,68 @@ async def phone_rotate(request: Request):
     return {"status": "ok"}
 
 
+# Wrong-PIN limits. A 6-digit PIN is only a million guesses, and this
+# endpoint is reachable by anything on the LAN, so guessing has to be slow:
+# a few tries per address, and a ceiling across all addresses so spreading
+# the guesses over many source IPs does not help either.
+_PIN_FAILS_PER_IP = 5
+_PIN_IP_LOCK_SECONDS = 60.0
+_PIN_FAILS_GLOBAL = 30
+_PIN_GLOBAL_WINDOW_SECONDS = 600.0
+_PIN_GLOBAL_LOCK_SECONDS = 300.0
+_pin_ip_state: dict[str, tuple[int, float]] = {}  # ip -> (fails, locked_until)
+_pin_global_fails: list[float] = []
+_pin_global_locked_until = 0.0
+
+
+def _pin_retry_after(ip: str, now: float) -> float:
+    """Seconds this address still has to wait, 0 when it may try."""
+    wait = max(0.0, _pin_global_locked_until - now)
+    fails, locked_until = _pin_ip_state.get(ip, (0, 0.0))
+    return max(wait, locked_until - now, 0.0)
+
+
+def _pin_record_failure(ip: str, now: float) -> None:
+    global _pin_global_locked_until
+    fails, _ = _pin_ip_state.get(ip, (0, 0.0))
+    fails += 1
+    if fails >= _PIN_FAILS_PER_IP:
+        _pin_ip_state[ip] = (0, now + _PIN_IP_LOCK_SECONDS)
+    else:
+        _pin_ip_state[ip] = (fails, 0.0)
+    _pin_global_fails.append(now)
+    cutoff = now - _PIN_GLOBAL_WINDOW_SECONDS
+    while _pin_global_fails and _pin_global_fails[0] < cutoff:
+        _pin_global_fails.pop(0)
+    if len(_pin_global_fails) >= _PIN_FAILS_GLOBAL:
+        _pin_global_fails.clear()
+        _pin_global_locked_until = now + _PIN_GLOBAL_LOCK_SECONDS
+        logger.warning("Phone control: too many wrong PINs, pairing paused for %d s",
+                       int(_PIN_GLOBAL_LOCK_SECONDS))
+    # Keep the table from growing without bound.
+    if len(_pin_ip_state) > 512:
+        for key in [k for k, (f, until) in _pin_ip_state.items() if until < now and f == 0][:256]:
+            _pin_ip_state.pop(key, None)
+
+
 @router.post("/api/phone/auth")
-async def phone_auth(req: _AuthRequest):
+async def phone_auth(req: _AuthRequest, request: Request):
     """PIN-only flow: phone POSTs the PIN it sees on the desktop screen
-    and gets the token back. PIN comparison is constant-time."""
+    and gets the token back. PIN comparison is constant-time, and wrong
+    attempts are rate-limited (see the limits above)."""
+    ip = request.client.host if request.client else "?"
+    now = time.monotonic()
+    wait = _pin_retry_after(ip, now)
+    if wait > 0:
+        raise HTTPException(
+            status_code=429,
+            detail={"code": "pin_locked", "message": "Too many wrong PINs", "retry_after": int(wait) + 1},
+            headers={"Retry-After": str(int(wait) + 1)},
+        )
     if not secrets.compare_digest(req.pin, _auth.pin):
+        _pin_record_failure(ip, now)
         raise HTTPException(status_code=401, detail={"code": "bad_pin", "message": "Invalid PIN"})
+    _pin_ip_state.pop(ip, None)
     return {"token": _auth.token}
 
 

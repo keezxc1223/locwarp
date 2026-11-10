@@ -5,6 +5,7 @@ contextBridge.exposeInMainWorld('electronAPI', {
   getRenderMode: () => ipcRenderer.invoke('get-render-mode'),
   setRenderMode: (mode) => ipcRenderer.invoke('set-render-mode', mode),
   relaunchApp: () => ipcRenderer.invoke('relaunch-app'),
+  openPipiExtensionFolder: () => ipcRenderer.invoke('open-pipi-extension-folder'),
   updateSupported: () => ipcRenderer.invoke('update-supported'),
   updateDownload: () => ipcRenderer.invoke('update-download'),
   updateInstall: () => ipcRenderer.invoke('update-install'),

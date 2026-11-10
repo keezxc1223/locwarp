@@ -10,6 +10,12 @@ import { cellsInBounds, approxCellSizeMeters } from '../services/s2grid';
 import type { S2CellPolygon } from '../services/s2grid';
 import { parseCoord, formatCoord, useCoordSettings, isDefaultCoordSettings, coordBadge } from '../utils/coords';
 import Supercluster from 'supercluster';
+import { usePipiMushroomLayer } from '../hooks/usePipiMushroomLayer';
+import type { PipiKinds } from '../hooks/usePipiMushroomLayer';
+import { resolvePipiFlowerFilter, resolvePipiKinds, resolvePipiMarkerSize, resolvePipiMushroomFilter } from '../defaults';
+import type { PipiFlowerFilter, PipiMarkerSize, PipiMushroomFilter } from '../defaults';
+import PipiMushroomPanel from './PipiMushroomPanel';
+import { PIPI_MIN_ZOOM } from '../pipiFetchPlanner';
 
 // MapLibre's Leaflet binding looks up `window.maplibregl` rather than
 // taking it as a constructor argument. Hoist it once at module load so
@@ -348,6 +354,10 @@ const MapView: React.FC<MapViewProps> = ({
   const s2GridBtnRef = useRef<HTMLButtonElement | null>(null);
   const s2GridHandlerRef = useRef<() => void>(() => {});
   const s2LayerRef = useRef<L.LayerGroup | null>(null);
+  // Mushroom map toggle (below the S2 button). Click toggles the layer,
+  // right-click opens its panel (what to show, and the login cookie).
+  const pipiBtnRef = useRef<HTMLButtonElement | null>(null);
+  const pipiHandlerRef = useRef<() => void>(() => {});
   // followStateRef mirrors followMode so the dragstart handler (wired once
   // at map init) sees the latest value without a stale closure.
   const followStateRef = useRef(false);
@@ -408,6 +418,28 @@ const MapView: React.FC<MapViewProps> = ({
     try { localStorage.setItem('locwarp.s2_level', String(s2Level)); }
     catch { /* ignore */ }
   }, [s2Level]);
+
+  const [pipiEnabled, setPipiEnabled] = useState<boolean>(() => {
+    try { return localStorage.getItem('locwarp.pipi_enabled') === '1'; }
+    catch { return false; }
+  });
+  const readStored = (key: string): string | null => {
+    try { return localStorage.getItem(key); } catch { return null; }
+  };
+  const [pipiKinds, setPipiKinds] = useState<PipiKinds>(() => resolvePipiKinds(readStored('locwarp.pipi_kinds')));
+  const [pipiFlowerFilter, setPipiFlowerFilter] = useState<PipiFlowerFilter>(() => resolvePipiFlowerFilter(readStored('locwarp.pipi_flower_filter')));
+  const [pipiMarkerSize, setPipiMarkerSize] = useState<PipiMarkerSize>(() => resolvePipiMarkerSize(readStored('locwarp.pipi_marker_size')));
+  const [pipiMushroomFilter, setPipiMushroomFilter] = useState<PipiMushroomFilter>(() => resolvePipiMushroomFilter(readStored('locwarp.pipi_mushroom_filter')));
+  const [pipiPanelOpen, setPipiPanelOpen] = useState(false);
+  useEffect(() => {
+    try {
+      localStorage.setItem('locwarp.pipi_enabled', pipiEnabled ? '1' : '0');
+      localStorage.setItem('locwarp.pipi_kinds', JSON.stringify(pipiKinds));
+      localStorage.setItem('locwarp.pipi_flower_filter', JSON.stringify(pipiFlowerFilter));
+      localStorage.setItem('locwarp.pipi_marker_size', pipiMarkerSize);
+      localStorage.setItem('locwarp.pipi_mushroom_filter', JSON.stringify(pipiMushroomFilter));
+    } catch { /* ignore */ }
+  }, [pipiEnabled, pipiKinds, pipiFlowerFilter, pipiMarkerSize, pipiMushroomFilter]);
 
   const [recentOpen, setRecentOpen] = useState(false);
   // Clear-button confirmation state. First click flips the single
@@ -632,6 +664,44 @@ const MapView: React.FC<MapViewProps> = ({
       });
       topLeftEl.appendChild(wrapper);
       s2GridBtnRef.current = btn;
+    }
+
+    // Mushroom map toggle. Click toggles the overlay; right-click opens
+    // its panel.
+    if (topLeftEl) {
+      const wrapper = L.DomUtil.create('div', 'leaflet-bar leaflet-control');
+      const btn = L.DomUtil.create('button', 'locwarp-pipi-btn', wrapper) as HTMLButtonElement;
+      btn.type = 'button';
+      btn.title = tRef.current('map.pipi_toggle');
+      btn.setAttribute('role', 'button');
+      btn.setAttribute('aria-pressed', 'false');
+      btn.style.cssText = [
+        'width: 30px', 'height: 30px', 'display: flex',
+        'align-items: center', 'justify-content: center',
+        'padding: 0', 'margin: 0', 'cursor: pointer',
+        'background: var(--bg-surface, #2a2f3a)',
+        'color: #fff', 'border: none', 'border-radius: 0',
+      ].join(';');
+      btn.innerHTML = `<svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.7" stroke-linecap="round" stroke-linejoin="round">
+        <path d="M3 12a9 8 0 0 1 18 0z" />
+        <path d="M9 12v5a3 3 0 0 0 6 0v-5" />
+        <circle cx="9" cy="8.5" r="0.9" fill="currentColor" />
+        <circle cx="14.5" cy="7.2" r="0.9" fill="currentColor" />
+      </svg>`;
+      L.DomEvent.disableClickPropagation(wrapper);
+      // Click opens the panel, which holds the on/off switch and the
+      // login steps; nothing here depends on knowing about a right-click.
+      // Right-click stays as a shortcut that flips the layer directly.
+      L.DomEvent.on(btn, 'click', (e: Event) => {
+        e.preventDefault();
+        setPipiPanelOpen((o) => !o);
+      });
+      L.DomEvent.on(btn, 'contextmenu', (e: Event) => {
+        e.preventDefault();
+        pipiHandlerRef.current();
+      });
+      topLeftEl.appendChild(wrapper);
+      pipiBtnRef.current = btn;
     }
 
     // User-initiated drag disables follow mode so they can pan freely. We
@@ -1877,6 +1947,44 @@ const MapView: React.FC<MapViewProps> = ({
     };
   }, [s2Enabled, s2Level]);
 
+  // ── Mushroom map overlay (pipimushroom.com) ─────────────────────────
+  // The status bar has its own 蘑菇地圖 button; it reaches the panel here.
+  useEffect(() => {
+    const open = () => setPipiPanelOpen(true);
+    window.addEventListener('locwarp:open-pipi-panel', open);
+    return () => window.removeEventListener('locwarp:open-pipi-panel', open);
+  }, []);
+  const pipi = usePipiMushroomLayer({
+    mapRef,
+    enabled: pipiEnabled,
+    kinds: pipiKinds,
+    flowerFilter: pipiFlowerFilter,
+    mushroomFilter: pipiMushroomFilter,
+    markerSize: pipiMarkerSize,
+    onTeleport,
+    onNavigate,
+    t,
+  });
+  const pipiConfiguredRef = useRef(pipi.configured);
+  pipiConfiguredRef.current = pipi.configured;
+  const pipiEnabledRef = useRef(pipiEnabled);
+  pipiEnabledRef.current = pipiEnabled;
+  const togglePipi = useCallback(() => {
+    const next = !pipiEnabledRef.current;
+    // Switching on without a login: open the panel so the user sees what
+    // is missing instead of an empty map.
+    if (next && pipiConfiguredRef.current === false) setPipiPanelOpen(true);
+    setPipiEnabled(next);
+  }, []);
+  useEffect(() => {
+    pipiHandlerRef.current = togglePipi;
+    const btn = pipiBtnRef.current;
+    if (!btn) return;
+    btn.style.background = pipiEnabled ? '#f0932b' : 'var(--bg-surface, #2a2f3a)';
+    btn.title = t('map.pipi_toggle');
+    btn.setAttribute('aria-pressed', pipiEnabled ? 'true' : 'false');
+  }, [togglePipi, pipiEnabled, t]);
+
   // Track the last avatar HTML we painted so the position-update effect
   // below can detect "avatar changed, need to rebuild marker even though
   // the position didn't change". Without this the new avatar only shows
@@ -2128,6 +2236,44 @@ const MapView: React.FC<MapViewProps> = ({
           >{tRef.current('panel.coord_navigate')}</button>
         </div>
       </div>
+
+      {/* The layer is on but the map is too far out to load anything: say it
+          on the map itself, where the user is looking. */}
+      {pipiEnabled && pipi.status.phase === 'zoom' && (
+        <div className="lw-banner info pipi-zoom-banner">
+          <span className="lw-banner-icon">
+            <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.4" strokeLinecap="round">
+              <circle cx="11" cy="11" r="7" /><line x1="20" y1="20" x2="16.5" y2="16.5" />
+              <line x1="11" y1="8" x2="11" y2="14" /><line x1="8" y1="11" x2="14" y2="11" />
+            </svg>
+          </span>
+          <span className="lw-banner-text">{t('map.pipi_zoom_banner', { zoom: PIPI_MIN_ZOOM, current: pipi.status.zoom })}</span>
+        </div>
+      )}
+
+      {pipiPanelOpen && (
+        <PipiMushroomPanel
+          enabled={pipiEnabled}
+          onEnabledChange={setPipiEnabled}
+          kinds={pipiKinds}
+          onKindsChange={setPipiKinds}
+          flowerFilter={pipiFlowerFilter}
+          onFlowerFilterChange={setPipiFlowerFilter}
+          mushroomFilter={pipiMushroomFilter}
+          onMushroomFilterChange={setPipiMushroomFilter}
+          facets={pipi.facets}
+          markerSize={pipiMarkerSize}
+          onMarkerSizeChange={setPipiMarkerSize}
+          status={pipi.status}
+          configured={pipi.configured}
+          cookieInfo={pipi.cookieInfo}
+          onRefresh={pipi.refresh}
+          onSaveCookie={pipi.saveCookie}
+          onClearCookie={pipi.clearCookie}
+          onClose={() => setPipiPanelOpen(false)}
+          t={t}
+        />
+      )}
 
       {/* S2 cell grid level picker — opens via right-click on the S2 toggle
           button OR via the small chip beside the legend below. Snaps to

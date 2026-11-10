@@ -1,4 +1,4 @@
-import React, { useState } from 'react';
+import React, { useRef, useState } from 'react';
 import { createPortal } from 'react-dom';
 import { wifiTunnelDiscover, wifiTunnelFindPort, wifiRepair, wifiKeepaliveGet, wifiKeepaliveSet, type TunnelInfo } from '../services/api';
 import { useT } from '../i18n';
@@ -29,6 +29,9 @@ interface DeviceStatusProps {
   devices: Device[];
   isConnected: boolean;
   onScan: () => void | Promise<void>;
+  // Finds iPhones on this WiFi and connects the ones that are not connected
+  // yet. Resolves with how many were newly connected / failed.
+  onScanWifi?: () => Promise<{ connected: number; failed: number; connectedAfter: number; tried: number }>;
   onSelect: (id: string) => void;
   onStartWifiTunnel?: (ip: string, port?: number, udid?: string, ports?: number[]) => Promise<any>;
   onStopTunnel?: (udid?: string) => Promise<void>;
@@ -44,6 +47,7 @@ const DeviceStatus: React.FC<DeviceStatusProps> = ({
   devices,
   isConnected,
   onScan,
+  onScanWifi,
   onSelect,
   onStartWifiTunnel,
   onStopTunnel,
@@ -142,6 +146,29 @@ const DeviceStatus: React.FC<DeviceStatusProps> = ({
     }
   };
   const [scanning, setScanning] = useState(false);
+  const [wifiScanBusy, setWifiScanBusy] = useState(false);
+  const [wifiScanMsg, setWifiScanMsg] = useState<{ ok: boolean; text: string } | null>(null);
+  const wifiMsgTimer = useRef<number | null>(null);
+  const handleScanWifi = async () => {
+    if (!onScanWifi || wifiScanBusy) return;
+    setWifiScanBusy(true);
+    setWifiScanMsg(null);
+    try {
+      const r = await onScanWifi();
+      let msg: { ok: boolean; text: string };
+      if (r.connected > 0) msg = { ok: true, text: t('device.wifi_scan_connected', { n: r.connected }) };
+      else if (r.failed > 0) msg = { ok: false, text: t('device.wifi_scan_failed', { n: r.failed }) };
+      else if (r.connectedAfter >= 3) msg = { ok: true, text: t('device.max_reached') };
+      else msg = { ok: false, text: t('device.wifi_scan_none') };
+      setWifiScanMsg(msg);
+    } catch {
+      setWifiScanMsg({ ok: false, text: t('device.wifi_scan_none') });
+    } finally {
+      setWifiScanBusy(false);
+      if (wifiMsgTimer.current !== null) window.clearTimeout(wifiMsgTimer.current);
+      wifiMsgTimer.current = window.setTimeout(() => setWifiScanMsg(null), 6000);
+    }
+  };
   // null = no recent scan; number = device count from most recent scan (flash display)
   const [scanResult, setScanResult] = useState<number | null>(null);
   const scanResultTimer = React.useRef<ReturnType<typeof setTimeout> | null>(null);
@@ -342,12 +369,14 @@ const DeviceStatus: React.FC<DeviceStatusProps> = ({
         </div>
       </div>
 
-      {/* USB scan button — standalone row below device info */}
+      {/* Scan buttons: USB and WiFi side by side, so finding a phone over WiFi
+          does not depend on opening the WiFi panel first. */}
+      <div style={{ display: 'flex', gap: 6, marginBottom: wifiScanMsg ? 4 : 8 }}>
       <button
         className="action-btn"
         onClick={handleScan}
         disabled={scanning}
-        style={{ width: '100%', padding: '6px 10px', fontSize: 12, marginBottom: 8, display: 'flex', alignItems: 'center', justifyContent: 'center', gap: 5 }}
+        style={{ flex: 1, minWidth: 0, padding: '6px 8px', fontSize: 12, display: 'flex', alignItems: 'center', justifyContent: 'center', gap: 5 }}
         title={t('device.scan_tooltip')}
       >
         {scanning ? (
@@ -375,6 +404,30 @@ const DeviceStatus: React.FC<DeviceStatusProps> = ({
           t('device.scan_tooltip')
         )}
       </button>
+      {onScanWifi && (
+        <button
+          className="action-btn"
+          onClick={handleScanWifi}
+          disabled={wifiScanBusy}
+          style={{ flex: 1, minWidth: 0, padding: '6px 8px', fontSize: 12, display: 'flex', alignItems: 'center', justifyContent: 'center', gap: 5 }}
+          title={t('device.wifi_scan_tooltip')}
+        >
+          {wifiScanBusy ? (
+            <>
+              <svg width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" style={{ animation: 'spin 1s linear infinite' }}>
+                <circle cx="12" cy="12" r="10" strokeDasharray="32" strokeDashoffset="16" />
+              </svg>
+              {t('device.scan_scanning')}
+            </>
+          ) : t('device.wifi_scan')}
+        </button>
+      )}
+      </div>
+      {wifiScanMsg && (
+        <div style={{ fontSize: 11, lineHeight: 1.45, marginBottom: 8, color: wifiScanMsg.ok ? '#7ee2a4' : '#ffb27a' }}>
+          {wifiScanMsg.text}
+        </div>
+      )}
 
       {/* WiFi tunnel cards for additional devices not shown in the top row */}
       {/* Pins narrow launch auto-connect to the pinned phones only. If a

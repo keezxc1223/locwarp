@@ -59,6 +59,14 @@ const ERROR_I18N: Record<string, { zh: string; en: string }> = {
     zh: '裝置 iOS 版本過舊,LocWarp 僅支援 iOS 16 以上。請升級 iOS 後再試。',
     en: 'This device runs an unsupported iOS version. LocWarp requires iOS 16 or later. Please update and try again.',
   },
+  pipi_no_cookie: { zh: '尚未設定 Pipi Mushroom 的 Cookie', en: 'Pipi Mushroom cookie is not set' },
+  pipi_local_only: { zh: '只能在這台電腦上設定 Cookie', en: 'The cookie can only be set from this PC' },
+  pipi_cookie_invalid: { zh: 'Cookie 格式不正確, 應為 name=value; name2=value2', en: 'Invalid cookie, expected name=value; name2=value2' },
+  pipi_login_required: { zh: 'Pipi Mushroom 回應未登入, Cookie 可能已失效, 請重新複製貼上', en: 'Pipi Mushroom says not logged in. The cookie may have expired, paste a fresh one' },
+  pipi_rate_limited: { zh: 'Pipi Mushroom 請求太頻繁, 稍後會自動重試', en: 'Pipi Mushroom rate limit hit, will retry automatically' },
+  pipi_unavailable: { zh: 'Pipi Mushroom 暫時無法連線, 或網站格式已變更', en: 'Pipi Mushroom is unreachable, or the site format changed' },
+  pipi_zoom_too_low: { zh: '請放大地圖後再載入蘑菇地圖', en: 'Zoom in to load the mushroom map' },
+  pipi_bad_bounds: { zh: '地圖範圍不正確', en: 'Invalid map bounds' },
 }
 
 function currentLang(): 'zh' | 'en' {
@@ -120,20 +128,30 @@ export const wifiConnect = (ip: string) => request<any>('POST', '/api/device/wif
 export const wifiScan = () => request<any[]>('GET', '/api/device/wifi/scan')
 // ports: extra RemotePairing port candidates the backend walks if `port` is
 // stale. iOS re-picks the port on every boot, so a remembered one often is.
-export const wifiTunnelStartAndConnect = (ip: string, port = 49152, udid?: string, ports?: number[]) =>
+// skipConnected: a phone that is already connected (USB or WiFi) is left
+// exactly as it is and the call answers { status: 'already_connected', udid }.
+export const wifiTunnelStartAndConnect = (
+  ip: string, port = 49152, udid?: string, ports?: number[], skipConnected = false,
+) =>
   request<any>('POST', '/api/device/wifi/tunnel/start-and-connect', {
     ip, port,
     ...(udid ? { udid } : {}),
     ...(ports && ports.length ? { ports } : {}),
+    ...(skipConnected ? { skip_connected: true } : {}),
   })
-export interface TunnelInfo { udid: string; rsd_address?: string; rsd_port?: number; interface?: string; protocol?: string }
+// target_ip / target_port: the phone's LAN address the tunnel was opened to.
+// Only /wifi/tunnel/status fills them.
+export interface TunnelInfo {
+  udid: string; rsd_address?: string; rsd_port?: number; interface?: string; protocol?: string
+  target_ip?: string; target_port?: number
+}
 export const wifiTunnelStatus = () =>
   request<{ tunnels: TunnelInfo[]; running: boolean; rsd_address?: string; rsd_port?: number }>(
     'GET', '/api/device/wifi/tunnel/status',
   )
 // scan=false: mDNS only, no LAN scan. Background auto-connect must use it.
 export const wifiTunnelDiscover = (opts?: { scan?: boolean }) =>
-  request<{ devices: { ip: string; port: number; ports?: number[]; host: string; name: string }[] }>(
+  request<{ devices: { ip: string; port: number; ports?: number[]; host: string; name: string; method?: 'mdns' | 'tcp_scan' }[] }>(
     'GET', `/api/device/wifi/tunnel/discover${opts?.scan === false ? '?scan=false' : ''}`,
   )
 export const wifiTunnelFindPort = (ip: string) =>
@@ -439,3 +457,79 @@ export function exportAllRoutesUrl(): string {
 
 export const importAllRoutes = (data: { routes: any[]; categories?: any[] }) =>
   request<{ imported: number }>('POST', '/api/route/saved/import', data)
+
+// ── Pipi Mushroom 蘑菇地圖 overlay ─────────────────────────────────────
+// Backend proxies pipimushroom.com with the cookie the user pasted. Errors
+// carry a machine-readable `code` so the layer can decide whether to keep
+// polling (rate limit / network) or stop (cookie missing / expired).
+export type PipiKind = 'mushroom' | 'flower' | 'smoke'
+export interface PipiItem {
+  id: string
+  itemKind: PipiKind | string
+  key?: string
+  displayName?: string
+  title?: string
+  sizeName?: string
+  state?: string
+  bloomedMs?: number
+  wiltingMs?: number
+  finishMs?: number
+  smokeEndMs?: number
+  lat: number
+  lng: number
+  image?: string
+}
+export interface PipiItemsResponse {
+  region: string | null
+  items: PipiItem[]
+  now_ms: number
+  truncated: boolean
+}
+export interface PipiCookieResult { configured: boolean; logged_in: boolean; error: string | null }
+
+export class PipiApiError extends Error {
+  code: string
+  status: number
+  retryAfter?: number
+  constructor(message: string, code: string, status: number, retryAfter?: number) {
+    super(message)
+    this.code = code
+    this.status = status
+    this.retryAfter = retryAfter
+  }
+}
+
+// Plain fetch (no fetchWithRetry): viewport requests get aborted on every
+// pan, and an AbortError must surface immediately rather than be retried.
+async function pipiRequest<T>(method: string, path: string, body?: unknown, signal?: AbortSignal): Promise<T> {
+  const opts: RequestInit = { method, headers: { 'Content-Type': 'application/json' }, signal }
+  if (body !== undefined) opts.body = JSON.stringify(body)
+  const res = await fetch(`${API}${path}`, opts)
+  if (!res.ok) {
+    const err = await res.json().catch(() => ({ detail: res.statusText }))
+    const d = err.detail && typeof err.detail === 'object' ? err.detail : {}
+    throw new PipiApiError(formatError(err.detail, res.statusText), d.code || 'pipi_unavailable', res.status, d.retry_after)
+  }
+  return res.json()
+}
+
+export const describePipiError = (code: string) => formatError({ code }, code)
+
+export interface PipiStatusResponse {
+  configured: boolean
+  source: 'manual' | 'extension' | null
+  updated_at: number | null
+}
+export const pipiStatus = () => pipiRequest<PipiStatusResponse>('GET', '/api/pipi/status')
+export const pipiSetCookie = (cookie: string) => pipiRequest<PipiCookieResult>('PUT', '/api/pipi/cookie', { cookie })
+export const pipiClearCookie = () => pipiRequest<{ configured: boolean }>('DELETE', '/api/pipi/cookie')
+export const pipiItems = (
+  b: { north: number; south: number; east: number; west: number; zoom: number },
+  signal?: AbortSignal,
+) => {
+  const q = new URLSearchParams({
+    north: b.north.toFixed(6), south: b.south.toFixed(6),
+    east: b.east.toFixed(6), west: b.west.toFixed(6), zoom: String(b.zoom),
+  })
+  return pipiRequest<PipiItemsResponse>('GET', `/api/pipi/items?${q.toString()}`, undefined, signal)
+}

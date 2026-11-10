@@ -532,6 +532,16 @@ function isNewerVersion(a, b) {
   return false
 }
 
+// The cookie-sync Chrome extension ships next to the app so the mushroom
+// map panel can point the user at a real folder to load in Chrome.
+ipcMain.handle('open-pipi-extension-folder', async () => {
+  const dir = app.isPackaged
+    ? path.join(process.resourcesPath, 'extensions', 'pipi-cookie-sync')
+    : path.join(__dirname, '..', '..', 'extensions', 'pipi-cookie-sync')
+  const err = await shell.openPath(dir)
+  return { ok: !err, path: dir }
+})
+
 ipcMain.handle('update-supported', () => !!getUpdater())
 
 ipcMain.handle('update-download', async () => {

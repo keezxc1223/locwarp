@@ -2,9 +2,13 @@ import { useState, useCallback, useEffect, useRef } from 'react'
 import {
   listDevices, connectDevice, disconnectDevice,
   wifiConnect, wifiScan,
-  wifiTunnelStartAndConnect, wifiTunnelStatus, wifiTunnelStop,
+  wifiTunnelStartAndConnect, wifiTunnelStatus, wifiTunnelStop, wifiTunnelDiscover,
   type TunnelInfo,
 } from '../services/api'
+import {
+  wifiCandidates, fillFreeSlots, tallyWifiResults, needsDiscovery,
+  type ConnectMode, type DiscoveredInput, type CandidateSource, type CandidateOutcome,
+} from '../wifiCandidates'
 import type { WsMessage } from './useWebSocket'
 import {
   readSavedIps, savedIpsForPrefix, upsertSavedIp,
@@ -388,9 +392,15 @@ export function useDevice(subscribe?: WsSubscribe) {
   }, [subscribe])
 
   const startWifiTunnel = useCallback(
-    async (ip: string, port = 49152, udidHint?: string, portHints?: number[]) => {
+    async (ip: string, port = 49152, udidHint?: string, portHints?: number[], skipConnected = false) => {
       try {
-        const res = await wifiTunnelStartAndConnect(ip, port, udidHint, portHints)
+        const res = await wifiTunnelStartAndConnect(ip, port, udidHint, portHints, skipConnected)
+        // The backend left an already-connected phone as it was, so there
+        // is nothing to record: marking it Network, adding a tunnel chip
+        // or saving the IP would all misdescribe a USB phone.
+        if (res?.status === 'already_connected') {
+          return { status: 'already_connected' as const, udid: String(res.udid) }
+        }
         // The backend re-scans and may land on a different port than the one
         // we asked for (iOS re-picks RemotePairing on every boot). Remember
         // what actually worked, not what we guessed.
@@ -431,7 +441,7 @@ export function useDevice(subscribe?: WsSubscribe) {
         upsertSavedIp({ ip, port: usedPort, udid: res.udid, name: res.name })
         // A successful connect clears any pending pin-retry for this device.
         clearPinRetry(res.udid)
-        return { ...info, port: usedPort }
+        return { ...info, port: usedPort, status: 'connected' as const }
       } catch (err) {
         console.error('WiFi tunnel failed:', err)
         throw err
@@ -442,6 +452,68 @@ export function useDevice(subscribe?: WsSubscribe) {
   // Expose the latest startWifiTunnel to the pin-retry loop without making
   // it a hook dependency (the callback is stable, deps: []).
   startWifiTunnelRef.current = startWifiTunnel
+
+  const devicesRef = useRef(devices)
+  devicesRef.current = devices
+
+  /**
+   * Launch auto-connect ('auto') or the 掃描 WiFi 裝置 button ('scan'): find
+   * iPhones on this LAN and open a WiFi tunnel to each one that is not
+   * connected yet, as many at once as the device cap still allows. Phones
+   * that are already connected are never touched.
+   *
+   * 'auto' honours pins (issue #35) and looks with mDNS only: a pass the
+   * user did not ask for must never scan the LAN (issue #49). 'scan'
+   * ignores pins and may fall back to the LAN scan, because the user
+   * pressed a button for it.
+   */
+  const findAndConnectWifi = useCallback(async (mode: ConnectMode) => {
+    const pinned = pinnedRef.current
+    const [status, hostPrefix, discovered] = await Promise.all([
+      wifiTunnelStatus().catch(() => null),
+      getHostPrefix(),
+      needsDiscovery(mode, pinned)
+        ? wifiTunnelDiscover({ scan: mode === 'scan' })
+          .then((r): DiscoveredInput[] => r?.devices || [])
+          // Saved addresses still get tried.
+          .catch((): DiscoveredInput[] => [])
+        : Promise.resolve<DiscoveredInput[]>([]),
+    ])
+    // Saved addresses, plus the single-IP keys from builds that predate
+    // the saved list.
+    let saved = readSavedIps()
+    if (saved.length === 0) {
+      try {
+        const ip = (localStorage.getItem('locwarp.tunnel.ip') || '').trim()
+        if (ip) saved = [{ ip, port: parseInt(localStorage.getItem('locwarp.tunnel.port') || '49152', 10) || 49152, lastUsed: 0 }]
+      } catch { /* ignore */ }
+    }
+    const connectedOf = () => devicesRef.current.filter((d) => d.is_connected).map((d) => d.udid)
+    const connectedUdids = connectedOf()
+    const candidates = wifiCandidates({
+      mode,
+      savedIps: savedIpsForPrefix(saved, hostPrefix),
+      discovered,
+      connectedUdids,
+      tunnelIps: (status?.tunnels || []).map((tn) => tn.target_ip).filter((x): x is string => !!x),
+      pinnedUdids: pinned,
+    })
+    type Result = { sources: CandidateSource[]; outcome: CandidateOutcome; udid?: string }
+    const results = await fillFreeSlots(candidates, connectedUdids.length, async (c): Promise<Result> => {
+      try {
+        const r = await startWifiTunnel(c.ip, c.ports[0], c.udid, c.ports.slice(1), true)
+        return { sources: c.sources, outcome: r.status, udid: r.udid }
+      } catch {
+        return { sources: c.sources, outcome: 'failed' }
+      }
+    })
+    // Counted at the end rather than "before + new": a USB phone may have
+    // been plugged in meanwhile, and this pass's own connections may not
+    // have rendered into devicesRef yet.
+    const after = new Set(connectedOf())
+    for (const r of results) if (r.outcome === 'connected' && r.udid) after.add(r.udid)
+    return { ...tallyWifiResults(results), connectedAfter: after.size, tried: results.length }
+  }, [startWifiTunnel])
 
   const checkTunnelStatus = useCallback(async () => {
     try {
@@ -499,7 +571,7 @@ export function useDevice(subscribe?: WsSubscribe) {
   return {
     devices, connectedDevice, scanning, scan, connect, disconnect,
     connectWifi, scanWifi, wifiScanning, wifiDevices,
-    startWifiTunnel, checkTunnelStatus, stopTunnel, tunnelStatus, tunnels,
+    startWifiTunnel, findAndConnectWifi, checkTunnelStatus, stopTunnel, tunnelStatus, tunnels,
     connectedDevices, primaryDevice,
     pinnedUdids, togglePin,
   }

@@ -1,9 +1,19 @@
 import asyncio
 import json
 import logging
+import sys
 from contextlib import asynccontextmanager
 from logging.handlers import RotatingFileHandler
 from pathlib import Path
+
+# `python main.py` (and the packaged exe) run this file as `__main__`. Then
+# uvicorn.run("main:app") and every `from main import app_state` in api/*
+# import it a second time under the name `main`, which builds a second
+# AppState: bookmarks and routes get loaded twice, and the two copies can
+# drift apart. Registering this module under its import name first makes
+# both names resolve to the same object.
+if __name__ == "__main__":
+    sys.modules.setdefault("main", sys.modules[__name__])
 
 import uvicorn
 from fastapi import FastAPI
@@ -16,6 +26,7 @@ from services.bookmarks import BookmarkManager
 from services.route_store import RouteManager
 from services.coord_format import CoordinateFormatter
 from services.reconnect import ReconnectManager
+from services.pipi_mushroom import PipiMushroomClient
 
 # Configure logging — console + rotating file in ~/.locwarp/logs/
 _log_fmt = "%(asctime)s [%(name)s] %(levelname)s: %(message)s"
@@ -72,7 +83,20 @@ class AppState:
         # idle Network tunnels so iOS doesn't drop the RSD socket when the
         # phone screen turns off. Default ON; user can toggle in the panel.
         self._wifi_keepalive_enabled: bool = True
+        # Mushroom map overlay (pipimushroom.com): the Cookie header from the
+        # user's own logged-in browser. Never returned to the frontend.
+        self._pipi_cookie: str = ""
+        self._pipi_cookie_source: str | None = None  # "manual" | "extension"
+        self._pipi_cookie_updated_at: int | None = None  # epoch ms
+        self.pipi_client = PipiMushroomClient(on_cookie_renewed=self._on_pipi_cookie_renewed)
         self._load_settings()
+
+    def _on_pipi_cookie_renewed(self, header: str) -> None:
+        """The site renewed the login via Set-Cookie: persist it so a
+        restart does not come back with the expired copy. `updated_at`
+        stays; it records when the user or the extension last set it."""
+        self._pipi_cookie = header
+        self.save_settings()
 
     def _load_settings(self):
         from services.json_safe import safe_load_json
@@ -105,6 +129,14 @@ class AppState:
             ka = data.get("wifi_keepalive_enabled")
             if isinstance(ka, bool):
                 self._wifi_keepalive_enabled = ka
+            pc = data.get("pipi_cookie")
+            if isinstance(pc, str) and pc:
+                self._pipi_cookie = pc
+                self.pipi_client.set_cookie(pc)
+                src = data.get("pipi_cookie_source")
+                self._pipi_cookie_source = src if src in ("manual", "extension") else "manual"
+                ts = data.get("pipi_cookie_updated_at")
+                self._pipi_cookie_updated_at = int(ts) if isinstance(ts, (int, float)) else None
         except (ValueError, KeyError):
             logger.warning("Settings payload field malformed; keeping defaults", exc_info=True)
 
@@ -119,6 +151,9 @@ class AppState:
             "google_geocode_key": self._google_geocode_key,
             "arcgis_geocode_key": self._arcgis_geocode_key,
             "wifi_keepalive_enabled": self._wifi_keepalive_enabled,
+            "pipi_cookie": self._pipi_cookie,
+            "pipi_cookie_source": self._pipi_cookie_source,
+            "pipi_cookie_updated_at": self._pipi_cookie_updated_at,
         }
         safe_write_json(SETTINGS_FILE, data)
 
@@ -647,10 +682,39 @@ async def _wifi_tunnel_keepalive():
             logger.debug("WiFi keepalive loop iteration error", exc_info=True)
 
 
+def _install_windows_connreset_filter() -> None:
+    """Drop the harmless WinError 10054 traceback on Windows.
+
+    ProactorEventLoop logs "Exception in callback
+    _ProactorBasePipeTransport._call_connection_lost()" with
+    ConnectionResetError whenever a client drops a TCP connection abruptly
+    (a page reload, Electron quitting, a phone leaving the Wi-Fi). The peer
+    is already gone and there is nothing to handle. Only that exact case is
+    dropped; everything else goes to the previous handler."""
+    if sys.platform != "win32":
+        return
+    loop = asyncio.get_running_loop()
+    previous = loop.get_exception_handler()
+
+    def _handler(loop: asyncio.AbstractEventLoop, context: dict) -> None:
+        if (
+            isinstance(context.get("exception"), ConnectionResetError)
+            and "_call_connection_lost" in context.get("message", "")
+        ):
+            return
+        if previous is not None:
+            previous(loop, context)
+        else:
+            loop.default_exception_handler(context)
+
+    loop.set_exception_handler(_handler)
+
+
 @asynccontextmanager
 async def lifespan(application: FastAPI):
     import asyncio
     # ── Startup ──
+    _install_windows_connreset_filter()
     logger.info("LocWarp starting — scanning for devices…")
     try:
         devices = await app_state.device_manager.discover_devices()
@@ -680,6 +744,7 @@ async def lifespan(application: FastAPI):
             pass
 
     app_state.save_settings()
+    await app_state.pipi_client.aclose()
     await app_state.device_manager.disconnect_all()
     logger.info("LocWarp shut down")
 
@@ -706,6 +771,7 @@ from api.recent import router as recent_router
 from api.websocket import router as ws_router
 from api.system import router as system_router
 from api.phone_control import router as phone_router
+from api.pipi import router as pipi_router
 
 app.include_router(device_router)
 app.include_router(location_router)
@@ -716,6 +782,7 @@ app.include_router(bookmarks_router)
 app.include_router(recent_router)
 app.include_router(ws_router)
 app.include_router(phone_router)
+app.include_router(pipi_router)
 
 
 @app.get("/")

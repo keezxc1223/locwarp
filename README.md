@@ -45,6 +45,7 @@
 - **USB 與 WiFi**:插上 USB 自動連線;iOS 17 以上可改用 WiFi Tunnel 拔線使用,釘選後每次啟動自動連上。
 - **多裝置同步**:最多三台裝置同時操作,所有動作同步套用,走的路線完全相同。
 - **座標與路線收藏**:搜尋、分類、拖曳排序,單擊即移動;支援 JSON 與 GPX 匯入匯出。
+- **蘑菇地圖**:在地圖上顯示 pipimushroom.com 的蘑菇、花與煙霧點位,可依大小與種類篩選,點一下就能過去。
 - **手機網頁操控**:人不在電腦旁時,用手機瀏覽器就能瞬移、導航、暫停與變速。
 - **座標格式**:WGS84、GCJ02、BD09 與經緯度順序可切換,顯示、複製、輸入一致。
 - **程式內更新**:有新版時在程式內下載並重新啟動即可,不會自動下載。
@@ -170,8 +171,10 @@
 
 - **USB**:插上自動連線,iPhone 鎖定螢幕不受影響。拔除約 4 秒內偵測到,重新插上自動恢復,不用重新整理。
 - **WiFi Tunnel**(iOS 17+,需先用 USB 配對過一次):
-  - 「自動偵測」會先用 mDNS 尋找裝置,找不到再掃描區域網路,只列出確認是 iPhone 的裝置。
-  - 啟動時的自動連線只用 mDNS 和連過的 IP,不會在背景掃描區域網路;USB 已連線時直接略過。
+  - 連線頁的「**掃描 WiFi 裝置**」會尋找同一個 WiFi 上的 iPhone,並連上還沒連線的那些;已連線的裝置不受影響。它先用 mDNS 尋找,找不到再掃描區域網路,只把確認是 iPhone 的裝置列入。
+  - WiFi 面板裡的「自動偵測」只列出找到的裝置,由你自己選要連哪一台。
+  - 啟動時的自動連線會補滿剩餘的裝置名額(最多三台):已有一台裝置(例如 USB)連線時,其他裝置仍會自動連上。它只用 mDNS 和連過的 IP,不會在背景掃描區域網路。
+  - 多台裝置同時連線時互不等待,其中一台連不上不會拖慢其他台。
   - 連過的 IP 會記住,也可以「釘選」裝置,之後每次啟動自動連上,斷線自動重試。只要釘選了任何裝置,啟動時就只會自動連線已釘選的那些;連線中的裝置若沒有釘選,連線頁會提示。
   - 「螢幕暗掉維持連線」(實驗功能)會持續補送位置,降低 iPhone 鎖定螢幕後斷線的機率。
   - 「重新配對」可在配對記錄損毀時,透過 USB 一鍵重建。
@@ -236,6 +239,28 @@
 </details>
 
 <details>
+<summary><b>蘑菇地圖</b></summary>
+
+在地圖上顯示 [pipimushroom.com](https://pipimushroom.com/) 的蘑菇、花與煙霧點位(目前涵蓋台灣、香港、馬來西亞)。按最下方狀態列的「**蘑菇地圖**」,或地圖左側工具列的蘑菇按鈕,就會開啟面板。
+
+- 蘑菇、花、煙霧三種點位可以分別開關。
+- **蘑菇篩選**(點開展開):依大小、種類與最少剩餘時間篩選,選項取自已載入的資料,每組都有全選與全不選。
+- 花可以「只顯示彩帶」或隱藏普花。彩帶花會有彩虹外框,並顯示彩帶期剩餘時間。
+- 點位標記有小、中、大三種大小。點開標記可以看到剩餘時間,並直接瞬移或導航過去。
+- 地圖要放大到 Zoom 15 以上才會載入,太遠時地圖上方會提示放大。同一個畫面 60 秒內不會重複抓取,對該網站的請求間隔至少 1 秒。
+
+**登入**:這個網站要登入後才提供資料。按面板裡的「**登入教學**」會開啟步驟說明,有兩種方式:
+
+1. **Chrome 擴充功能(建議)**:按教學裡的「開啟資料夾」找到隨程式附上的擴充功能,到 Chrome 的 `chrome://extensions` 開啟開發人員模式並「載入未封裝項目」,再於同一個 Chrome 登入 pipimushroom.com。登入狀態會自動同步,之後也會自動續期。
+2. **手動貼上 Cookie**:不用 Chrome 時,依教學裡的說明從瀏覽器複製 Cookie 貼上。
+
+LocWarp 不會經手你的 Google 帳號密碼。登入資料只存在本機(`~/.locwarp/settings.json`),只會送到 pipimushroom.com。擴充功能的隱私權說明見 [docs/pipi-extension-privacy.md](docs/pipi-extension-privacy.md)。
+
+> 資料來源為 pipimushroom.com。位置、種類與剩餘時間的準確度無法保證,僅供參考;該網站改版時這個圖層可能暫時無法使用。
+
+</details>
+
+<details>
 <summary><b>地址搜尋</b></summary>
 
 - **免費版**:預設來源,使用 OpenStreetMap 開放資料,不用 API key。設定裡另有 Photon 選項,模糊搜尋與錯字容錯較強。
@@ -250,7 +275,7 @@
 
 人不在電腦旁時,可以用手機瀏覽器操控。按狀態列的「手機操控」會顯示區域網路網址與 6 位數 PIN,手機輸入後就能使用行動版地圖:瞬移、導航到指定點(走路 / 腳踏車 / 開車或自訂速度)、搜尋地址、輸入座標、停止與還原,並即時顯示桌面上同一條路徑。移動中會顯示進度、剩餘距離與時間,可以暫停、繼續或變更速度。電腦上儲存的座標與最近紀錄可以直接取用。頁面可以加到手機主畫面,像 app 一樣全螢幕開啟,配色與座標格式跟隨電腦端的設定。
 
-> 手機必須跟電腦連在**同一個 WiFi**,電腦防火牆需放行 8777 port。按「重新產生」可立刻更換 PIN,讓之前配對過的手機失效。
+> 手機必須跟電腦連在**同一個 WiFi**,電腦防火牆需放行 8777 port。按「重新產生」可立刻更換 PIN,讓之前配對過的手機失效。PIN 連續輸入錯誤 5 次會暫時鎖定 60 秒。
 
 </details>
 
@@ -349,6 +374,7 @@ iOS 17 以上需要 iPhone 上掛有 Personalized DDI 才能模擬定位。LocWa
 | Tunnel 啟動後連不上 | 確認以系統管理員身分啟動;暫時關閉 VPN 或第三方防火牆再試 |
 | WiFi 自動偵測找不到裝置 | 確認在同一個 WiFi 網段、路由器沒有開啟裝置隔離(AP isolation);可改為手動輸入 IP |
 | WiFi 每次啟動都要手動連線 | 到「連線」頁確認目前這台裝置是否已釘選。只要釘選了其他裝置,啟動時就只會自動連線已釘選的那些 |
+| 蘑菇地圖沒有顯示點位 | 依序確認:面板上顯示「已登入」(否則按「登入教學」)、地圖已放大到 Zoom 15 以上、所在位置在台灣 / 香港 / 馬來西亞。登入大約 15 分鐘會到期,Chrome 擴充功能會自動續期;手動貼上的 Cookie 過期後需要重貼 |
 | port 掃描提示「每個 port 都有回應」 | VPN 或代理軟體正在攔截連線,關閉後再試。開著 VPN 時「自動偵測」也可能找不到裝置 |
 | `No such service: com.apple.instruments.dtservicehub`,或提示「未偵測到 DDI」 | 依[步驟 4](#4-掛載-developer-disk-imageios-17)掛載 DDI。仍失敗時,先把開發者模式關閉、重開機、再次開啟,然後重新掛載 |
 | iPhone 設定裡找不到開發者模式 | LocWarp 連上裝置後,到上方的「設定」頁按「開啟開發者模式」,再依[步驟 3](#3-開啟開發者模式)關掉並重開 iPhone 的「設定」App。按鈕無效時改用[側載方式](#附錄用側載方式讓開發者模式出現) |
@@ -415,6 +441,7 @@ iOS 17 以上需要 iPhone 上掛有 Personalized DDI 才能模擬定位。LocWa
 | [TimezoneDB](https://timezonedb.com/) | backend | 座標轉時區(內建 key) |
 | [flagcdn.com](https://flagcdn.com/) | frontend | 國旗圖片 |
 | OpenStreetMap、Google、[ESRI](https://www.esri.com/)、[OpenFreeMap](https://openfreemap.org/)、[VersaTiles](https://versatiles.org/)、[NLSC](https://maps.nlsc.gov.tw/)、[GSI](https://www.gsi.go.jp/) | frontend | 地圖圖磚 |
+| [pipimushroom.com](https://pipimushroom.com/) | backend | 蘑菇地圖圖層的點位資料(選用,需使用者自己登入) |
 | [GitHub Releases](https://github.com/keezxc1223/locwarp/releases) | frontend | 啟動時檢查新版本(無遙測);使用者按下「下載更新」後才下載新版 |
 
 反向地理編碼不使用 Nominatim 公共伺服器,因為它的使用政策以應用程式為單位計算流量上限,不適合散佈型的桌面程式。地址搜尋的預設選項若被 Nominatim 拒絕,會自動改用 Photon。
@@ -519,6 +546,7 @@ locwarp/
 │
 ├── LocWarp.bat / start.py   # 開發用啟動器(自動提權)
 ├── stop.py
+├── extensions/              # 蘑菇地圖用的 Chrome 擴充功能,pack.py 產生商店上傳用的 zip
 └── build-installer.bat      # 一鍵建置安裝檔
 ```
 
@@ -553,6 +581,7 @@ LocWarp 建立在這些開源專案與公共服務之上:
 - [OpenStreetMap](https://www.openstreetmap.org/copyright) 貢獻者:地圖資料
 - [OSRM](https://project-osrm.org/)、[Valhalla](https://github.com/valhalla/valhalla)、[BRouter](https://brouter.de/):路線規劃
 - [Photon](https://photon.komoot.io/)、[Open-Meteo](https://open-meteo.com/):地址搜尋與天氣
+- [蘑菇地圖 (pipimushroom.com)](https://pipimushroom.com/):蘑菇地圖圖層的點位資料
 - 回報問題、測試各個 iOS 版本與貢獻程式碼的每一位使用者
 
 ---

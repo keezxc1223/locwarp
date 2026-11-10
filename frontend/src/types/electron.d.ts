@@ -28,6 +28,7 @@ declare global {
       getRenderMode(): Promise<RenderModeInfo>
       setRenderMode(mode: RenderMode): Promise<{ ok: boolean }>
       relaunchApp(): Promise<void>
+      openPipiExtensionFolder?(): Promise<{ ok: boolean; path: string }>
       updateSupported?(): Promise<boolean>
       updateDownload?(): Promise<{ ok: boolean; version?: string; code?: 'UNSUPPORTED' | 'NO_UPDATE' | 'ERROR'; message?: string }>
       updateInstall?(): Promise<{ ok: boolean }>

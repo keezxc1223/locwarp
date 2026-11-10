@@ -657,7 +657,7 @@
       just_now: '剛剛', min_ago: '{n} 分鐘前', hr_ago: '{n} 小時前', day_ago: '{n} 天前',
       lat: '緯度', lng: '經度', format_note: '目前格式: {f}',
       pin_title: '輸入 PIN', pin_help: '在電腦的 LocWarp 點「手機操控」,把畫面上的 6 位數 PIN 輸入這裡。',
-      pin_connect: '連線', pin_wrong: 'PIN 不正確', pin_fail: '連線失敗,請重試',
+      pin_connect: '連線', pin_wrong: 'PIN 不正確', pin_locked: '錯誤次數太多,請等 {n} 秒後再試', pin_fail: '連線失敗,請重試',
       zoomed: '畫面被縮放,請按 Ctrl+0 (Mac: Cmd+0) 重置,或兩指縮回正常',
       ios_1: '點瀏覽器下方的「分享」按鈕', ios_2: '選「加入主畫面」', ios_3: '從主畫面開啟,第一次需要再輸入一次 PIN',
       and_1: '點瀏覽器右上角的選單', and_2: '選「加到主畫面」或「安裝應用程式」', and_3: '從主畫面開啟,第一次需要再輸入一次 PIN',
@@ -696,7 +696,7 @@
       just_now: 'just now', min_ago: '{n} min ago', hr_ago: '{n} h ago', day_ago: '{n} d ago',
       lat: 'Lat', lng: 'Lng', format_note: 'Current format: {f}',
       pin_title: 'Enter PIN', pin_help: 'On the PC, click "Phone control" in LocWarp and type the 6-digit PIN shown there.',
-      pin_connect: 'Connect', pin_wrong: 'Wrong PIN', pin_fail: 'Connection failed, try again',
+      pin_connect: 'Connect', pin_wrong: 'Wrong PIN', pin_locked: 'Too many wrong PINs. Try again in {n} s', pin_fail: 'Connection failed, try again',
       zoomed: 'The page is zoomed. Press Ctrl+0 (Mac: Cmd+0) or pinch back out.',
       ios_1: 'Tap the Share button at the bottom of the browser', ios_2: 'Choose "Add to Home Screen"', ios_3: 'Open it from the Home Screen; the PIN is asked once more the first time',
       and_1: 'Open the browser menu at the top right', and_2: 'Choose "Add to Home screen" or "Install app"', and_3: 'Open it from the Home Screen; the PIN is asked once more the first time',
@@ -1463,6 +1463,13 @@
         method: 'POST', headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({ pin: pinInput.value }),
       });
+      if (r.status === 429) {
+        let wait = 60;
+        try { wait = (await r.json()).detail.retry_after || wait; } catch (e) { /* keep default */ }
+        pinErr.textContent = t('pin_locked').replace('{n}', String(wait));
+        pinSubmit.disabled = false;
+        return;
+      }
       if (!r.ok) { pinErr.textContent = t('pin_wrong'); pinSubmit.disabled = false; return; }
       token = (await r.json()).token;
       ls('locwarp.phone.token', token);

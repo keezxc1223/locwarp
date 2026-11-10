@@ -1,0 +1,33 @@
+{
+  "manifest_version": 3,
+  "name": "LocWarp 蘑菇地圖 Cookie 同步",
+  "version": "1.1.1",
+  "description": "自動把 pipimushroom.com 的登入 Cookie 同步到本機的 LocWarp (127.0.0.1:8777)，給 LocWarp 的蘑菇地圖圖層使用。",
+  "permissions": [
+    "cookies",
+    "webRequest",
+    "storage",
+    "alarms"
+  ],
+  "host_permissions": [
+    "https://pipimushroom.com/*",
+    "http://127.0.0.1:8777/*"
+  ],
+  "background": {
+    "service_worker": "background.js"
+  },
+  "action": {
+    "default_title": "LocWarp 蘑菇地圖 Cookie 同步 (點一下立即同步)",
+    "default_icon": {
+      "16": "icons/icon16.png",
+      "32": "icons/icon32.png"
+    }
+  },
+  "icons": {
+    "16": "icons/icon16.png",
+    "32": "icons/icon32.png",
+    "48": "icons/icon48.png",
+    "128": "icons/icon128.png"
+  },
+  "homepage_url": "https://github.com/keezxc1223/locwarp"
+}

@@ -45,6 +45,7 @@
 - **USB and Wi-Fi**: Plug in and it connects. On iOS 17 and later a Wi-Fi Tunnel lets you unplug, and a pinned device reconnects on every launch.
 - **Multi-device sync**: Up to three devices at once. Every action is applied to all of them and they walk exactly the same route.
 - **Saved coordinates and routes**: Search, categories and drag-and-drop ordering; one click to go. JSON and GPX import and export.
+- **Mushroom map**: Shows the mushroom, flower and smoke spots from pipimushroom.com on the map, filterable by size and type, one click to go.
 - **Phone web control**: Away from the PC, a phone browser can teleport, navigate, pause and change speed.
 - **Coordinate formats**: Switch between WGS84, GCJ02 and BD09 and choose the axis order; display, copy and input stay consistent.
 - **In-app updates**: Download a new version inside the app and restart into it. Nothing is downloaded on its own.
@@ -170,8 +171,10 @@ When an engine fails, that leg falls back to a straight line and the next leg tr
 
 - **USB**: connects automatically when plugged in, and locking the iPhone screen has no effect. Unplugging is detected within about 4 seconds, and plugging back in recovers without a refresh.
 - **Wi-Fi Tunnel** (iOS 17+, requires one prior USB pairing):
-  - "Auto-detect" looks for the device over mDNS first, then scans the local network, and lists only devices confirmed to be iPhones.
-  - Auto-connect at startup uses only mDNS and previously connected IPs. It never scans the local network in the background, and it is skipped when USB is already connected.
+  - **Scan WiFi devices** on the Connection page finds iPhones on the same Wi-Fi and connects the ones that are not connected yet; connected devices are left alone. It looks over mDNS first, then scans the local network, and only counts devices confirmed to be iPhones.
+  - "Auto-detect" inside the Wi-Fi panel only lists what it finds and leaves the choice to you.
+  - Auto-connect at startup fills the remaining device slots (three at most): with one device already connected (for example over USB), the others still connect by themselves. It uses only mDNS and previously connected IPs and never scans the local network in the background.
+  - Devices connecting at the same time do not wait for each other, so one that fails does not slow the rest.
   - Previously used IPs are remembered. You can also pin a device so that it connects on every launch and retries after a drop. Once any device is pinned, only pinned devices auto-connect on launch; the connection page points it out when the device in use is not pinned.
   - "Keep connection alive when the screen dims" (experimental) keeps re-sending the position to reduce drops after the iPhone locks.
   - "Re-pair" rebuilds a damaged pairing record over USB in one click.
@@ -236,6 +239,28 @@ Connect **up to three** devices at once. Teleport, Navigate, every movement mode
 </details>
 
 <details>
+<summary><b>Mushroom map</b></summary>
+
+Shows the mushroom, flower and smoke spots from [pipimushroom.com](https://pipimushroom.com/) on the map (Taiwan, Hong Kong and Malaysia at the moment). Press **Mushroom map** in the status bar at the bottom, or the mushroom button in the toolbar on the left of the map, to open its panel.
+
+- Mushrooms, flowers and smoke can be switched on and off separately.
+- **Mushroom filters** (click to expand): filter by size, type and minimum time left. The choices come from the loaded data, and each group has Select all and None.
+- Flowers can be narrowed to ribbon flowers only, or common flowers can be hidden. Ribbon flowers get a rainbow ring and show how long the ribbon period has left.
+- Markers come in three sizes. Open one to see the time remaining and to teleport or navigate there.
+- Data loads from zoom 15 upward; when the map is too far out, a notice above the map tells you to zoom in. The same view is not fetched again within 60 seconds, and requests to the site are at least 1 second apart.
+
+**Logging in**: the site only serves data to logged-in users. **How to log in** in the panel opens the steps. There are two ways:
+
+1. **Chrome extension (recommended)**: press Open folder in the guide to find the extension that ships with the app, go to `chrome://extensions` in Chrome, turn on Developer mode and Load unpacked, then log in to pipimushroom.com in the same Chrome. The login syncs by itself and is renewed automatically afterwards.
+2. **Paste the cookie by hand**: without Chrome, copy the cookie from your browser as the guide describes and paste it in.
+
+LocWarp never handles your Google password. The login data stays on this PC (`~/.locwarp/settings.json`) and is only ever sent to pipimushroom.com. The extension's privacy notes are in [docs/pipi-extension-privacy.md](docs/pipi-extension-privacy.md).
+
+> Data source: pipimushroom.com. Position, type and time left are not guaranteed to be accurate and are for reference only. If that site changes, this layer may stop working for a while.
+
+</details>
+
+<details>
 <summary><b>Address search</b></summary>
 
 - **Free**: the default provider, built on OpenStreetMap open data, no API key needed. A Photon option in the settings offers stronger fuzzy matching and typo tolerance.
@@ -250,7 +275,7 @@ Connect **up to three** devices at once. Teleport, Navigate, every movement mode
 
 Control LocWarp from a phone browser when you are away from the PC. The "Phone control" button in the status bar shows a LAN address and a 6-digit PIN. Enter them on the phone to get a mobile map with teleport, navigate to a point (walk / bike / drive or a custom speed), address search, coordinate input, stop, and restore, plus a live view of the route running on the desktop. While moving it shows progress, remaining distance and time, and lets you pause, resume or change the speed. The coordinates saved on the PC and the recent list are available directly. The page can be added to the phone's home screen to open full screen like an app, and it follows the desktop's theme colour and coordinate format.
 
-> The phone must be on the **same Wi-Fi** as the PC, and the PC firewall must allow port 8777. "Regenerate" issues a new PIN at once and invalidates phones paired earlier.
+> The phone must be on the **same Wi-Fi** as the PC, and the PC firewall must allow port 8777. "Regenerate" issues a new PIN at once and invalidates phones paired earlier. Five wrong PINs in a row lock entry for 60 seconds.
 
 </details>
 
@@ -348,6 +373,7 @@ Nothing is downloaded until you ask for it. You can also get the installer yours
 | A dialog says the backend program is missing | Antivirus quarantined the unsigned backend exe. Add the install folder to the exclusion list and reinstall |
 | The tunnel starts but nothing connects | Make sure LocWarp runs as administrator, and try again with VPN or third-party firewall software turned off |
 | Wi-Fi has to be connected by hand on every launch | On the Connection page, check whether this device is pinned. Once any other device is pinned, only pinned devices auto-connect on launch |
+| The mushroom map shows no spots | Check in order: the panel says Logged in (otherwise press How to log in), the map is at zoom 15 or closer, and the location is in Taiwan, Hong Kong or Malaysia. The login expires after about 15 minutes; the Chrome extension renews it by itself, while a cookie pasted by hand has to be pasted again |
 | Wi-Fi auto-detect finds no device | Check that both are on the same Wi-Fi subnet and that the router has no client or AP isolation. Entering the IP by hand also works |
 | The port scan says the IP answers on every port | A VPN or proxy is intercepting connections. Turn it off and retry. Auto-detect may also find nothing while a VPN is on |
 | `No such service: com.apple.instruments.dtservicehub`, or "No DDI detected" | Mount the DDI as described in [step 4](#4-mount-the-developer-disk-image-ios-17). If it still fails, turn Developer Mode off, reboot, turn it back on, and mount again |
@@ -415,6 +441,7 @@ All free. Only Google Geocoding needs a key, which the user supplies. Nothing el
 | [TimezoneDB](https://timezonedb.com/) | backend | Coordinate to time zone (built-in key) |
 | [flagcdn.com](https://flagcdn.com/) | frontend | Flag images |
 | OpenStreetMap, Google, [ESRI](https://www.esri.com/), [OpenFreeMap](https://openfreemap.org/), [VersaTiles](https://versatiles.org/), [NLSC](https://maps.nlsc.gov.tw/), [GSI](https://www.gsi.go.jp/) | frontend | Map tiles |
+| [pipimushroom.com](https://pipimushroom.com/) | backend | Spot data for the mushroom map layer (optional, needs the user's own login) |
 | [GitHub Releases](https://github.com/keezxc1223/locwarp/releases) | frontend | Update check at launch (no telemetry); the new version is downloaded only after the user presses Download update |
 
 Reverse geocoding does not use the public Nominatim server. Its usage policy counts traffic per application, which does not suit a distributed desktop app. If the default address search option is refused by Nominatim, it falls back to Photon automatically.
@@ -519,6 +546,7 @@ locwarp/
 │
 ├── LocWarp.bat / start.py   # Dev launcher (auto-elevates)
 ├── stop.py
+├── extensions/              # Chrome extension for the mushroom map; pack.py builds the store upload zip
 └── build-installer.bat      # One-shot installer build
 ```
 
@@ -553,6 +581,7 @@ LocWarp is built on these open-source projects and public services:
 - [OpenStreetMap](https://www.openstreetmap.org/copyright) contributors: map data
 - [OSRM](https://project-osrm.org/), [Valhalla](https://github.com/valhalla/valhalla) and [BRouter](https://brouter.de/): routing
 - [Photon](https://photon.komoot.io/) and [Open-Meteo](https://open-meteo.com/): address search and weather
+- [Mushroom map (pipimushroom.com)](https://pipimushroom.com/): spot data for the mushroom map layer
 - Everyone who reported issues, tested iOS versions and contributed code
 
 ---

@@ -11,8 +11,6 @@ import { UserAvatar, avatarToHtml, loadAvatar, saveAvatar, loadCustomPng, saveCu
 import * as api from './services/api'
 import { parseCoord, formatCoord, useCoordSettings, coordInputHint } from './utils/coords'
 import { loadSavedAppearance, themeDef } from './utils/appearance'
-import { readSavedIps, savedIpsForPrefix, prefixOf } from './utils/savedTunnelIps'
-import { getHostPrefix } from './utils/hostNetwork'
 
 import MapView from './components/MapView'
 import ControlPanel from './components/ControlPanel'
@@ -401,138 +399,22 @@ const App: React.FC = () => {
   // (USB plug, or backend already brought a tunnel back up via its own
   // restart logic) so we don't fight with an existing USB connection.
   const wifiAutoConnectAttemptedRef = useRef(false)
-  // The effect below only re-runs on ws.connected, so its timer would read a
-  // stale device list. Read the live count through a ref instead.
-  const connectedCountRef = useRef(0)
-  connectedCountRef.current = device.connectedDevices.length
   useEffect(() => {
     if (!ws.connected) return
     if (wifiAutoConnectAttemptedRef.current) return
-    let enabled: boolean
-    let savedList: Array<{ ip: string; port: number; udid?: string; prefix?: string; lastUsed: number }> = []
-    try {
-      enabled = localStorage.getItem('locwarp.tunnel.autoconnect') !== '0'
-      savedList = readSavedIps()
-      // Legacy single-IP fallback for upgraders.
-      if (savedList.length === 0) {
-        const legacyIp = (localStorage.getItem('locwarp.tunnel.ip') || '').trim()
-        if (legacyIp) {
-          const portStr = localStorage.getItem('locwarp.tunnel.port') || '49152'
-          savedList = [{
-            ip: legacyIp,
-            port: parseInt(portStr, 10) || 49152,
-            prefix: prefixOf(legacyIp) || undefined,
-            lastUsed: 0,
-          }]
-        }
-      }
-    } catch {
-      return
-    }
+    let enabled = true
+    try { enabled = localStorage.getItem('locwarp.tunnel.autoconnect') !== '0' } catch { /* default on */ }
     if (!enabled) return
-    wifiAutoConnectAttemptedRef.current = true
-    // Defer so device.scan() and any backend-side restored tunnels have
-    // time to surface in `device.connectedDevices` before we decide
-    // whether auto-connect is needed.
+    // Defer so device.scan() and any tunnel the backend restored by itself
+    // have time to show up as connected before the candidates are chosen.
     const tid = setTimeout(() => {
-      ;(async () => {
-        try {
-          // Skip if a device is already connected (USB plug, or backend
-          // already brought a tunnel back up via its own restart logic).
-          if (connectedCountRef.current > 0) return
-          const status = await api.wifiTunnelStatus()
-          const alreadyTunneled = new Set(
-            (status?.tunnels || [])
-              .map((tn) => `${tn.rsd_address || ''}:${tn.rsd_port || 0}`),
-          )
-          // Two sources for auto-connect candidates:
-          //   1. savedips: previously-connected iPhones (UDID known)
-          //   2. mDNS / subnet discover: iPhones currently broadcasting
-          //      their RemotePairing service (UDID unknown until handshake)
-          // Discover catches the case where a user connected a second
-          // iPhone via the auto-connect path itself (so it never went
-          // through the manual save) — without it, only one iPhone keeps
-          // auto-connecting on every launch even though both are paired.
-          const seen = new Set<string>()
-          const uniq: Array<{ ip: string; port: number; udid?: string; ports?: number[] }> = []
-          const addCand = (ip: string, port: number, udid?: string, ports?: number[]) => {
-            const key = `${ip}:${port}`
-            if (seen.has(key)) return
-            if (alreadyTunneled.has(key)) return
-            seen.add(key)
-            uniq.push({ ip, port, udid, ports })
-          }
-          // When the user has pinned devices, only auto-connect those UDIDs.
-          // This prevents a friend's device (present on the same WiFi but
-          // in savedips from a previous session) from being auto-connected
-          // on startup (issue #35). If no pins are set, fall back to the
-          // original behaviour so first-time users are unaffected.
-          const pinnedUdids: string[] = []
-          try {
-            const p = JSON.parse(localStorage.getItem('locwarp.tunnel.pinned') || '[]')
-            if (Array.isArray(p)) pinnedUdids.push(...p.filter((x: any) => typeof x === 'string'))
-          } catch { /* ignore */ }
-          const hasPins = pinnedUdids.length > 0
-          const pinFiltered = hasPins
-            ? savedList.filter((e) => e.udid && pinnedUdids.includes(e.udid))
-            : savedList
-          // Only try addresses that belong to the WiFi this PC is on right
-          // now. A phone saved under several LANs would otherwise burn a
-          // ~10s handshake timeout per unreachable address and eat into the
-          // MAX_DEVICES candidate budget below, pushing out the address
-          // that actually works (issue #48). An unknown host prefix leaves
-          // every saved address in play, as before.
-          const hostPrefix = await getHostPrefix()
-          const filteredList = savedIpsForPrefix(pinFiltered, hostPrefix)
-          // One candidate per phone: entries written before the prefix tag
-          // existed can leave two addresses for the same device in the
-          // list, and the newest (first after the sort) is the live one.
-          const udidSeen = new Set<string>()
-          for (const entry of filteredList) {
-            if (entry.udid) {
-              if (udidSeen.has(entry.udid)) continue
-              udidSeen.add(entry.udid)
-            }
-            addCand(entry.ip, entry.port, entry.udid)
-          }
-          // Skip mDNS discover when user has pins — avoids connecting to
-          // unintended devices on the same network. Discover only runs
-          // when no pins are set so new users can still auto-connect.
-          // scan:false = mDNS only. A background pass must never run the
-          // LAN port scan; that is reserved for the manual detect button
-          // (issue #49: it exhausted Windows TCP ports behind a VPN).
-          if (!hasPins && connectedCountRef.current === 0) {
-            try {
-              const dres = await api.wifiTunnelDiscover({ scan: false })
-              for (const d of (dres?.devices || [])) {
-                // d.ports is the full open-port list from the TCP-scan
-                // fallback; a scan can't tell which one is RemotePairing,
-                // so hand them all to the backend to try in order.
-                addCand(String(d.ip), Number(d.port) || 49152, undefined, d.ports)
-              }
-            } catch { /* discover failed — savedips entries still try */ }
-          }
-          // Cap at MAX_DEVICES the backend enforces — anything beyond
-          // would 409 anyway.
-          const limited = uniq.slice(0, 3)
-          if (limited.length === 0) return
-          // USB may have come up while savedips / mDNS were being checked.
-          if (connectedCountRef.current > 0) return
-          // Parallel: every iPhone gets a tunnel attempt at the same
-          // time so the user doesn't wait sequentially for unreachable
-          // ones to time out (~10s each). Pass entry.udid so the backend
-          // tries the right pair record FIRST — without the hint, the
-          // second device's request can stall on the wrong candidate's
-          // 8s handshake timeout and bail.
-          await Promise.allSettled(
-            limited.map((entry) =>
-              device.startWifiTunnel(entry.ip, entry.port, entry.udid, entry.ports).catch(() => {}),
-            ),
-          )
-        } catch {
-          // Silent — tunnel section will show its own error when opened.
-        }
-      })()
+      // Set here, not above: if the socket drops inside the delay, the
+      // next connect schedules the pass again instead of skipping it.
+      wifiAutoConnectAttemptedRef.current = true
+      // Fills whatever device slots are still free. A phone already on USB
+      // no longer cancels the whole pass, so a second phone on WiFi still
+      // connects by itself. Failures are silent; the 連線 page shows them.
+      device.findAndConnectWifi('auto').catch(() => { /* silent */ })
     }, 1500)
     return () => clearTimeout(tid)
     // eslint-disable-next-line react-hooks/exhaustive-deps
@@ -1622,6 +1504,7 @@ const App: React.FC = () => {
           }))}
           isConnected={device.connectedDevice !== null}
           onScan={() => { device.scan() }}
+          onScanWifi={() => device.findAndConnectWifi('scan')}
           onSelect={(id: string) => { device.connect(id) }}
           onStartWifiTunnel={device.startWifiTunnel}
           onStopTunnel={device.stopTunnel}
