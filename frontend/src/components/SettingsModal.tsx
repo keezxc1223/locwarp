@@ -99,7 +99,7 @@ const SettingsModal: React.FC<Props> = ({ open, onClose }) => {
       onClick={onClose}
       style={{
         position: 'fixed', inset: 0, zIndex: 2000,
-        background: 'rgba(8, 10, 20, 0.55)', backdropFilter: 'blur(4px)',
+        background: 'rgba(8, 10, 20, 0.55)', backdropFilter: 'blur(4px)', animation: 'var(--anim-scrim)',
         display: 'flex', alignItems: 'center', justifyContent: 'center',
       }}
     >
@@ -109,10 +109,10 @@ const SettingsModal: React.FC<Props> = ({ open, onClose }) => {
           width: 560, maxWidth: 'calc(100vw - 48px)',
           maxHeight: 'calc(100vh - 80px)',
           position: 'relative',
-          background: 'rgba(26, 29, 39, 0.96)',
-          border: '1px solid rgba(108, 140, 255, 0.25)', borderRadius: 14,
+          background: 'var(--glass-pop)',
+          border: '1px solid rgba(var(--accent-rgb), 0.25)', borderRadius: 14,
           padding: '28px 32px', color: '#e8eaf0',
-          boxShadow: '0 20px 60px rgba(12, 18, 40, 0.65)',
+          boxShadow: 'var(--shadow-pop)', animation: 'var(--anim-pop)',
           overflowY: 'auto',
         }}
       >
@@ -157,9 +157,9 @@ const SettingsModal: React.FC<Props> = ({ open, onClose }) => {
             onClick={() => playCompletionAlert(true)}
             style={{
               padding: '5px 12px', fontSize: 12,
-              background: 'rgba(108, 140, 255, 0.15)',
-              color: '#a8b8ff',
-              border: '1px solid rgba(108, 140, 255, 0.4)',
+              background: 'rgba(var(--accent-rgb), 0.15)',
+              color: 'var(--accent-soft)',
+              border: '1px solid rgba(var(--accent-rgb), 0.4)',
               borderRadius: 6, cursor: 'pointer',
             }}
           >
@@ -194,20 +194,20 @@ const SettingsModal: React.FC<Props> = ({ open, onClose }) => {
               <div style={{
                 display: 'flex', alignItems: 'center', justifyContent: 'space-between',
                 gap: 12, padding: '8px 12px',
-                background: 'rgba(108, 140, 255, 0.08)',
-                border: '1px solid rgba(108, 140, 255, 0.25)',
+                background: 'rgba(var(--accent-rgb), 0.08)',
+                border: '1px solid rgba(var(--accent-rgb), 0.25)',
                 borderRadius: 8,
               }}>
-                <span style={{ fontSize: 12, color: '#a8b8ff' }}>
+                <span style={{ fontSize: 12, color: 'var(--accent-soft)' }}>
                   {t('settings.render_mode_restart_hint')}
                 </span>
                 <button
                   onClick={handleRestart}
                   style={{
                     padding: '5px 12px', fontSize: 12,
-                    background: 'rgba(108, 140, 255, 0.18)',
-                    color: '#a8b8ff',
-                    border: '1px solid rgba(108, 140, 255, 0.45)',
+                    background: 'rgba(var(--accent-rgb), 0.18)',
+                    color: 'var(--accent-soft)',
+                    border: '1px solid rgba(var(--accent-rgb), 0.45)',
                     borderRadius: 6, cursor: 'pointer',
                   }}
                 >

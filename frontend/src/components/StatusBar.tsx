@@ -4,12 +4,13 @@ import { SimMode } from '../hooks/useSimulation';
 import type { RuntimesMap } from '../hooks/useSimulation';
 import type { DeviceInfo } from '../hooks/useDevice';
 import { useT } from '../i18n';
+import { formatCoord, useCoordSettings, isDefaultCoordSettings, coordBadge } from '../utils/coords';
 import LangToggle from './LangToggle';
 import PhoneControlButton from './PhoneControl';
 import SettingsModal from './SettingsModal';
 import pkg from '../../package.json';
 import { WeatherIcon, categorize, labelKeyFor } from './WeatherIcon';
-import { useUpdateCheck } from './UpdateChecker';
+import { useUpdateCheck, openUpdateDialog } from './UpdateChecker';
 
 const APP_VERSION = (pkg as { version: string }).version;
 
@@ -119,6 +120,7 @@ const StatusBar: React.FC<StatusBarProps> = ({
   gmtOffsetSeconds = null,
 }) => {
   const t = useT();
+  useCoordSettings();
   const { latest: updateLatest, releaseUrl: updateUrl } = useUpdateCheck();
   const [cooldownDisplay, setCooldownDisplay] = useState(cooldown);
   // Tick every second so the right-side clock and the destination-timezone
@@ -225,10 +227,10 @@ const StatusBar: React.FC<StatusBarProps> = ({
         padding: '6px 16px',
         fontSize: 12,
         color: '#c7cbd9',
-        background: 'rgba(18, 21, 32, 0.72)',
-        backdropFilter: 'blur(24px) saturate(160%)',
-        WebkitBackdropFilter: 'blur(24px) saturate(160%)',
-        border: '1px solid rgba(108, 140, 255, 0.18)',
+        background: 'var(--glass-float)',
+        backdropFilter: 'var(--glass-blur)',
+        WebkitBackdropFilter: 'var(--glass-blur)',
+        border: '1px solid rgba(var(--accent-rgb), 0.18)',
         borderRadius: 18,
         boxShadow:
           '0 14px 36px rgba(12, 18, 40, 0.48), 0 2px 8px rgba(12, 18, 40, 0.3), inset 0 1px 0 rgba(255, 255, 255, 0.06)',
@@ -288,10 +290,20 @@ const StatusBar: React.FC<StatusBarProps> = ({
                 <path d="M12 2a15.3 15.3 0 014 10 15.3 15.3 0 01-4 10 15.3 15.3 0 01-4-10 15.3 15.3 0 014-10z" />
               </svg>
             )}
-            <span>{currentPosition.lat.toFixed(6)}, {currentPosition.lng.toFixed(6)}</span>
+            <span>{formatCoord(currentPosition.lat, currentPosition.lng, 6)}</span>
+            {!isDefaultCoordSettings() && (
+              <span
+                title={t('coord.badge_tooltip')}
+                style={{
+                  fontSize: 10, padding: '1px 6px', borderRadius: 8,
+                  background: 'rgba(var(--accent-rgb), 0.18)', color: 'var(--accent-soft)',
+                  border: '1px solid rgba(var(--accent-rgb), 0.35)', whiteSpace: 'nowrap',
+                }}
+              >{coordBadge(t)}</span>
+            )}
             <button
               onClick={() => {
-                const txt = `${currentPosition.lat.toFixed(6)}, ${currentPosition.lng.toFixed(6)}`;
+                const txt = formatCoord(currentPosition.lat, currentPosition.lng, 6);
                 navigator.clipboard.writeText(txt).then(
                   () => setCopied(true),
                   () => setCopied(false),
@@ -439,9 +451,9 @@ const StatusBar: React.FC<StatusBarProps> = ({
               gap: 4,
               padding: '2px 8px',
               fontSize: 12,
-              background: 'rgba(108, 140, 255, 0.15)',
-              border: '1px solid rgba(108, 140, 255, 0.4)',
-              color: '#6c8cff',
+              background: 'rgba(var(--accent-rgb), 0.15)',
+              border: '1px solid rgba(var(--accent-rgb), 0.4)',
+              color: 'var(--accent-blue)',
               borderRadius: 4,
               cursor: 'pointer',
             }}
@@ -495,9 +507,9 @@ const StatusBar: React.FC<StatusBarProps> = ({
                 gap: 4,
                 padding: '2px 8px',
                 fontSize: 12,
-                background: 'rgba(108, 140, 255, 0.12)',
-                border: '1px solid rgba(108, 140, 255, 0.4)',
-                color: '#6c8cff',
+                background: 'rgba(var(--accent-rgb), 0.12)',
+                border: '1px solid rgba(var(--accent-rgb), 0.4)',
+                color: 'var(--accent-blue)',
                 borderRadius: 4,
                 cursor: 'pointer',
               }}
@@ -547,24 +559,14 @@ const StatusBar: React.FC<StatusBarProps> = ({
         </span>
         <div style={{ width: 1, height: 12, background: 'rgba(255,255,255,0.12)' }} />
         {updateLatest && updateUrl ? (
-          <a
-            href={updateUrl}
-            target="_blank"
-            rel="noreferrer"
+          <button
+            type="button"
             title={t('update.title')}
-            onClick={(e) => {
-              try {
-                const anyWin: any = window;
-                if (anyWin.locwarp?.openExternal) {
-                  e.preventDefault();
-                  anyWin.locwarp.openExternal(updateUrl);
-                }
-              } catch { /* fall back to default link nav */ }
-            }}
+            onClick={openUpdateDialog}
             style={{
               display: 'inline-flex', alignItems: 'center', gap: 5,
               padding: '1px 4px', borderRadius: 4,
-              textDecoration: 'none', cursor: 'pointer',
+              background: 'transparent', border: 'none', cursor: 'pointer',
             }}
           >
             <span className="lw-update-pill">NEW</span>
@@ -574,7 +576,7 @@ const StatusBar: React.FC<StatusBarProps> = ({
             }}>
               v{APP_VERSION}
             </span>
-          </a>
+          </button>
         ) : (
           <span style={{ fontSize: 10, opacity: 0.45, fontFamily: 'monospace' }}>
             v{APP_VERSION}
@@ -635,7 +637,7 @@ const StatusBar: React.FC<StatusBarProps> = ({
             onClick={() => setTzModalOpen(false)}
             style={{
               position: 'fixed', inset: 0, zIndex: 2000,
-              background: 'rgba(8, 10, 20, 0.55)', backdropFilter: 'blur(4px)',
+              background: 'rgba(8, 10, 20, 0.55)', backdropFilter: 'blur(4px)', animation: 'var(--anim-scrim)',
               display: 'flex', alignItems: 'center', justifyContent: 'center',
             }}
           >
@@ -643,10 +645,10 @@ const StatusBar: React.FC<StatusBarProps> = ({
               onClick={(e) => e.stopPropagation()}
               style={{
                 width: 360, position: 'relative',
-                background: 'rgba(26, 29, 39, 0.96)',
-                border: '1px solid rgba(108, 140, 255, 0.25)', borderRadius: 12,
+                background: 'var(--glass-pop)',
+                border: '1px solid rgba(var(--accent-rgb), 0.25)', borderRadius: 12,
                 padding: '22px 24px', color: '#e8eaf0',
-                boxShadow: '0 20px 60px rgba(12, 18, 40, 0.65)',
+                boxShadow: 'var(--shadow-pop)', animation: 'var(--anim-pop)',
               }}
             >
               {/* Top-right close button. Stays in the corner so it doesn't
@@ -705,17 +707,17 @@ const StatusBar: React.FC<StatusBarProps> = ({
           onClick={() => { if (!locatePcBusy) { setLocatePcOpen(false); setLocatePcResult(null); setLocatePcError(null); } }}
           style={{
             position: 'fixed', inset: 0, zIndex: 2000,
-            background: 'rgba(8, 10, 20, 0.55)', backdropFilter: 'blur(4px)',
+            background: 'rgba(8, 10, 20, 0.55)', backdropFilter: 'blur(4px)', animation: 'var(--anim-scrim)',
             display: 'flex', alignItems: 'center', justifyContent: 'center',
           }}
         >
           <div
             onClick={(e) => e.stopPropagation()}
             style={{
-              width: 380, background: 'rgba(26, 29, 39, 0.96)',
+              width: 380, background: 'var(--glass-pop)',
               border: '1px solid rgba(244, 143, 177, 0.3)', borderRadius: 12,
               padding: 22, color: '#e8eaf0',
-              boxShadow: '0 20px 60px rgba(12, 18, 40, 0.65)',
+              boxShadow: 'var(--shadow-pop)', animation: 'var(--anim-pop)',
               fontSize: 13,
             }}
           >
@@ -735,7 +737,7 @@ const StatusBar: React.FC<StatusBarProps> = ({
             {locatePcResult && (
               <>
                 <div style={{ fontSize: 12, opacity: 0.85, marginBottom: 6, fontFamily: 'monospace' }}>
-                  {locatePcResult.lat.toFixed(6)}, {locatePcResult.lng.toFixed(6)}
+                  {formatCoord(locatePcResult.lat, locatePcResult.lng, 6)}
                 </div>
                 <div style={{ fontSize: 11, opacity: 0.6, marginBottom: 4 }}>
                   {t('status.locate_pc_accuracy').replace('{m}', Math.round(locatePcResult.accuracy).toString())}
@@ -763,7 +765,7 @@ const StatusBar: React.FC<StatusBarProps> = ({
                       }}
                       style={{
                         padding: '10px 14px', fontSize: 13, fontWeight: 500, cursor: 'pointer',
-                        background: '#6c8cff', color: '#fff',
+                        background: 'var(--accent-blue)', color: '#fff',
                         border: 'none', borderRadius: 8, textAlign: 'left',
                       }}
                     >
@@ -780,8 +782,8 @@ const StatusBar: React.FC<StatusBarProps> = ({
                       }}
                       style={{
                         padding: '10px 14px', fontSize: 13, fontWeight: 500, cursor: 'pointer',
-                        background: 'rgba(108, 140, 255, 0.15)', color: '#a8b8ff',
-                        border: '1px solid rgba(108, 140, 255, 0.4)', borderRadius: 8, textAlign: 'left',
+                        background: 'rgba(var(--accent-rgb), 0.15)', color: 'var(--accent-soft)',
+                        border: '1px solid rgba(var(--accent-rgb), 0.4)', borderRadius: 8, textAlign: 'left',
                       }}
                     >
                       {t('status.locate_pc_pan_only')}

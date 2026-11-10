@@ -44,7 +44,7 @@
 
 ## Quick start
 
-1. Download the latest `LocWarp Setup x.y.z.exe` from [Releases](https://github.com/keezxc1223/locwarp/releases) and install it.
+1. Download the latest `LocWarp-Setup-x.y.z.exe` from [Releases](https://github.com/keezxc1223/locwarp/releases) and install it.
 2. Install iTunes or Apple Devices on the PC. Either one provides the Apple USB driver.
 3. Connect the iPhone over USB and tap "Trust This Computer" on the phone.
 4. On the iPhone, turn on Settings → Privacy & Security → Developer Mode. If the option is missing, connect in LocWarp and press "Enable Developer Mode" in its Settings tab to make it appear.
@@ -68,7 +68,7 @@ Each step is covered in detail under [Installation and setup](#installation-and-
 
 | Major | Verified versions |
 | --- | --- |
-| **iOS 27.x** | 27.0 (tested by the developer on iPhone 18 Pro Max) |
+| **iOS 27.x** | 27.0 (tested by the developer on iPhone 18 Pro Max) · 27.3 Beta (user report) |
 | **iOS 26.x** | 26.5 · 26.4.2 · 26.4.1 · 26.4.1 iPadOS · 26.4 · 26.3.1 · 26.2 · 26.2.1 iPadOS (M1 iPad) |
 | **iOS 18.x** | 18.7.8 · 18.7.7 · 18.7.1 · 18.6.2 · 18.5 iPadOS · 18.3.1 · 18.1.1 |
 | **iOS 17.x** | 17.6.1 |
@@ -376,7 +376,7 @@ build-installer.bat
 
 1. **PyInstaller** builds the backend into `dist-py/locwarp-backend/`
 2. **Vite** builds the frontend into `frontend/dist/`
-3. **electron-builder** produces `frontend/release/LocWarp Setup X.Y.Z.exe` (about 175 MB)
+3. **electron-builder** produces `frontend/release/LocWarp-Setup-X.Y.Z.exe` (about 150 MB)
 
 Note that `npm run dist` only runs step 3. Re-run PyInstaller after changing the backend, and re-run `npx vite build` after changing the frontend or the version number. Otherwise the installer ships stale content.
 
@@ -421,7 +421,7 @@ For questions, suggestions, or to report an iOS version as working, [add the aut
 LocWarp is free and open source. If you would like to support development, the address is below. **TRC-20 (TRON network) only.** Do not send over any other network.
 
 ```
-TB1i7pEcifAeh8oDLLZFqiRVrpUaZmmDAn
+TTLi4YcPcDw5R8Mr4H4u5rDuFwTZjtCQXk
 ```
 
 <p>

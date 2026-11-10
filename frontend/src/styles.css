@@ -15,16 +15,52 @@
   --border-color: #262b3b;
   --border-light: #323851;
   --border-subtle: rgba(255, 255, 255, 0.06);
-  --border-accent: rgba(108, 140, 255, 0.22);
+  --border-accent: rgba(var(--accent-rgb), 0.22);
 
   --text-primary: #e8eaf0;
   --text-secondary: #9499ac;
   --text-muted: #6b7089;
 
-  --accent-blue: #6c8cff;
-  --accent-blue-hover: #8aa3ff;
-  --accent-blue-dim: rgba(108, 140, 255, 0.15);
-  --accent-blue-glow: rgba(108, 140, 255, 0.35);
+  /* Accent as bare R, G, B so every tint is rgba(var(--accent-rgb), a);
+     a colour theme only has to override this one value. */
+  --accent-rgb: 108, 140, 255;
+  --accent-blue: rgb(var(--accent-rgb));
+  --accent-blue-hover: color-mix(in srgb, var(--accent-blue) 80%, white);
+  /* Lighter / darker steps of the accent, for text on dark panels and the
+     far end of gradients. Derived, so every theme gets them for free. */
+  --accent-soft: color-mix(in srgb, var(--accent-blue) 56%, white);
+  --accent-softer: color-mix(in srgb, var(--accent-blue) 36%, white);
+  --accent-deep: color-mix(in srgb, var(--accent-blue) 78%, black);
+  /* Second hue (gradients, ambient glow) and the base tone of panels.
+     Both are overwritten per theme by utils/appearance.ts. */
+  --accent-2-rgb: 150, 120, 255;
+  --panel-rgb: 20, 23, 36;
+
+  /* Glass surfaces. Three strengths of the same material:
+       panel = cards in the sidebar, float = bars over the map,
+       pop   = dialogs and menus (most opaque, text-heavy).
+     These are the "liquid" values; [data-glass] below swaps them. */
+  --glass-sheen: linear-gradient(140deg,
+    rgba(255, 255, 255, 0.13) 0%, rgba(255, 255, 255, 0.04) 28%,
+    rgba(255, 255, 255, 0) 58%, rgba(var(--accent-rgb), 0.09) 100%);
+  --glass-blur: blur(26px) saturate(185%);
+  --glass-panel: var(--glass-sheen), rgba(var(--panel-rgb), 0.46);
+  --glass-float: var(--glass-sheen), rgba(var(--panel-rgb), 0.76);
+  --glass-pop: var(--glass-sheen), rgba(var(--panel-rgb), 0.86);
+  --glass-border: rgba(255, 255, 255, 0.15);
+  --glass-edge:
+    inset 0 1px 0 rgba(255, 255, 255, 0.26),
+    inset 0 -1px 0 rgba(255, 255, 255, 0.05),
+    inset 0 0 26px rgba(var(--accent-rgb), 0.07);
+  --shadow-glass: 0 10px 30px rgba(6, 9, 20, 0.38), 0 2px 6px rgba(6, 9, 20, 0.22), var(--glass-edge);
+  --shadow-pop: 0 24px 64px rgba(6, 9, 20, 0.62), 0 4px 14px rgba(6, 9, 20, 0.36), var(--glass-edge);
+
+  /* Entrance animations used from inline styles (dialogs, scrims), so
+     turning motion off is one switch instead of a hunt through the TSX. */
+  --anim-pop: lw-pop-in 260ms cubic-bezier(0.2, 0.9, 0.25, 1.08) backwards;
+  --anim-scrim: lw-scrim-in 200ms ease-out backwards;
+  --accent-blue-dim: rgba(var(--accent-rgb), 0.15);
+  --accent-blue-glow: rgba(var(--accent-rgb), 0.35);
   --accent-green: #4ecdc4;
   --accent-green-dim: rgba(78, 205, 196, 0.15);
   --accent-pink: #ff6b9d;
@@ -49,7 +85,7 @@
   --shadow-md: 0 4px 14px rgba(12, 18, 40, 0.45), 0 1px 2px rgba(12, 18, 40, 0.3);
   --shadow-lg: 0 10px 32px rgba(12, 18, 40, 0.55), 0 2px 6px rgba(12, 18, 40, 0.35);
   --shadow-xl: 0 20px 60px rgba(12, 18, 40, 0.65), 0 4px 12px rgba(12, 18, 40, 0.4);
-  --shadow-accent: 0 6px 20px rgba(108, 140, 255, 0.28);
+  --shadow-accent: 0 6px 20px rgba(var(--accent-rgb), 0.28);
 
   /* Easing curves. Snappy for enter, smooth for exit, spring for playful. */
   --ease-out: cubic-bezier(0.16, 1, 0.3, 1);
@@ -155,7 +191,7 @@ textarea:focus {
   height: 100%;
   width: 100%;
   background:
-    radial-gradient(ellipse 80% 60% at 15% 0%, rgba(108, 140, 255, 0.08), transparent 60%),
+    radial-gradient(ellipse 80% 60% at 15% 0%, rgba(var(--accent-rgb), 0.08), transparent 60%),
     radial-gradient(ellipse 60% 50% at 90% 100%, rgba(180, 140, 255, 0.05), transparent 60%),
     var(--bg-primary);
 }
@@ -185,7 +221,7 @@ textarea:focus {
   background: rgba(18, 21, 32, 0.72);
   backdrop-filter: blur(24px) saturate(160%);
   -webkit-backdrop-filter: blur(24px) saturate(160%);
-  border: 1px solid rgba(108, 140, 255, 0.18);
+  border: 1px solid rgba(var(--accent-rgb), 0.18);
   border-radius: 16px;
   box-shadow:
     0 8px 24px rgba(12, 18, 40, 0.35),
@@ -207,8 +243,8 @@ textarea:focus {
   cursor: pointer;
   transition: background var(--transition-fast), color var(--transition-fast);
 }
-.nav-rail-btn:hover { background: rgba(108, 140, 255, 0.10); color: #c7d2ff; }
-.nav-rail-btn.active { background: rgba(108, 140, 255, 0.20); color: #9ac0ff; }
+.nav-rail-btn:hover { background: rgba(var(--accent-rgb), 0.10); color: var(--accent-softer); }
+.nav-rail-btn.active { background: rgba(var(--accent-rgb), 0.20); color: var(--accent-soft); }
 .nav-rail-icon svg { width: 19px; height: 19px; display: block; }
 .nav-rail-label { font-size: 10px; line-height: 1; letter-spacing: 0.02em; }
 
@@ -225,7 +261,7 @@ textarea:focus {
 }
 .ios-card {
   background: rgba(28, 31, 44, 0.66);
-  border: 1px solid rgba(108, 140, 255, 0.16);
+  border: 1px solid rgba(var(--accent-rgb), 0.16);
   border-radius: 14px;
   overflow: hidden;
   backdrop-filter: blur(18px) saturate(140%);
@@ -239,13 +275,13 @@ textarea:focus {
 }
 .ios-row + .ios-row { border-top: 1px solid rgba(255, 255, 255, 0.06); }
 .ios-row-tap { cursor: pointer; }
-.ios-row-tap:hover { background: rgba(108, 140, 255, 0.08); }
+.ios-row-tap:hover { background: rgba(var(--accent-rgb), 0.08); }
 /* Label takes the remaining width and may wrap; the control on the right
    never gets overlapped (long EN labels like "Route completion alert
    sound"). */
 .ios-row-label { display: inline-flex; flex-wrap: wrap; align-items: center; gap: 6px; flex: 1 1 auto; min-width: 0; }
 .ios-row-value { display: inline-flex; align-items: center; gap: 6px; color: rgba(255, 255, 255, 0.5); font-size: 12px; white-space: nowrap; flex-shrink: 0; }
-.ios-row-sub { font-size: 12px; color: #a8b8ff; flex: 1 1 auto; min-width: 0; }
+.ios-row-sub { font-size: 12px; color: var(--accent-soft); flex: 1 1 auto; min-width: 0; }
 .ios-row-control { display: inline-flex; align-items: center; gap: 10px; flex-shrink: 0; }
 .ios-help {
   width: 14px; height: 14px; display: inline-flex; align-items: center; justify-content: center;
@@ -255,9 +291,28 @@ textarea:focus {
 }
 .ios-pill {
   padding: 4px 10px; font-size: 11px; cursor: pointer; white-space: nowrap; flex-shrink: 0;
-  background: rgba(108, 140, 255, 0.15); color: #a8b8ff;
-  border: 1px solid rgba(108, 140, 255, 0.4); border-radius: 8px;
+  background: rgba(var(--accent-rgb), 0.15); color: var(--accent-soft);
+  border: 1px solid rgba(var(--accent-rgb), 0.4); border-radius: 8px;
 }
+.ios-select {
+  width: 100%; padding: 6px 8px; font-size: 12px; cursor: pointer;
+  background: rgba(10, 12, 18, 0.7); color: #e8eaf0; outline: none;
+  border: 1px solid rgba(var(--accent-rgb), 0.3); border-radius: 8px;
+}
+.ios-select:focus-visible { border-color: var(--accent-blue); }
+.ios-select option { background: #1a1d27; color: #e8eaf0; }
+/* Stacked row: label on top, full-width control below. The settings rail
+   is too narrow to fit a label and a select side by side. */
+.ios-row-stack { flex-direction: column; align-items: stretch; gap: 7px; }
+.ios-row-caption { font-size: 11px; color: rgba(255, 255, 255, 0.5); }
+.coord-preview {
+  display: grid; grid-template-columns: 1fr 1fr;
+  background: rgba(var(--accent-rgb), 0.08); border: 1px solid rgba(var(--accent-rgb), 0.22); border-radius: 8px;
+}
+.coord-preview-cell { display: flex; flex-direction: column; gap: 2px; padding: 6px 9px; min-width: 0; }
+.coord-preview-cell + .coord-preview-cell { border-left: 1px solid rgba(var(--accent-rgb), 0.22); }
+.coord-preview-axis { font-size: 10px; color: var(--accent-soft); }
+.coord-preview-value { font-family: monospace; font-size: 12px; color: #e8eaf0; white-space: nowrap; }
 .ios-switch {
   position: relative; width: 42px; height: 24px; flex-shrink: 0;
   border-radius: 24px; border: none; cursor: pointer; padding: 0;
@@ -277,11 +332,11 @@ textarea:focus {
   align-items: center;
   gap: 10px;
   background:
-    linear-gradient(135deg, rgba(108, 140, 255, 0.16), rgba(108, 140, 255, 0.04)),
+    linear-gradient(135deg, rgba(var(--accent-rgb), 0.16), rgba(var(--accent-rgb), 0.04)),
     rgba(18, 21, 32, 0.72);
   backdrop-filter: blur(24px) saturate(160%);
   -webkit-backdrop-filter: blur(24px) saturate(160%);
-  border: 1px solid rgba(108, 140, 255, 0.25);
+  border: 1px solid rgba(var(--accent-rgb), 0.25);
   border-radius: 18px;
   box-shadow:
     0 8px 24px rgba(12, 18, 40, 0.35),
@@ -294,7 +349,7 @@ textarea:focus {
   font-weight: 700;
   letter-spacing: -0.02em;
   color: var(--text-primary);
-  background: linear-gradient(135deg, #e8eaf0, #9ac0ff);
+  background: linear-gradient(135deg, #e8eaf0, var(--accent-soft));
   -webkit-background-clip: text;
   -webkit-text-fill-color: transparent;
   background-clip: text;
@@ -315,7 +370,7 @@ textarea:focus {
   background: rgba(18, 21, 32, 0.72);
   backdrop-filter: blur(24px) saturate(160%);
   -webkit-backdrop-filter: blur(24px) saturate(160%);
-  border: 1px solid rgba(108, 140, 255, 0.18);
+  border: 1px solid rgba(var(--accent-rgb), 0.18);
   border-radius: 18px;
   box-shadow:
     0 8px 24px rgba(12, 18, 40, 0.35),
@@ -415,7 +470,7 @@ textarea:focus {
   background: var(--accent-blue-dim);
   color: var(--accent-blue);
   border-color: var(--accent-blue);
-  box-shadow: inset 0 0 0 1px var(--accent-blue-dim), 0 0 0 3px rgba(108, 140, 255, 0.1);
+  box-shadow: inset 0 0 0 1px var(--accent-blue-dim), 0 0 0 3px rgba(var(--accent-rgb), 0.1);
 }
 
 .mode-btn .mode-icon {
@@ -532,7 +587,7 @@ textarea:focus {
 .lw-input:focus {
   border-color: var(--accent-blue);
   background: var(--bg-surface);
-  box-shadow: 0 0 0 3px rgba(108, 140, 255, 0.12);
+  box-shadow: 0 0 0 3px rgba(var(--accent-rgb), 0.12);
 }
 .lw-input::placeholder {
   color: var(--text-muted);
@@ -624,8 +679,8 @@ textarea:focus {
   justify-content: center;
   gap: 7px;
   padding: 8px 14px;
-  background: linear-gradient(135deg, rgba(108, 140, 255, 0.22), rgba(78, 205, 196, 0.20));
-  border: 1px solid rgba(108, 140, 255, 0.42);
+  background: linear-gradient(135deg, rgba(var(--accent-rgb), 0.22), rgba(78, 205, 196, 0.20));
+  border: 1px solid rgba(var(--accent-rgb), 0.42);
   border-radius: 999px;
   color: var(--text-primary);
   font-size: 12px;
@@ -650,7 +705,7 @@ textarea:focus {
 .route-paste-shimmer:hover {
   border-color: var(--accent-blue);
   transform: translateY(-1px);
-  box-shadow: 0 6px 18px rgba(108, 140, 255, 0.32);
+  box-shadow: 0 6px 18px rgba(var(--accent-rgb), 0.32);
 }
 .route-paste-shimmer > * { position: relative; z-index: 1; }
 .route-paste-shimmer svg { color: var(--accent-blue); }
@@ -666,15 +721,15 @@ textarea:focus {
   gap: 12px;
   width: 100%;
   padding: 12px 14px;
-  background: linear-gradient(135deg, rgba(108, 140, 255, 0.30), rgba(255, 217, 61, 0.18));
-  border: 1px solid rgba(108, 140, 255, 0.55);
+  background: linear-gradient(135deg, rgba(var(--accent-rgb), 0.30), rgba(255, 217, 61, 0.18));
+  border: 1px solid rgba(var(--accent-rgb), 0.55);
   border-radius: 10px;
   cursor: pointer;
   text-align: left;
   color: var(--text-primary);
   font-family: inherit;
   transition: all 0.2s;
-  box-shadow: 0 4px 18px rgba(108, 140, 255, 0.22);
+  box-shadow: 0 4px 18px rgba(var(--accent-rgb), 0.22);
   position: relative;
   overflow: hidden;
 }
@@ -682,13 +737,13 @@ textarea:focus {
   content: '';
   position: absolute;
   inset: 0;
-  background: radial-gradient(circle at 20% 50%, rgba(108, 140, 255, 0.22), transparent 60%);
+  background: radial-gradient(circle at 20% 50%, rgba(var(--accent-rgb), 0.22), transparent 60%);
   pointer-events: none;
 }
 .dev-mode-card:hover:not(:disabled) {
   border-color: var(--accent-blue-hover);
   transform: translateX(2px);
-  box-shadow: 0 6px 22px rgba(108, 140, 255, 0.42);
+  box-shadow: 0 6px 22px rgba(var(--accent-rgb), 0.42);
 }
 .dev-mode-card:disabled { opacity: 0.6; cursor: not-allowed; }
 .dev-mode-card .ic-wrap {
@@ -696,7 +751,7 @@ textarea:focus {
   height: 38px;
   flex-shrink: 0;
   border-radius: 9px;
-  background: rgba(108, 140, 255, 0.42);
+  background: rgba(var(--accent-rgb), 0.42);
   display: flex;
   align-items: center;
   justify-content: center;
@@ -749,7 +804,7 @@ textarea:focus {
 .lw-transport-resume {
   background: var(--accent-blue);
   color: #fff;
-  box-shadow: 0 4px 12px rgba(108, 140, 255, 0.4);
+  box-shadow: 0 4px 12px rgba(var(--accent-rgb), 0.4);
 }
 .lw-transport-start:hover,
 .lw-transport-resume:hover {
@@ -1115,7 +1170,7 @@ textarea:focus {
   background: var(--accent-blue);
   color: #fff;
   cursor: pointer;
-  box-shadow: 0 8px 24px rgba(108, 140, 255, 0.4), 0 2px 6px rgba(12, 18, 40, 0.4);
+  box-shadow: 0 8px 24px rgba(var(--accent-rgb), 0.4), 0 2px 6px rgba(12, 18, 40, 0.4);
   display: inline-flex;
   align-items: center;
   justify-content: center;
@@ -1125,7 +1180,7 @@ textarea:focus {
 }
 .fab:hover:not(:disabled) {
   transform: translateY(-2px) scale(1.03);
-  box-shadow: 0 12px 32px rgba(108, 140, 255, 0.5), 0 4px 10px rgba(12, 18, 40, 0.45);
+  box-shadow: 0 12px 32px rgba(var(--accent-rgb), 0.5), 0 4px 10px rgba(12, 18, 40, 0.45);
   background: var(--accent-blue-hover);
 }
 .fab:active:not(:disabled) {
@@ -1260,13 +1315,13 @@ textarea:focus {
   transform: translate(-50%, -50%);
   border-radius: 50%;
   background: var(--accent-blue);
-  box-shadow: 0 0 12px rgba(108, 140, 255, 0.4);
+  box-shadow: 0 0 12px rgba(var(--accent-rgb), 0.4);
   transition: box-shadow var(--transition-fast);
   pointer-events: none;
 }
 
 .joystick-knob.active {
-  box-shadow: 0 0 20px rgba(108, 140, 255, 0.6);
+  box-shadow: 0 0 20px rgba(var(--accent-rgb), 0.6);
   background: var(--accent-blue-hover);
 }
 
@@ -1773,7 +1828,7 @@ textarea:focus {
 }
 
 .section:hover {
-  border-color: rgba(108, 140, 255, 0.18);
+  border-color: rgba(var(--accent-rgb), 0.18);
 }
 
 .section + .section {
@@ -1801,7 +1856,7 @@ textarea:focus {
   bottom: 2px;
   width: 3px;
   border-radius: 2px;
-  background: linear-gradient(180deg, var(--accent-blue), rgba(108, 140, 255, 0.25));
+  background: linear-gradient(180deg, var(--accent-blue), rgba(var(--accent-rgb), 0.25));
   opacity: 0.7;
 }
 
@@ -1862,7 +1917,7 @@ textarea:focus {
 .action-btn.primary:hover:not(:disabled) {
   background: var(--accent-blue-hover);
   border-color: var(--accent-blue-hover);
-  box-shadow: 0 8px 24px rgba(108, 140, 255, 0.4);
+  box-shadow: 0 8px 24px rgba(var(--accent-rgb), 0.4);
 }
 
 .action-btn.danger {
@@ -2207,7 +2262,7 @@ textarea:focus {
 
 .joystick-handle.active {
   background: radial-gradient(circle, var(--accent-blue-hover) 0%, var(--accent-blue) 100%);
-  box-shadow: 0 0 16px rgba(108, 140, 255, 0.5);
+  box-shadow: 0 0 16px rgba(var(--accent-rgb), 0.5);
 }
 
 .joystick-info {
@@ -2960,7 +3015,7 @@ input:focus-visible {
    ───────────────────────────────────────────────────────────────────── */
 .lw-update-pill {
   display: inline-block;
-  background: linear-gradient(90deg, #6c8cff, #36d399, #f4c542, #ff7a59, #6c8cff);
+  background: linear-gradient(90deg, var(--accent-blue), #36d399, #f4c542, #ff7a59, var(--accent-blue));
   background-size: 300% 100%;
   color: #ffffff;
   font-weight: 700;

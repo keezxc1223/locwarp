@@ -288,7 +288,7 @@ const JoystickPad: React.FC<JoystickPadProps> = ({
             width: PAD_RADIUS * 2,
             height: PAD_RADIUS * 2,
             borderRadius: '50%',
-            background: 'rgba(30, 30, 40, 0.75)',
+            background: 'var(--glass-float)',
             border: '2px solid rgba(255,255,255,0.15)',
             position: 'relative',
             cursor: 'grab',
@@ -341,10 +341,10 @@ const JoystickPad: React.FC<JoystickPadProps> = ({
           textAlign: 'center',
           fontSize: 12,
           color: 'rgba(255,255,255,0.7)',
-          background: 'rgba(30, 30, 40, 0.65)',
+          background: 'var(--glass-float)',
           padding: '4px 12px',
           borderRadius: 4,
-          backdropFilter: 'blur(4px)',
+          backdropFilter: 'blur(4px)', animation: 'var(--anim-scrim)',
         }}
       >
         {!active ? (

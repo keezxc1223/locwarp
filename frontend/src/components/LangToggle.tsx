@@ -9,10 +9,10 @@ const LangToggle: React.FC = () => {
     fontSize: 11,
     border: 'none',
     background: 'transparent',
-    color: active ? '#6c8cff' : 'rgba(255,255,255,0.45)',
+    color: active ? 'var(--accent-blue)' : 'rgba(255,255,255,0.45)',
     fontWeight: active ? 600 : 400,
     cursor: 'pointer',
-    borderBottom: active ? '1px solid #6c8cff' : '1px solid transparent',
+    borderBottom: active ? '1px solid var(--accent-blue)' : '1px solid transparent',
   });
 
   return (

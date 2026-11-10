@@ -44,7 +44,7 @@
 
 ## 快速開始
 
-1. 到 [Releases](https://github.com/keezxc1223/locwarp/releases) 下載最新的 `LocWarp Setup x.y.z.exe` 並安裝。
+1. 到 [Releases](https://github.com/keezxc1223/locwarp/releases) 下載最新的 `LocWarp-Setup-x.y.z.exe` 並安裝。
 2. 電腦安裝 iTunes 或 Apple Devices(提供 Apple USB driver)。
 3. 用 USB 線接上 iPhone,在 iPhone 上點「信任這部電腦」。
 4. iPhone 開啟「設定 → 隱私權與安全性 → 開發者模式」。找不到這個選項時,LocWarp 連線後到「設定」頁按「開啟開發者模式」就會出現。
@@ -68,7 +68,7 @@
 
 | 主版本 | 已驗證版本 |
 | --- | --- |
-| **iOS 27.x** | 27.0(開發者實測,iPhone 18 Pro Max) |
+| **iOS 27.x** | 27.0(開發者實測,iPhone 18 Pro Max) · 27.3 Beta(使用者回報) |
 | **iOS 26.x** | 26.5 · 26.4.2 · 26.4.1 · 26.4.1 iPadOS · 26.4 · 26.3.1 · 26.2 · 26.2.1 iPadOS (M1 iPad) |
 | **iOS 18.x** | 18.7.8 · 18.7.7 · 18.7.1 · 18.6.2 · 18.5 iPadOS · 18.3.1 · 18.1.1 |
 | **iOS 17.x** | 17.6.1 |
@@ -376,7 +376,7 @@ build-installer.bat
 
 1. **PyInstaller** 編譯 backend 到 `dist-py/locwarp-backend/`
 2. **Vite** 建置前端到 `frontend/dist/`
-3. **electron-builder** 產出 `frontend/release/LocWarp Setup X.Y.Z.exe`(約 175 MB)
+3. **electron-builder** 產出 `frontend/release/LocWarp-Setup-X.Y.Z.exe`(約 150 MB)
 
 注意 `npm run dist` 只執行第 3 步。改過 backend 要重跑 PyInstaller,改過前端或版本號要重跑 `npx vite build`,否則安裝檔會帶到舊的內容。
 
@@ -421,7 +421,7 @@ locwarp/
 LocWarp 免費且開源。想支持開發的話,可以使用下方地址。**僅支援 TRC-20(TRON 鏈)**,請勿使用其他鏈轉帳。
 
 ```
-TB1i7pEcifAeh8oDLLZFqiRVrpUaZmmDAn
+TTLi4YcPcDw5R8Mr4H4u5rDuFwTZjtCQXk
 ```
 
 <p>

@@ -11,8 +11,8 @@ interface Props {
 }
 
 const ENGINE_META: Record<RouteEngine, { color: string; dot: string; label: string }> = {
-  osrm:         { color: 'rgba(108, 140, 255, 0.18)', dot: '#6c8cff', label: 'OSRM demo' },
-  osrm_fossgis: { color: 'rgba(108, 140, 255, 0.18)', dot: '#9ac0ff', label: 'OSRM FOSSGIS' },
+  osrm:         { color: 'rgba(var(--accent-rgb), 0.18)', dot: '#6c8cff', label: 'OSRM demo' },
+  osrm_fossgis: { color: 'rgba(var(--accent-rgb), 0.18)', dot: 'var(--accent-soft)', label: 'OSRM FOSSGIS' },
   valhalla:     { color: 'rgba(255, 186, 107, 0.20)', dot: '#ffba6b', label: 'Valhalla' },
   brouter:      { color: 'rgba(140, 220, 140, 0.18)', dot: '#7fd17f', label: 'BRouter' },
 };
@@ -36,7 +36,7 @@ const RouteEngineSelector: React.FC<Props> = ({ value, onChange, disabled }) => 
           gap: 8,
           padding: '6px 10px',
           background: disabled ? 'rgba(255, 255, 255, 0.04)' : meta.color,
-          border: `1px solid ${disabled ? 'rgba(255, 255, 255, 0.10)' : 'rgba(108, 140, 255, 0.32)'}`,
+          border: `1px solid ${disabled ? 'rgba(255, 255, 255, 0.10)' : 'rgba(var(--accent-rgb), 0.32)'}`,
           borderRadius: 6,
           color: disabled ? '#6e7180' : '#e8eaf0',
           fontSize: 11,
@@ -70,7 +70,7 @@ const RouteEngineSelector: React.FC<Props> = ({ value, onChange, disabled }) => 
           style={{
             position: 'fixed', inset: 0, zIndex: 9000,
             background: 'rgba(8, 11, 22, 0.6)',
-            backdropFilter: 'blur(4px)',
+            backdropFilter: 'blur(4px)', animation: 'var(--anim-scrim)',
             WebkitBackdropFilter: 'blur(4px)',
             display: 'flex', alignItems: 'center', justifyContent: 'center',
             padding: 20,
@@ -82,10 +82,10 @@ const RouteEngineSelector: React.FC<Props> = ({ value, onChange, disabled }) => 
               width: 480, maxWidth: '100%',
               maxHeight: 'calc(100vh - 60px)',
               overflowY: 'auto',
-              background: 'rgba(26, 29, 39, 0.97)',
-              backdropFilter: 'blur(16px) saturate(160%)',
-              WebkitBackdropFilter: 'blur(16px) saturate(160%)',
-              border: '1px solid rgba(108, 140, 255, 0.32)',
+              background: 'var(--glass-pop)',
+              backdropFilter: 'var(--glass-blur)',
+              WebkitBackdropFilter: 'var(--glass-blur)',
+              border: '1px solid rgba(var(--accent-rgb), 0.32)',
               borderRadius: 12,
               padding: '20px 22px',
               color: '#e8eaf0',
@@ -96,7 +96,7 @@ const RouteEngineSelector: React.FC<Props> = ({ value, onChange, disabled }) => 
               display: 'flex', alignItems: 'center', justifyContent: 'space-between',
               marginBottom: 14,
             }}>
-              <div style={{ fontSize: 15, fontWeight: 700, color: '#9ac0ff' }}>
+              <div style={{ fontSize: 15, fontWeight: 700, color: 'var(--accent-soft)' }}>
                 {t('panel.route_engine_title')}
               </div>
               <button
@@ -121,7 +121,7 @@ const RouteEngineSelector: React.FC<Props> = ({ value, onChange, disabled }) => 
                     display: 'flex', alignItems: 'flex-start', gap: 10,
                     padding: '12px 14px', borderRadius: 8, cursor: 'pointer',
                     background: active ? m.color : 'rgba(255, 255, 255, 0.02)',
-                    border: `1px solid ${active ? 'rgba(108, 140, 255, 0.32)' : 'rgba(255, 255, 255, 0.06)'}`,
+                    border: `1px solid ${active ? 'rgba(var(--accent-rgb), 0.32)' : 'rgba(255, 255, 255, 0.06)'}`,
                     marginBottom: 10,
                     transition: 'all 0.16s',
                   }}
@@ -131,7 +131,7 @@ const RouteEngineSelector: React.FC<Props> = ({ value, onChange, disabled }) => 
                     name="route-engine-modal"
                     checked={active}
                     onChange={() => onChange(eng)}
-                    style={{ marginTop: 3, accentColor: '#6c8cff' }}
+                    style={{ marginTop: 3, accentColor: 'var(--accent-blue)' }}
                   />
                   <div style={{ flex: 1 }}>
                     <div style={{

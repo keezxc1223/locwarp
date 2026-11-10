@@ -225,7 +225,7 @@ const AddressSearch: React.FC<AddressSearchProps> = ({ onSelect }) => {
             fontFamily: 'monospace',
             background: 'rgba(12, 15, 26, 0.85)',
             color: '#e8eaf0',
-            border: '1px solid rgba(108, 140, 255, 0.35)',
+            border: '1px solid rgba(var(--accent-rgb), 0.35)',
             borderRadius: 6,
             outline: 'none',
           }}
@@ -285,8 +285,8 @@ const AddressSearch: React.FC<AddressSearchProps> = ({ onSelect }) => {
         padding: '12px 14px',
         borderRadius: 8,
         cursor: 'pointer',
-        background: provider === p ? 'rgba(108, 140, 255, 0.10)' : 'rgba(255, 255, 255, 0.02)',
-        border: `1px solid ${provider === p ? 'rgba(108, 140, 255, 0.32)' : 'rgba(255, 255, 255, 0.06)'}`,
+        background: provider === p ? 'rgba(var(--accent-rgb), 0.10)' : 'rgba(255, 255, 255, 0.02)',
+        border: `1px solid ${provider === p ? 'rgba(var(--accent-rgb), 0.32)' : 'rgba(255, 255, 255, 0.06)'}`,
         marginBottom: 10,
         transition: 'all 0.16s',
       }}
@@ -297,7 +297,7 @@ const AddressSearch: React.FC<AddressSearchProps> = ({ onSelect }) => {
         name="geocode-provider-modal"
         checked={provider === p}
         onChange={() => persistProvider(p)}
-        style={{ marginTop: 3, accentColor: '#6c8cff' }}
+        style={{ marginTop: 3, accentColor: 'var(--accent-blue)' }}
       />
       <div style={{ flex: 1 }}>
         <div style={{ fontWeight: 700, fontSize: 13.5 }}>
@@ -364,7 +364,7 @@ const AddressSearch: React.FC<AddressSearchProps> = ({ onSelect }) => {
             background: isGoogleActive ? 'rgba(66, 133, 244, 0.18)' : 'rgba(255, 255, 255, 0.06)',
             border: `1px solid ${isGoogleActive ? 'rgba(66, 133, 244, 0.55)' : 'rgba(255, 255, 255, 0.16)'}`,
             borderRadius: 4,
-            color: isGoogleActive ? '#9ac0ff' : '#c8cad2',
+            color: isGoogleActive ? 'var(--accent-soft)' : '#c8cad2',
             fontSize: 11,
             fontWeight: 600,
             cursor: 'pointer',
@@ -395,7 +395,7 @@ const AddressSearch: React.FC<AddressSearchProps> = ({ onSelect }) => {
             inset: 0,
             zIndex: 9000,
             background: 'rgba(8, 11, 22, 0.6)',
-            backdropFilter: 'blur(4px)',
+            backdropFilter: 'blur(4px)', animation: 'var(--anim-scrim)',
             WebkitBackdropFilter: 'blur(4px)',
             display: 'flex',
             alignItems: 'center',
@@ -410,10 +410,10 @@ const AddressSearch: React.FC<AddressSearchProps> = ({ onSelect }) => {
               maxWidth: '100%',
               maxHeight: 'calc(100vh - 60px)',
               overflowY: 'auto',
-              background: 'rgba(26, 29, 39, 0.97)',
-              backdropFilter: 'blur(16px) saturate(160%)',
-              WebkitBackdropFilter: 'blur(16px) saturate(160%)',
-              border: '1px solid rgba(108, 140, 255, 0.32)',
+              background: 'var(--glass-pop)',
+              backdropFilter: 'var(--glass-blur)',
+              WebkitBackdropFilter: 'var(--glass-blur)',
+              border: '1px solid rgba(var(--accent-rgb), 0.32)',
               borderRadius: 12,
               padding: '20px 22px',
               color: '#e8eaf0',
@@ -424,7 +424,7 @@ const AddressSearch: React.FC<AddressSearchProps> = ({ onSelect }) => {
               display: 'flex', alignItems: 'center', justifyContent: 'space-between',
               marginBottom: 14,
             }}>
-              <div style={{ fontSize: 15, fontWeight: 700, color: '#9ac0ff' }}>
+              <div style={{ fontSize: 15, fontWeight: 700, color: 'var(--accent-soft)' }}>
                 {t('search.settings_title')}
               </div>
               <button
@@ -447,8 +447,8 @@ const AddressSearch: React.FC<AddressSearchProps> = ({ onSelect }) => {
               style={{
                 padding: '12px 14px',
                 borderRadius: 8,
-                background: provider === 'arcgis' ? 'rgba(108, 140, 255, 0.10)' : 'rgba(255, 255, 255, 0.02)',
-                border: `1px solid ${provider === 'arcgis' ? 'rgba(108, 140, 255, 0.32)' : 'rgba(255, 255, 255, 0.06)'}`,
+                background: provider === 'arcgis' ? 'rgba(var(--accent-rgb), 0.10)' : 'rgba(255, 255, 255, 0.02)',
+                border: `1px solid ${provider === 'arcgis' ? 'rgba(var(--accent-rgb), 0.32)' : 'rgba(255, 255, 255, 0.06)'}`,
                 marginBottom: 10,
                 transition: 'all 0.16s',
               }}
@@ -462,7 +462,7 @@ const AddressSearch: React.FC<AddressSearchProps> = ({ onSelect }) => {
                   name="geocode-provider-modal"
                   checked={provider === 'arcgis'}
                   onChange={() => persistProvider('arcgis')}
-                  style={{ marginTop: 3, accentColor: '#6c8cff' }}
+                  style={{ marginTop: 3, accentColor: 'var(--accent-blue)' }}
                 />
                 <div style={{ flex: 1 }}>
                   <div style={{ fontWeight: 700, fontSize: 13.5 }}>
@@ -503,7 +503,7 @@ const AddressSearch: React.FC<AddressSearchProps> = ({ onSelect }) => {
                     href="https://location.arcgis.com/sign-up/"
                     target="_blank"
                     rel="noopener noreferrer"
-                    style={{ color: '#9ac0ff', textDecoration: 'underline' }}
+                    style={{ color: 'var(--accent-soft)', textDecoration: 'underline' }}
                   >
                     {t('search.arcgis_signup_label')}
                   </a>
@@ -511,7 +511,7 @@ const AddressSearch: React.FC<AddressSearchProps> = ({ onSelect }) => {
                     href="https://developers.arcgis.com/documentation/security-and-authentication/api-key-authentication/tutorials/create-an-api-key/"
                     target="_blank"
                     rel="noopener noreferrer"
-                    style={{ color: '#9ac0ff', textDecoration: 'underline' }}
+                    style={{ color: 'var(--accent-soft)', textDecoration: 'underline' }}
                   >
                     {t('search.arcgis_key_howto_label')}
                   </a>
@@ -550,7 +550,7 @@ const AddressSearch: React.FC<AddressSearchProps> = ({ onSelect }) => {
                   checked={provider === 'google'}
                   onChange={() => { if (googleKey) persistProvider('google'); }}
                   disabled={!googleKey}
-                  style={{ marginTop: 3, accentColor: '#6c8cff' }}
+                  style={{ marginTop: 3, accentColor: 'var(--accent-blue)' }}
                 />
                 <div style={{ flex: 1 }}>
                   <div style={{ fontWeight: 700, fontSize: 13.5 }}>
@@ -576,7 +576,7 @@ const AddressSearch: React.FC<AddressSearchProps> = ({ onSelect }) => {
                     href="https://console.cloud.google.com/apis/library/geocoding-backend.googleapis.com"
                     target="_blank"
                     rel="noopener noreferrer"
-                    style={{ color: '#9ac0ff', textDecoration: 'underline' }}
+                    style={{ color: 'var(--accent-soft)', textDecoration: 'underline' }}
                   >
                     {t('search.signup_label')}
                   </a>

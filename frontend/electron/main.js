@@ -488,6 +488,78 @@ async function createWindow() {
   }
 }
 
+// ── In-app update ───────────────────────────────────────────────────
+// electron-updater against GitHub Releases. Nothing here runs on its own:
+// the renderer decides when a newer release exists (its own GitHub check)
+// and the download only starts when the user presses 更新. A release must
+// carry latest.yml and the installer's .blockmap next to the installer,
+// otherwise the check fails and the UI falls back to the release page.
+let updaterInstance = null
+function sendUpdateStatus(payload) {
+  for (const w of BrowserWindow.getAllWindows()) {
+    try { w.webContents.send('update-status', payload) } catch { /* window closing */ }
+  }
+}
+function getUpdater() {
+  if (!app.isPackaged) return null
+  if (updaterInstance) return updaterInstance
+  try {
+    const { autoUpdater } = require('electron-updater')
+    autoUpdater.autoDownload = false
+    autoUpdater.autoInstallOnAppQuit = false
+    autoUpdater.allowDowngrade = false
+    autoUpdater.on('download-progress', (p) => sendUpdateStatus({
+      phase: 'downloading', percent: p.percent, transferred: p.transferred, total: p.total,
+    }))
+    autoUpdater.on('update-downloaded', (info) => sendUpdateStatus({ phase: 'ready', version: info.version }))
+    autoUpdater.on('error', (e) => sendUpdateStatus({
+      phase: 'error', message: String((e && e.message) || e).slice(0, 300),
+    }))
+    updaterInstance = autoUpdater
+  } catch (e) {
+    console.error('[update] electron-updater unavailable:', e)
+    return null
+  }
+  return updaterInstance
+}
+
+function isNewerVersion(a, b) {
+  const x = String(a).replace(/^v/i, '').split('.').map((n) => parseInt(n, 10) || 0)
+  const y = String(b).replace(/^v/i, '').split('.').map((n) => parseInt(n, 10) || 0)
+  for (let i = 0; i < Math.max(x.length, y.length); i++) {
+    if ((x[i] || 0) !== (y[i] || 0)) return (x[i] || 0) > (y[i] || 0)
+  }
+  return false
+}
+
+ipcMain.handle('update-supported', () => !!getUpdater())
+
+ipcMain.handle('update-download', async () => {
+  const u = getUpdater()
+  if (!u) return { ok: false, code: 'UNSUPPORTED' }
+  try {
+    const r = await u.checkForUpdates()
+    const version = r && r.updateInfo && r.updateInfo.version
+    if (!version || !isNewerVersion(version, app.getVersion())) return { ok: false, code: 'NO_UPDATE' }
+    // Not awaited: progress, completion and failure all arrive as events.
+    u.downloadUpdate().catch(() => { /* reported through the 'error' event */ })
+    return { ok: true, version }
+  } catch (e) {
+    return { ok: false, code: 'ERROR', message: String((e && e.message) || e).slice(0, 300) }
+  }
+})
+
+ipcMain.handle('update-install', () => {
+  const u = getUpdater()
+  if (!u) return { ok: false }
+  // The backend exe lives in the install folder; it has to be gone before
+  // the installer starts replacing files.
+  stopBackend()
+  // Silent install, then start the new version.
+  setTimeout(() => u.quitAndInstall(true, true), 400)
+  return { ok: true }
+})
+
 app.whenReady().then(createWindow)
 app.on('window-all-closed', () => {
   stopBackend()

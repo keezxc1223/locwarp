@@ -74,20 +74,20 @@ export function DeviceChip({ letter, device, runtime, onDisconnect, onRestoreOne
           setMenu({ x: e.clientX, y: e.clientY })
         }}
         style={{
+          // The full device name always shows: it wraps onto a second line
+          // instead of being cut off, so the chip grows rather than hides.
           display: 'inline-flex', alignItems: 'center', gap: 6,
-          height: 24, padding: '0 8px',
+          minHeight: 24, padding: '4px 9px',
           borderRadius: 12,
           background: 'rgba(255,255,255,0.06)',
-          backdropFilter: 'blur(24px) saturate(160%)',
-          WebkitBackdropFilter: 'blur(24px) saturate(160%)',
-          border: '1px solid rgba(108, 140, 255, 0.18)',
+          backdropFilter: 'var(--glass-blur)',
+          WebkitBackdropFilter: 'var(--glass-blur)',
+          border: '1px solid rgba(var(--accent-rgb), 0.18)',
           fontSize: 11,
           color: 'rgba(255,255,255,0.9)',
           cursor: 'context-menu',
           maxWidth: '100%',
-          whiteSpace: 'nowrap',
-          overflow: 'hidden',
-          textOverflow: 'ellipsis',
+          lineHeight: 1.3,
         }}
         title={`${letter} · ${device.name}`}
       >
@@ -100,17 +100,17 @@ export function DeviceChip({ letter, device, runtime, onDisconnect, onRestoreOne
             flexShrink: 0,
           }}
         />
-        <span style={{ fontWeight: 600, color: accent }}>{letter}</span>
-        <span style={{ opacity: 0.85, overflow: 'hidden', textOverflow: 'ellipsis' }}>· {fullName}</span>
-        <span style={{ opacity: 0.6, marginLeft: 2 }}>· {label}</span>
+        <span style={{ fontWeight: 600, color: accent, flexShrink: 0 }}>{letter}</span>
+        <span style={{ opacity: 0.9, minWidth: 0, overflowWrap: 'anywhere' }}>{fullName}</span>
+        <span style={{ opacity: 0.6, marginLeft: 2, flexShrink: 0, whiteSpace: 'nowrap' }}>· {label}</span>
       </div>
       {menu && createPortal(
         <div
           onClick={(e) => e.stopPropagation()}
           style={{
             position: 'fixed', left: menu.x, top: menu.y,
-            background: 'rgba(20,22,28,0.96)',
-            backdropFilter: 'blur(18px) saturate(160%)',
+            background: 'var(--glass-pop)',
+            backdropFilter: 'var(--glass-blur)',
             border: '1px solid rgba(255,255,255,0.08)',
             borderRadius: 8, padding: 4, minWidth: 160,
             boxShadow: '0 8px 24px rgba(0,0,0,0.4)',
@@ -138,7 +138,7 @@ function MenuItem({ children, onClick }: { children: React.ReactNode; onClick: (
         padding: '6px 10px',
         borderRadius: 6,
         cursor: 'pointer',
-        background: hover ? 'rgba(108,140,255,0.18)' : 'transparent',
+        background: hover ? 'rgba(var(--accent-rgb),0.18)' : 'transparent',
       }}
     >
       {children}

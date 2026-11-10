@@ -140,7 +140,7 @@ const PhoneControlButton: React.FC<PhoneControlButtonProps> = ({ showToast }) =>
           onClick={() => setOpen(false)}
           style={{
             position: 'fixed', inset: 0, zIndex: 2000,
-            background: 'rgba(8, 10, 20, 0.55)', backdropFilter: 'blur(4px)',
+            background: 'rgba(8, 10, 20, 0.55)', backdropFilter: 'blur(4px)', animation: 'var(--anim-scrim)',
             display: 'flex', alignItems: 'center', justifyContent: 'center',
           }}
         >
@@ -148,8 +148,8 @@ const PhoneControlButton: React.FC<PhoneControlButtonProps> = ({ showToast }) =>
             onClick={(e) => e.stopPropagation()}
             style={{
               width: 420, maxWidth: 'calc(100vw - 32px)',
-              background: 'rgba(26, 29, 39, 0.98)',
-              border: '1px solid rgba(108, 140, 255, 0.3)',
+              background: 'var(--glass-pop)',
+              border: '1px solid rgba(var(--accent-rgb), 0.3)',
               borderRadius: 12,
               padding: 22,
               boxShadow: '0 20px 60px rgba(0,0,0,0.5)',
@@ -218,7 +218,7 @@ const PhoneControlButton: React.FC<PhoneControlButtonProps> = ({ showToast }) =>
                       onClick={() => url && copy(url)}
                       style={{
                         fontFamily: 'ui-monospace, SFMono-Regular, Menlo, monospace',
-                        fontSize: 14, color: '#6c8cff',
+                        fontSize: 14, color: 'var(--accent-blue)',
                         background: '#0f1218', padding: '10px 12px', borderRadius: 8,
                         cursor: url ? 'pointer' : 'default', wordBreak: 'break-all',
                         border: '1px solid rgba(255,255,255,0.08)',
@@ -270,12 +270,12 @@ const PhoneControlButton: React.FC<PhoneControlButtonProps> = ({ showToast }) =>
                         background:
                           fwState === 'ok' ? 'rgba(77, 210, 138, 0.18)' :
                           fwState === 'fail' ? 'rgba(239, 93, 93, 0.18)' :
-                          fwState === 'busy' ? 'rgba(108, 140, 255, 0.15)' :
+                          fwState === 'busy' ? 'rgba(var(--accent-rgb), 0.15)' :
                           'rgba(255, 180, 60, 0.12)',
                         border: `1px solid ${
                           fwState === 'ok' ? 'rgba(77, 210, 138, 0.55)' :
                           fwState === 'fail' ? 'rgba(239, 93, 93, 0.55)' :
-                          fwState === 'busy' ? 'rgba(108, 140, 255, 0.45)' :
+                          fwState === 'busy' ? 'rgba(var(--accent-rgb), 0.45)' :
                           'rgba(255, 180, 60, 0.45)'}`,
                         color:
                           fwState === 'ok' ? '#7ee2a4' :
@@ -333,9 +333,9 @@ const PhoneControlButton: React.FC<PhoneControlButtonProps> = ({ showToast }) =>
                     onClick={() => setOpen(false)}
                     style={{
                       padding: '6px 12px', fontSize: 12,
-                      background: 'rgba(108, 140, 255, 0.18)',
-                      border: '1px solid rgba(108, 140, 255, 0.4)',
-                      color: '#6c8cff', borderRadius: 4, cursor: 'pointer',
+                      background: 'rgba(var(--accent-rgb), 0.18)',
+                      border: '1px solid rgba(var(--accent-rgb), 0.4)',
+                      color: 'var(--accent-blue)', borderRadius: 4, cursor: 'pointer',
                     }}
                   >
                     {t('generic.close')}

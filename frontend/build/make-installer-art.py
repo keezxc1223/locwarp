@@ -88,8 +88,32 @@ def _glow(img: Image.Image, spread: int, strength: float) -> Image.Image:
     return canvas
 
 
+def _pools(img: Image.Image) -> Image.Image:
+    """Two soft pools of light, the same ambient glow the app's sidebar has
+    behind its glass panels, so the installer and the app read as one piece."""
+    w, h = img.size
+    layer = Image.new("RGBA", (w, h), (0, 0, 0, 0))
+    d = ImageDraw.Draw(layer)
+    d.ellipse([-70, -60, 110, 120], fill=(108, 140, 255, 120))
+    d.ellipse([w - 90, h - 150, w + 70, h + 10], fill=(150, 120, 255, 105))
+    layer = layer.filter(ImageFilter.GaussianBlur(38))
+    out = img.convert("RGBA")
+    out.alpha_composite(layer)
+    return out.convert("RGB")
+
+
+def _glass_card(canvas: Image.Image, box: tuple[int, int, int, int], radius: int) -> None:
+    """Translucent panel with a bright top edge: the app's liquid-glass card."""
+    x0, y0, x1, y1 = box
+    card = Image.new("RGBA", canvas.size, (0, 0, 0, 0))
+    d = ImageDraw.Draw(card)
+    d.rounded_rectangle(box, radius=radius, fill=(255, 255, 255, 20), outline=(255, 255, 255, 46), width=1)
+    d.line([(x0 + radius, y0 + 1), (x1 - radius, y0 + 1)], fill=(255, 255, 255, 90), width=1)
+    canvas.alpha_composite(card)
+
+
 def build_sidebar(path: Path, w: int = 164, h: int = 314) -> None:
-    bg = _gradient(w, h)
+    bg = _pools(_gradient(w, h))
     rings = _arcs((w, h), (w // 2, 104))
     bg.paste(Image.new("RGB", (w, h), (150, 190, 255)), (0, 0), rings)
 
@@ -99,6 +123,8 @@ def build_sidebar(path: Path, w: int = 164, h: int = 314) -> None:
     icon = _rounded(icon, 20)
     glowed = _glow(icon, 14, 0.34)
     canvas.alpha_composite(glowed, ((w - glowed.width) // 2, 104 - glowed.height // 2))
+
+    _glass_card(canvas, (14, 156, w - 14, 246), 16)
 
     d = ImageDraw.Draw(canvas)
     title = _font(FONT_BOLD, 25)

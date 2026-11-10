@@ -52,6 +52,22 @@ websockets_hidden = collect_submodules('websockets')
 # for NIC enumeration to work in the frozen exe.
 ps_datas, ps_binaries, ps_hidden = collect_all('psutil')
 
+# collect_all() also returns every package's .py source as a data file.
+# The frozen importer loads modules from the PYZ archive, never from those
+# copies, and nothing in these packages opens its own source (they only
+# read real data: json / txt / js / png / wintun.dll). The loose sources
+# were 465 of the ~830 installed files, so dropping them roughly halves
+# the file count the installer has to write and the antivirus has to scan.
+def _no_py(datas):
+    return [d for d in datas if not d[0].lower().endswith(('.py', '.pyi'))]
+
+pmd_datas = _no_py(pmd_datas)
+pytun_datas = _no_py(pytun_datas)
+pytcp_datas = _no_py(pytcp_datas)
+ddi_datas = _no_py(ddi_datas)
+pyimg4_datas = _no_py(pyimg4_datas)
+ps_datas = _no_py(ps_datas)
+
 hidden = [
     *pmd_hiddenimports,
     *pytun_hidden,
@@ -88,12 +104,23 @@ a = Analysis(
               *ps_binaries],
     datas=[*pmd_datas, *pytun_datas, *pytcp_datas, *ddi_datas, *pyimg4_datas, *pyimg4_meta,
            *ps_datas,
-           ('static/phone.html', 'static')],
+           ('static/phone.html', 'static'),
+           ('static/phone-icon.png', 'static')],
     hiddenimports=hidden,
     hookspath=[],
     hooksconfig={},
     runtime_hooks=[],
-    excludes=['tkinter', 'matplotlib', 'PIL', 'numpy', 'scipy', 'pandas'],
+    # Size / install-time trims. All of these are only reached through
+    # pymobiledevice3 features LocWarp never calls, and each import is lazy:
+    #   av (PyAV + ffmpeg DLLs, ~68 MB): remote/core_device/hevc_av.py, the
+    #       screen-mirroring transcoder.
+    #   IPython / jedi / parso (~25 MB, ~5500 files): utils.start_ipython_shell,
+    #       the CLI's interactive shell. jedi alone was 78% of the installed
+    #       file count, which is what made the installer slow.
+    #   tzdata (~600 files): only zoneinfo.ZoneInfo(key) lookups need it and
+    #       nothing in the backend does one.
+    excludes=['tkinter', 'matplotlib', 'PIL', 'numpy', 'scipy', 'pandas',
+              'av', 'IPython', 'jedi', 'parso', 'tzdata'],
     noarchive=False,
 )
 

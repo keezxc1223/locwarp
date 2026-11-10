@@ -32,8 +32,7 @@ const ApplySpeedButton: React.FC<{ onApply: () => Promise<void> | void; t: (k: a
 import PauseControl from './PauseControl';
 import { SimMode, MoveMode } from '../hooks/useSimulation';
 import AddressSearch from './AddressSearch';
-import BookmarkList from './BookmarkList';
-import RouteList, { RouteCategory, SavedRoute } from './RouteList';
+import LibraryPanel, { type RouteCategory, type SavedRoute } from './LibraryPanel';
 
 interface Position {
   lat: number;
@@ -474,13 +473,13 @@ const ControlPanel: React.FC<ControlPanelProps> = ({
             style={{
               display: 'flex', alignItems: 'flex-start', gap: 6,
               padding: '6px 10px', marginBottom: 6, fontSize: 12,
-              background: 'rgba(108, 140, 255, 0.10)',
-              border: '1px solid rgba(108, 140, 255, 0.30)',
+              background: 'rgba(var(--accent-rgb), 0.10)',
+              border: '1px solid rgba(var(--accent-rgb), 0.30)',
               borderRadius: 6,
             }}
             title={loadedRouteName}
           >
-            <svg width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="#9ac0ff" strokeWidth="2" style={{ flexShrink: 0, marginTop: 2 }}>
+            <svg width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="var(--accent-soft)" strokeWidth="2" style={{ flexShrink: 0, marginTop: 2 }}>
               <circle cx="6" cy="19" r="2" /><circle cx="18" cy="5" r="2" />
               <path d="M8 19h6a4 4 0 0 0 0-8H10a4 4 0 0 1 0-8h4" />
             </svg>
@@ -529,8 +528,8 @@ const ControlPanel: React.FC<ControlPanelProps> = ({
                 style={{
                   gridColumn: '1 / -1',
                   padding: '6px 10px',
-                  background: straightLine ? 'rgba(108, 140, 255, 0.10)' : 'transparent',
-                  border: `1px solid ${straightLine ? 'rgba(108, 140, 255, 0.32)' : 'transparent'}`,
+                  background: straightLine ? 'rgba(var(--accent-rgb), 0.10)' : 'transparent',
+                  border: `1px solid ${straightLine ? 'rgba(var(--accent-rgb), 0.32)' : 'transparent'}`,
                   borderRadius: 6,
                   fontSize: 11,
                 }}
@@ -560,8 +559,8 @@ const ControlPanel: React.FC<ControlPanelProps> = ({
                 style={{
                   gridColumn: '1 / -1',
                   padding: '6px 10px',
-                  background: clickToAddWaypoint ? 'rgba(108, 140, 255, 0.10)' : 'transparent',
-                  border: `1px solid ${clickToAddWaypoint ? 'rgba(108, 140, 255, 0.32)' : 'transparent'}`,
+                  background: clickToAddWaypoint ? 'rgba(var(--accent-rgb), 0.10)' : 'transparent',
+                  border: `1px solid ${clickToAddWaypoint ? 'rgba(var(--accent-rgb), 0.32)' : 'transparent'}`,
                   borderRadius: 6,
                   fontSize: 11,
                 }}
@@ -584,8 +583,8 @@ const ControlPanel: React.FC<ControlPanelProps> = ({
                 style={{
                   gridColumn: '1 / -1',
                   padding: '6px 10px',
-                  background: keepWaypoints ? 'rgba(108, 140, 255, 0.10)' : 'transparent',
-                  border: `1px solid ${keepWaypoints ? 'rgba(108, 140, 255, 0.32)' : 'transparent'}`,
+                  background: keepWaypoints ? 'rgba(var(--accent-rgb), 0.10)' : 'transparent',
+                  border: `1px solid ${keepWaypoints ? 'rgba(var(--accent-rgb), 0.32)' : 'transparent'}`,
                   borderRadius: 6,
                   fontSize: 11,
                 }}
@@ -876,7 +875,7 @@ const ControlPanel: React.FC<ControlPanelProps> = ({
                 marginTop: 8,
                 padding: '8px 10px',
                 background: 'rgba(255,255,255,0.03)',
-                border: '1px solid rgba(108, 140, 255, 0.10)',
+                border: '1px solid rgba(var(--accent-rgb), 0.10)',
                 borderRadius: 6,
               }}>
                 <label className="lw-checkbox">
@@ -980,9 +979,9 @@ const ControlPanel: React.FC<ControlPanelProps> = ({
               style={{
                 width: '100%', padding: '10px 12px', fontSize: 14, fontWeight: 700,
                 borderRadius: 8, border: 'none', cursor: goldDittoBusy ? 'not-allowed' : 'pointer',
-                background: goldDittoBusy ? 'rgba(108,140,255,0.35)' : 'linear-gradient(135deg, #6c8cff 0%, #4f6fe8 100%)',
+                background: goldDittoBusy ? 'rgba(var(--accent-rgb),0.35)' : 'linear-gradient(135deg, var(--accent-blue) 0%, #4f6fe8 100%)',
                 color: '#fff', letterSpacing: '0.03em',
-                boxShadow: goldDittoBusy ? 'none' : '0 4px 16px rgba(108,140,255,0.45)',
+                boxShadow: goldDittoBusy ? 'none' : '0 4px 16px rgba(var(--accent-rgb),0.45)',
                 transition: 'all 0.15s', opacity: goldDittoBusy ? 0.6 : 1,
               }}
             >
@@ -1059,97 +1058,64 @@ const ControlPanel: React.FC<ControlPanelProps> = ({
             // Scale with the window: shrinks toward 280px on a small app
             // window, caps at 440px on a large one (issue #34).
             width: 'clamp(280px, 34vw, 440px)', maxHeight: '72vh',
-            background: 'rgba(26, 29, 39, 0.96)',
-            backdropFilter: 'blur(14px)', WebkitBackdropFilter: 'blur(14px)',
-            border: '1px solid rgba(108, 140, 255, 0.18)', borderRadius: 12,
-            boxShadow: '0 20px 60px rgba(12, 18, 40, 0.65), 0 0 0 1px rgba(255, 255, 255, 0.04) inset',
+            background: 'var(--glass-pop)',
+            backdropFilter: 'var(--glass-blur)', WebkitBackdropFilter: 'var(--glass-blur)',
+            border: '1px solid var(--glass-border)', borderRadius: 16,
+            boxShadow: 'var(--shadow-pop)',
             display: 'flex', flexDirection: 'column', overflow: 'hidden',
           }}
         >
-          <div style={{ display: 'flex', flexDirection: 'column', flex: 1, overflow: 'hidden' }}>
-            <div
-              onMouseDown={startDrag}
-              style={{
-                display: 'flex', alignItems: 'center',
-                padding: '6px 10px', fontSize: 11, opacity: 0.6,
-                background: '#1c1c22', borderBottom: '1px solid #3a3a42',
-                cursor: 'move', userSelect: 'none',
-              }}
-            >
-              <svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" style={{ marginRight: 6 }}>
-                <circle cx="9" cy="6" r="1" /><circle cx="9" cy="12" r="1" /><circle cx="9" cy="18" r="1" />
-                <circle cx="15" cy="6" r="1" /><circle cx="15" cy="12" r="1" /><circle cx="15" cy="18" r="1" />
-              </svg>
-            </div>
-            <div style={{ display: 'flex', alignItems: 'center', borderBottom: '1px solid #3a3a42' }}>
-              <button
-                className={`action-btn${libraryTab === 'bookmarks' ? ' primary' : ''}`}
-                style={{ flex: 1, borderRadius: 0, padding: '10px', background: libraryTab === 'bookmarks' ? '#2d4373' : 'transparent' }}
-                onClick={() => setLibraryTab('bookmarks')}
-              >{t('panel.bookmarks_count')} ({bookmarks.length})</button>
-              <button
-                className={`action-btn${libraryTab === 'routes' ? ' primary' : ''}`}
-                style={{ flex: 1, borderRadius: 0, padding: '10px', background: libraryTab === 'routes' ? '#2d4373' : 'transparent' }}
-                onClick={() => setLibraryTab('routes')}
-              >{t('panel.routes_count')} ({savedRoutes.length})</button>
-              <button
-                className="action-btn"
-                style={{ padding: '10px 14px', borderRadius: 0 }}
-                onClick={() => setLibraryOpen(false)}
-                title={t('panel.close')}
-              >X</button>
-            </div>
-            <div style={{ padding: 12, overflowY: 'auto', flex: 1, minWidth: 0 }}>
-              {libraryTab === 'bookmarks' ? (
-                <BookmarkList
-                  bookmarks={bookmarks}
-                  categories={bookmarkCategories}
-                  categoryColors={bookmarkCategoryColors}
-                  currentPosition={currentPosition}
-                  onBookmarkClick={(b) => { onBookmarkClick(b); }}
-                  onBookmarkPreview={onBookmarkPreview}
-                  onBookmarkAdd={onBookmarkAdd}
-                  onBookmarkDelete={onBookmarkDelete}
-                  onBookmarkEdit={onBookmarkEdit}
-                  onCategoryAdd={onCategoryAdd}
-                  onCategoryDelete={onCategoryDelete}
-                  onCategoryRename={onCategoryRename}
-                  onCategoryRecolor={onCategoryRecolor}
-                  onCategoryReorder={onCategoryReorder}
-                  onBookmarkReorder={onBookmarkReorder}
-                  onCategoryExportGpx={onCategoryExportGpx}
-                  onCategoriesExportGpxZip={onCategoriesExportGpxZip}
-                  showOnMap={bookmarkShowOnMap}
-                  onShowOnMapChange={onBookmarkShowOnMapChange}
-                  onImport={onBookmarkImport}
-                  onBulkPaste={onBookmarkBulkPaste}
-                  exportUrl={bookmarkExportUrl}
-                />
-              ) : (
-                <RouteList
-                  routes={savedRoutes}
-                  categories={routeCategories}
-                  currentWaypointsCount={currentWaypointsCount}
-                  onRouteLoad={(id) => { onRouteLoad(id); setLibraryOpen(false); }}
-                  onRouteSave={onRouteSave}
-                  onRouteRename={(id, name) => onRouteRename?.(id, name)}
-                  onRouteDelete={(id) => onRouteDelete?.(id)}
-                  onRoutesBulkDelete={onRoutesBulkDelete}
-                  onRouteMove={onRouteMove}
-                  onRouteGpxExport={onRouteGpxExport}
-                  onRouteGpxImport={onRouteGpxImport}
-                  onCategoryAdd={onRouteCategoryAdd}
-                  onCategoryDelete={onRouteCategoryDelete}
-                  onCategoryRename={onRouteCategoryRename}
-                  onCategoryRecolor={onRouteCategoryRecolor}
-                  onCategoryReorder={onRouteCategoryReorder}
-                  onRouteReorder={onRouteReorder}
-                  routesExportAllUrl={routesExportAllUrl}
-                  onRoutesImportAll={onRoutesImportAll}
-                />
-              )}
-            </div>
-          </div>
+          <LibraryPanel
+            tab={libraryTab}
+            onTabChange={setLibraryTab}
+            onClose={() => setLibraryOpen(false)}
+            onDragStart={startDrag}
+            bm={{
+                bookmarks: bookmarks,
+                categories: bookmarkCategories,
+                categoryColors: bookmarkCategoryColors,
+                currentPosition: currentPosition,
+                onBookmarkClick: (b) => { onBookmarkClick(b); },
+                onBookmarkPreview: onBookmarkPreview,
+                onBookmarkAdd: onBookmarkAdd,
+                onBookmarkDelete: onBookmarkDelete,
+                onBookmarkEdit: onBookmarkEdit,
+                onCategoryAdd: onCategoryAdd,
+                onCategoryDelete: onCategoryDelete,
+                onCategoryRename: onCategoryRename,
+                onCategoryRecolor: onCategoryRecolor,
+                onCategoryReorder: onCategoryReorder,
+                onBookmarkReorder: onBookmarkReorder,
+                onCategoryExportGpx: onCategoryExportGpx,
+                onCategoriesExportGpxZip: onCategoriesExportGpxZip,
+                showOnMap: bookmarkShowOnMap,
+                onShowOnMapChange: onBookmarkShowOnMapChange,
+                onImport: onBookmarkImport,
+                onBulkPaste: onBookmarkBulkPaste,
+                exportUrl: bookmarkExportUrl,
+            }}
+            rt={{
+                routes: savedRoutes,
+                categories: routeCategories,
+                currentWaypointsCount: currentWaypointsCount,
+                onRouteLoad: (id) => { onRouteLoad(id); setLibraryOpen(false); },
+                onRouteSave: onRouteSave,
+                onRouteRename: (id, name) => onRouteRename?.(id, name),
+                onRouteDelete: (id) => onRouteDelete?.(id),
+                onRoutesBulkDelete: onRoutesBulkDelete,
+                onRouteMove: onRouteMove,
+                onRouteGpxExport: onRouteGpxExport,
+                onRouteGpxImport: onRouteGpxImport,
+                onCategoryAdd: onRouteCategoryAdd,
+                onCategoryDelete: onRouteCategoryDelete,
+                onCategoryRename: onRouteCategoryRename,
+                onCategoryRecolor: onRouteCategoryRecolor,
+                onCategoryReorder: onRouteCategoryReorder,
+                onRouteReorder: onRouteReorder,
+                routesExportAllUrl: routesExportAllUrl,
+                onRoutesImportAll: onRoutesImportAll,
+            }}
+          />
         </div>,
         document.body
       )}
@@ -1174,7 +1140,7 @@ const ControlPanel: React.FC<ControlPanelProps> = ({
           target="_blank"
           rel="noopener noreferrer"
           style={{
-            color: '#6c8cff',
+            color: 'var(--accent-blue)',
             textDecoration: 'none',
             display: 'inline-flex',
             alignItems: 'center',

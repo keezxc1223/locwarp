@@ -8,7 +8,7 @@ import maplibreWorkerUrl from 'maplibre-gl/dist/maplibre-gl-worker.mjs?worker&ur
 import '@maplibre/maplibre-gl-leaflet';
 import { cellsInBounds, approxCellSizeMeters } from '../services/s2grid';
 import type { S2CellPolygon } from '../services/s2grid';
-import { parseCoord } from '../utils/coords';
+import { parseCoord, formatCoord, useCoordSettings, isDefaultCoordSettings, coordBadge } from '../utils/coords';
 import Supercluster from 'supercluster';
 
 // MapLibre's Leaflet binding looks up `window.maplibregl` rather than
@@ -174,10 +174,10 @@ function TransportButtons({
         alignItems: 'center',
         gap: 0,
         padding: 4,
-        background: 'rgba(20, 23, 34, 0.78)',
-        backdropFilter: 'blur(14px) saturate(160%)',
-        WebkitBackdropFilter: 'blur(14px) saturate(160%)',
-        border: '1px solid rgba(108, 140, 255, 0.22)',
+        background: 'var(--glass-float)',
+        backdropFilter: 'var(--glass-blur)',
+        WebkitBackdropFilter: 'var(--glass-blur)',
+        border: '1px solid rgba(var(--accent-rgb), 0.22)',
         borderRadius: 10,
         boxShadow: '0 10px 26px rgba(8, 11, 22, 0.5)',
         pointerEvents: 'auto',
@@ -305,6 +305,7 @@ const MapView: React.FC<MapViewProps> = ({
   // user upgrades from an earlier 0.2.0 build that had them rendered.
   void devices; void runtimes;
   const t = useT();
+  const coordSettings = useCoordSettings();
   // The map-init useEffect only runs once, so its click handler captures the
   // first-render `t`. Language switches then don't reach the tooltip hint.
   // Route lookups through a ref that we keep in sync every render.
@@ -1082,7 +1083,7 @@ const MapView: React.FC<MapViewProps> = ({
     const map = mapRef.current;
     if (!map) return;
 
-    const sig = previewPin ? `${previewPin.lat.toFixed(7)},${previewPin.lng.toFixed(7)}` : null;
+    const sig = previewPin ? `${previewPin.lat.toFixed(7)},${previewPin.lng.toFixed(7)},${coordSettings.datum},${coordSettings.order}` : null;
     if (sig === previewSigRef.current) return;
     previewSigRef.current = sig;
 
@@ -1123,14 +1124,14 @@ const MapView: React.FC<MapViewProps> = ({
         zIndexOffset: 500,
       }).addTo(map);
 
-      const tip = `${tRef.current('map.preview_pin')} · ${previewPin.lat.toFixed(5)}, ${previewPin.lng.toFixed(5)}`;
+      const tip = `${tRef.current('map.preview_pin')} · ${formatCoord(previewPin.lat, previewPin.lng, 5)}`;
       marker.bindTooltip(tip, { direction: 'top', offset: [0, -48] });
       if (onPreviewPinClear) {
         marker.on('click', () => onPreviewPinClear());
       }
       previewMarkerRef.current = marker;
     }
-  }, [previewPin, onPreviewPinClear]);
+  }, [previewPin, onPreviewPinClear, coordSettings]);
 
   // Update waypoint markers
   const waypointSigRef = useRef<string>('');
@@ -1377,8 +1378,8 @@ const MapView: React.FC<MapViewProps> = ({
               maxWidth: 240,
               offset: [0, -12],
             }).setContent(`
-              <div style="background:rgba(26,29,39,0.96);backdrop-filter:blur(12px);border:1px solid rgba(108,140,255,0.25);border-radius:8px;padding:6px;min-width:180px;max-height:280px;overflow-y:auto;">
-                <div style="padding:4px 8px;font-size:10px;letter-spacing:1px;text-transform:uppercase;color:#9ac0ff;">${count} ${escapeHtml(count === 1 ? 'bookmark' : 'bookmarks')}</div>
+              <div style="background:rgba(26,29,39,0.96);backdrop-filter:blur(12px);border:1px solid rgba(var(--accent-rgb),0.25);border-radius:8px;padding:6px;min-width:180px;max-height:280px;overflow-y:auto;">
+                <div style="padding:4px 8px;font-size:10px;letter-spacing:1px;text-transform:uppercase;color:var(--accent-soft);">${count} ${escapeHtml(count === 1 ? 'bookmark' : 'bookmarks')}</div>
                 ${listHtml}
               </div>
             `);
@@ -1738,7 +1739,7 @@ const MapView: React.FC<MapViewProps> = ({
     const btn = recenterBtnRef.current;
     if (!btn) return;
     btn.disabled = !currentPosition;
-    btn.style.background = currentPosition ? '#6c8cff' : 'var(--bg-surface, #2a2f3a)';
+    btn.style.background = currentPosition ? 'var(--accent-blue)' : 'var(--bg-surface, #2a2f3a)';
     btn.style.cursor = currentPosition ? 'pointer' : 'not-allowed';
     btn.style.opacity = currentPosition ? '1' : '0.55';
   }, [recenter, currentPosition]);
@@ -1761,7 +1762,7 @@ const MapView: React.FC<MapViewProps> = ({
     followHandlerRef.current = toggleFollow;
     const btn = followBtnRef.current;
     if (!btn) return;
-    btn.style.background = followMode ? '#6c8cff' : 'var(--bg-surface, #2a2f3a)';
+    btn.style.background = followMode ? 'var(--accent-blue)' : 'var(--bg-surface, #2a2f3a)';
     btn.style.cursor = 'pointer';
     btn.style.opacity = '1';
     btn.title = t(followMode ? 'map.follow_on' : 'map.follow_off');
@@ -1793,7 +1794,7 @@ const MapView: React.FC<MapViewProps> = ({
     s2GridHandlerRef.current = toggleS2Grid;
     const btn = s2GridBtnRef.current;
     if (!btn) return;
-    btn.style.background = s2Enabled ? '#6c8cff' : 'var(--bg-surface, #2a2f3a)';
+    btn.style.background = s2Enabled ? 'var(--accent-blue)' : 'var(--bg-surface, #2a2f3a)';
     btn.title = t('map.s2_toggle');
     btn.setAttribute('aria-pressed', s2Enabled ? 'true' : 'false');
   }, [toggleS2Grid, s2Enabled, t]);
@@ -1996,10 +1997,10 @@ const MapView: React.FC<MapViewProps> = ({
               display: 'inline-flex', alignItems: 'center', gap: 6,
               padding: '7px 12px', height: 32, fontSize: 12,
               color: '#e8eaff', fontWeight: 600,
-              background: 'rgba(20, 23, 34, 0.88)',
-              backdropFilter: 'blur(14px) saturate(160%)',
-              WebkitBackdropFilter: 'blur(14px) saturate(160%)',
-              border: '1px solid rgba(108, 140, 255, 0.32)',
+              background: 'var(--glass-float)',
+              backdropFilter: 'var(--glass-blur)',
+              WebkitBackdropFilter: 'var(--glass-blur)',
+              border: '1px solid rgba(var(--accent-rgb), 0.32)',
               borderRadius: 10,
               boxShadow: '0 10px 26px rgba(8, 11, 22, 0.5)',
               cursor: 'pointer',
@@ -2030,17 +2031,17 @@ const MapView: React.FC<MapViewProps> = ({
           className="anim-fade-slide-up"
           style={{
             display: 'flex', alignItems: 'center', gap: 6,
-            background: 'rgba(26, 29, 39, 0.82)',
-            backdropFilter: 'blur(14px) saturate(140%)',
-            WebkitBackdropFilter: 'blur(14px) saturate(140%)',
+            background: 'var(--glass-float)',
+            backdropFilter: 'var(--glass-blur)',
+            WebkitBackdropFilter: 'var(--glass-blur)',
             borderRadius: 10,
             padding: '7px 9px',
             boxShadow: '0 10px 32px rgba(12, 18, 40, 0.55), 0 0 0 1px rgba(255, 255, 255, 0.06) inset',
-            border: '1px solid rgba(108, 140, 255, 0.15)',
+            border: '1px solid rgba(var(--accent-rgb), 0.15)',
             pointerEvents: 'auto',
           }}
         >
-          <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="#6c8cff" strokeWidth="2" style={{ flexShrink: 0 }}>
+          <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="var(--accent-blue)" strokeWidth="2" style={{ flexShrink: 0 }}>
             <path d="M21 10c0 7-9 13-9 13s-9-6-9-13a9 9 0 0118 0z" />
             <circle cx="12" cy="10" r="3" />
           </svg>
@@ -2049,7 +2050,9 @@ const MapView: React.FC<MapViewProps> = ({
             value={coordInput}
             onChange={(e) => setCoordInput(e.target.value)}
             onKeyDown={(e) => { if (e.key === 'Enter') submitCoordGo('teleport'); }}
-            placeholder={tRef.current('panel.coord_placeholder')}
+            placeholder={isDefaultCoordSettings()
+              ? tRef.current('panel.coord_placeholder')
+              : coordBadge(tRef.current)}
             style={{
               width: 210, background: 'transparent', border: 'none',
               color: '#e8e8e8', fontSize: 12, outline: 'none',
@@ -2084,7 +2087,7 @@ const MapView: React.FC<MapViewProps> = ({
             disabled={!coordInput.trim() || !deviceConnected}
             title={t('map.teleport_here')}
             style={{
-              background: !coordInput.trim() || !deviceConnected ? 'rgba(108,140,255,0.3)' : '#6c8cff',
+              background: !coordInput.trim() || !deviceConnected ? 'rgba(var(--accent-rgb),0.3)' : 'var(--accent-blue)',
               color: '#fff', border: 'none', borderRadius: 4,
               padding: '4px 10px', fontSize: 11, fontWeight: 600,
               cursor: !coordInput.trim() || !deviceConnected ? 'not-allowed' : 'pointer',
@@ -2138,10 +2141,10 @@ const MapView: React.FC<MapViewProps> = ({
           style={{
             position: 'absolute',
             left: 56, top: 196, zIndex: 851,
-            background: 'rgba(26, 29, 39, 0.94)',
-            backdropFilter: 'blur(14px) saturate(160%)',
-            WebkitBackdropFilter: 'blur(14px) saturate(160%)',
-            border: '1px solid rgba(108, 140, 255, 0.28)',
+            background: 'var(--glass-pop)',
+            backdropFilter: 'var(--glass-blur)',
+            WebkitBackdropFilter: 'var(--glass-blur)',
+            border: '1px solid rgba(var(--accent-rgb), 0.28)',
             borderRadius: 10,
             padding: '10px 12px',
             minWidth: 220,
@@ -2168,7 +2171,7 @@ const MapView: React.FC<MapViewProps> = ({
               onChange={(e) => setS2Level(parseInt(e.target.value, 10))}
               style={{ flex: 1 }}
             />
-            <span style={{ fontFamily: 'monospace', fontWeight: 700, color: '#9ac0ff', minWidth: 22, textAlign: 'right' }}>
+            <span style={{ fontFamily: 'monospace', fontWeight: 700, color: 'var(--accent-soft)', minWidth: 22, textAlign: 'right' }}>
               L{s2Level}
             </span>
           </div>
@@ -2198,8 +2201,8 @@ const MapView: React.FC<MapViewProps> = ({
                 key={lv}
                 onClick={() => setS2Level(lv)}
                 style={{
-                  background: s2Level === lv ? 'rgba(108,140,255,0.35)' : 'rgba(255,255,255,0.06)',
-                  border: `1px solid ${s2Level === lv ? 'rgba(108,140,255,0.6)' : 'rgba(255,255,255,0.12)'}`,
+                  background: s2Level === lv ? 'rgba(var(--accent-rgb),0.35)' : 'rgba(255,255,255,0.06)',
+                  border: `1px solid ${s2Level === lv ? 'rgba(var(--accent-rgb),0.6)' : 'rgba(255,255,255,0.12)'}`,
                   color: s2Level === lv ? '#fff' : '#c7d0e4',
                   fontSize: 11, fontWeight: 600,
                   padding: '3px 8px', borderRadius: 4, cursor: 'pointer',
@@ -2211,8 +2214,8 @@ const MapView: React.FC<MapViewProps> = ({
             <button
               onClick={() => setS2Enabled((v) => !v)}
               style={{
-                background: s2Enabled ? '#6c8cff' : 'transparent',
-                border: `1px solid ${s2Enabled ? '#6c8cff' : 'rgba(255,255,255,0.18)'}`,
+                background: s2Enabled ? 'var(--accent-blue)' : 'transparent',
+                border: `1px solid ${s2Enabled ? 'var(--accent-blue)' : 'rgba(255,255,255,0.18)'}`,
                 color: s2Enabled ? '#fff' : '#c7d0e4',
                 fontSize: 11, fontWeight: 600,
                 padding: '4px 10px', borderRadius: 4, cursor: 'pointer',
@@ -2243,17 +2246,17 @@ const MapView: React.FC<MapViewProps> = ({
             onMouseEnter={(e) => {
               if (recentOpen) return;
               (e.currentTarget as HTMLButtonElement).style.background =
-                'linear-gradient(135deg, rgba(108, 140, 255, 0.35) 0%, rgba(46, 52, 82, 0.95) 100%)';
-              (e.currentTarget as HTMLButtonElement).style.borderColor = 'rgba(108, 140, 255, 0.55)';
+                'linear-gradient(135deg, rgba(var(--accent-rgb), 0.35) 0%, rgba(46, 52, 82, 0.95) 100%)';
+              (e.currentTarget as HTMLButtonElement).style.borderColor = 'rgba(var(--accent-rgb), 0.55)';
               (e.currentTarget as HTMLButtonElement).style.transform = 'translateY(-1px)';
               (e.currentTarget as HTMLButtonElement).style.boxShadow =
-                '0 10px 24px rgba(108, 140, 255, 0.35), 0 2px 6px rgba(12, 18, 40, 0.45)';
+                '0 10px 24px rgba(var(--accent-rgb), 0.35), 0 2px 6px rgba(12, 18, 40, 0.45)';
             }}
             onMouseLeave={(e) => {
               if (recentOpen) return;
               (e.currentTarget as HTMLButtonElement).style.background =
                 'linear-gradient(135deg, rgba(38, 42, 58, 0.92) 0%, rgba(22, 25, 36, 0.92) 100%)';
-              (e.currentTarget as HTMLButtonElement).style.borderColor = 'rgba(108, 140, 255, 0.22)';
+              (e.currentTarget as HTMLButtonElement).style.borderColor = 'rgba(var(--accent-rgb), 0.22)';
               (e.currentTarget as HTMLButtonElement).style.transform = 'translateY(0)';
               (e.currentTarget as HTMLButtonElement).style.boxShadow = '0 6px 18px rgba(12, 18, 40, 0.45)';
             }}
@@ -2263,17 +2266,17 @@ const MapView: React.FC<MapViewProps> = ({
               width: 42, height: 42,
               display: 'flex', alignItems: 'center', justifyContent: 'center',
               background: recentOpen
-                ? 'linear-gradient(135deg, #6c8cff 0%, #4c6bd9 100%)'
+                ? 'linear-gradient(135deg, var(--accent-blue) 0%, var(--accent-deep) 100%)'
                 : 'linear-gradient(135deg, rgba(38, 42, 58, 0.92) 0%, rgba(22, 25, 36, 0.92) 100%)',
               color: '#fff',
-              border: `1px solid ${recentOpen ? 'rgba(108, 140, 255, 0.85)' : 'rgba(108, 140, 255, 0.22)'}`,
+              border: `1px solid ${recentOpen ? 'rgba(var(--accent-rgb), 0.85)' : 'rgba(var(--accent-rgb), 0.22)'}`,
               borderRadius: 10,
               cursor: 'pointer',
               boxShadow: recentOpen
-                ? '0 10px 28px rgba(108, 140, 255, 0.55), inset 0 1px 0 rgba(255, 255, 255, 0.15)'
+                ? '0 10px 28px rgba(var(--accent-rgb), 0.55), inset 0 1px 0 rgba(255, 255, 255, 0.15)'
                 : '0 6px 18px rgba(12, 18, 40, 0.45)',
-              backdropFilter: 'blur(14px) saturate(160%)',
-              WebkitBackdropFilter: 'blur(14px) saturate(160%)',
+              backdropFilter: 'var(--glass-blur)',
+              WebkitBackdropFilter: 'var(--glass-blur)',
               transition: 'transform 120ms ease-out, background 120ms ease-out, border-color 120ms ease-out, box-shadow 120ms ease-out',
             }}
           >
@@ -2319,10 +2322,10 @@ const MapView: React.FC<MapViewProps> = ({
                 width: 320,
                 maxHeight: '62vh',
                 display: 'flex', flexDirection: 'column',
-                background: 'rgba(26, 29, 39, 0.94)',
-                backdropFilter: 'blur(18px) saturate(160%)',
-                WebkitBackdropFilter: 'blur(18px) saturate(160%)',
-                border: '1px solid rgba(108, 140, 255, 0.22)',
+                background: 'var(--glass-pop)',
+                backdropFilter: 'var(--glass-blur)',
+                WebkitBackdropFilter: 'var(--glass-blur)',
+                border: '1px solid rgba(var(--accent-rgb), 0.22)',
                 borderRadius: 12,
                 boxShadow: '0 18px 48px rgba(12, 18, 40, 0.65)',
                 overflow: 'hidden',
@@ -2391,7 +2394,7 @@ const MapView: React.FC<MapViewProps> = ({
                   // point is what the user remembers.
                   type BadgeSpec = { label: string; color: string; bg: string };
                   const badgeByKind: Record<string, BadgeSpec> = {
-                    teleport:        { label: tRef.current('recent.kind_teleport'),   color: '#6c8cff', bg: 'rgba(108, 140, 255, 0.16)' },
+                    teleport:        { label: tRef.current('recent.kind_teleport'),   color: 'var(--accent-blue)', bg: 'rgba(var(--accent-rgb), 0.16)' },
                     navigate:        { label: tRef.current('recent.kind_navigate'),   color: '#4caf50', bg: 'rgba(76, 175, 80, 0.16)' },
                     search:          { label: tRef.current('recent.kind_search'),     color: '#f48fb1', bg: 'rgba(244, 143, 177, 0.16)' },
                     coord_teleport:  { label: tRef.current('recent.kind_coord'),      color: '#ffb74d', bg: 'rgba(255, 183, 77, 0.16)' },
@@ -2411,7 +2414,7 @@ const MapView: React.FC<MapViewProps> = ({
                   }
                   const display = entry.name && entry.name.length > 0
                     ? entry.name
-                    : `${entry.lat.toFixed(5)}, ${entry.lng.toFixed(5)}`;
+                    : formatCoord(entry.lat, entry.lng, 5);
                   return (
                     <button
                       key={`${entry.ts}-${idx}`}
@@ -2451,7 +2454,7 @@ const MapView: React.FC<MapViewProps> = ({
                         <div style={{
                           fontSize: 10, opacity: 0.55, fontFamily: 'monospace', marginTop: 2,
                         }}>
-                          {entry.lat.toFixed(5)}, {entry.lng.toFixed(5)} · {agoLabel}
+                          {formatCoord(entry.lat, entry.lng, 5)} · {agoLabel}
                         </div>
                       </div>
                     </button>
@@ -2483,10 +2486,10 @@ const MapView: React.FC<MapViewProps> = ({
             top: contextMenuPos ? contextMenuPos.top : contextMenu.y,
             visibility: contextMenuPos ? 'visible' : 'hidden',
             zIndex: 1000,
-            background: 'rgba(26, 29, 39, 0.95)',
-            backdropFilter: 'blur(10px)',
-            WebkitBackdropFilter: 'blur(10px)',
-            border: '1px solid rgba(108, 140, 255, 0.18)',
+            background: 'var(--glass-pop)',
+            backdropFilter: 'var(--glass-blur)',
+            WebkitBackdropFilter: 'var(--glass-blur)',
+            border: '1px solid rgba(var(--accent-rgb), 0.18)',
             borderRadius: 10,
             padding: '4px 0',
             boxShadow: '0 10px 32px rgba(12, 18, 40, 0.55), 0 0 0 1px rgba(255, 255, 255, 0.04) inset',
@@ -2504,7 +2507,7 @@ const MapView: React.FC<MapViewProps> = ({
             className="context-menu-item"
             style={{
               padding: '8px 16px 6px',
-              color: '#9ac0ff',
+              color: 'var(--accent-soft)',
               fontSize: 12,
               fontFamily: 'monospace',
               display: 'flex',
@@ -2538,7 +2541,7 @@ const MapView: React.FC<MapViewProps> = ({
               <path d="M21 10c0 7-9 13-9 13s-9-6-9-13a9 9 0 0118 0z" />
               <circle cx="12" cy="10" r="3" />
             </svg>
-            <span style={{ flex: 1 }}>{contextMenu.lat.toFixed(6)}, {contextMenu.lng.toFixed(6)}</span>
+            <span style={{ flex: 1 }}>{formatCoord(contextMenu.lat, contextMenu.lng, 6)}</span>
             <span style={{ fontSize: 10, opacity: 0.7, fontFamily: 'inherit' }}>
               {reverseGeo.loading && reverseGeo.key === `${contextMenu.lat.toFixed(6)}|${contextMenu.lng.toFixed(6)}`
                 ? t('map.whats_here_loading')
@@ -2624,7 +2627,7 @@ const MapView: React.FC<MapViewProps> = ({
             onMouseEnter={highlightItem}
             onMouseLeave={unhighlightItem}
             onClick={async () => {
-              const txt = `${contextMenu.lat.toFixed(6)}, ${contextMenu.lng.toFixed(6)}`;
+              const txt = formatCoord(contextMenu.lat, contextMenu.lng, 6);
               try {
                 await navigator.clipboard.writeText(txt);
               } catch {
@@ -2703,10 +2706,10 @@ const MapView: React.FC<MapViewProps> = ({
             left: Math.max(8, Math.min(wpMenu.x + 6, window.innerWidth - 188)),
             top: Math.max(8, Math.min(wpMenu.y + 6, window.innerHeight - 100)),
             zIndex: 1000,
-            background: 'rgba(26, 29, 39, 0.96)',
-            backdropFilter: 'blur(10px)',
-            WebkitBackdropFilter: 'blur(10px)',
-            border: '1px solid rgba(108, 140, 255, 0.18)',
+            background: 'var(--glass-pop)',
+            backdropFilter: 'var(--glass-blur)',
+            WebkitBackdropFilter: 'var(--glass-blur)',
+            border: '1px solid rgba(var(--accent-rgb), 0.18)',
             borderRadius: 10,
             padding: '4px 0',
             boxShadow: '0 10px 32px rgba(12, 18, 40, 0.55), 0 0 0 1px rgba(255, 255, 255, 0.04) inset',
@@ -2757,7 +2760,7 @@ const MapView: React.FC<MapViewProps> = ({
                 fn?.(idx);
               }}
             >
-              <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="#6c8cff" strokeWidth="2" style={{ marginRight: 8 }}>
+              <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="var(--accent-blue)" strokeWidth="2" style={{ marginRight: 8 }}>
                 <line x1="12" y1="5" x2="12" y2="19" />
                 <line x1="5" y1="12" x2="19" y2="12" />
               </svg>

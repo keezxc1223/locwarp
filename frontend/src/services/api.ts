@@ -279,6 +279,13 @@ export const reverseGeocode = (lat: number, lng: number, precise = false) =>
 // page (which can't read renderer localStorage) honours the same provider.
 export const setGeocodeProviderPref = (provider: string, googleKey: string = '', arcgisKey: string = '') =>
   request<any>('PUT', '/api/geocode/provider-pref', { provider, google_key: googleKey, arcgis_key: arcgisKey })
+// Mirrors the desktop's coordinate format (設定 > 座標格式) to the backend so
+// the phone control page shows and parses coordinate text the same way.
+export const setPhoneCoordFormat = (datum: string, order: string) =>
+  request<any>('POST', '/api/phone/coord_format', { datum, order })
+// Theme accent as "R, G, B", so the phone control page matches the desktop.
+export const setPhoneAppearance = (accentRgb: string) =>
+  request<any>('POST', '/api/phone/appearance', { accent_rgb: accentRgb })
 export const lookupTimezone = (lat: number, lng: number) =>
   request<{ zone: string; gmt_offset_seconds: number; abbreviation: string; timestamp: number } | null>(
     'GET', `/api/geocode/timezone?lat=${lat}&lng=${lng}`,

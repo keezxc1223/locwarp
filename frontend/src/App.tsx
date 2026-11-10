@@ -9,7 +9,8 @@ import { useBookmarks } from './hooks/useBookmarks'
 import UserAvatarPicker from './components/UserAvatarPicker'
 import { UserAvatar, avatarToHtml, loadAvatar, saveAvatar, loadCustomPng, saveCustomPng } from './userAvatars'
 import * as api from './services/api'
-import { parseCoord } from './utils/coords'
+import { parseCoord, formatCoord, useCoordSettings, coordInputHint } from './utils/coords'
+import { loadSavedAppearance, themeDef } from './utils/appearance'
 import { readSavedIps, savedIpsForPrefix, prefixOf } from './utils/savedTunnelIps'
 import { getHostPrefix } from './utils/hostNetwork'
 
@@ -17,6 +18,7 @@ import MapView from './components/MapView'
 import ControlPanel from './components/ControlPanel'
 import DeviceStatus from './components/DeviceStatus'
 import SettingsPage from './components/SettingsPage'
+import { UpdateDialog } from './components/UpdateChecker'
 import JoystickPad from './components/JoystickPad'
 import EtaBar from './components/EtaBar'
 import PauseControl from './components/PauseControl'
@@ -87,6 +89,16 @@ const NumberField: React.FC<{
 
 const App: React.FC = () => {
   const t = useT()
+  const coordSettings = useCoordSettings()
+  // The phone control page cannot read this window's localStorage, so the
+  // format is mirrored to the backend on launch and on every change.
+  // Fire-and-forget: a failure only leaves the phone page on WGS84.
+  useEffect(() => {
+    api.setPhoneCoordFormat(coordSettings.datum, coordSettings.order).catch(() => { /* ignore */ })
+  }, [coordSettings])
+  useEffect(() => {
+    api.setPhoneAppearance(themeDef(loadSavedAppearance().theme).accent).catch(() => { /* ignore */ })
+  }, [])
   const ws = useWebSocket()
   const device = useDevice(ws.subscribe)
   // Pass primary-device udid into useSimulation so its legacy single-device
@@ -805,7 +817,7 @@ const App: React.FC = () => {
     for (const entry of valid) {
       try {
         await bm.createBookmark({
-          name: `${entry.lat.toFixed(5)}, ${entry.lng.toFixed(5)}`,
+          name: formatCoord(entry.lat, entry.lng, 5),
           lat: entry.lat,
           lng: entry.lng,
           category_id: catId,
@@ -1896,8 +1908,8 @@ const App: React.FC = () => {
               {sim.mode === SimMode.Flower && (
                 <div style={{
                   marginBottom: 8, padding: '8px 10px',
-                  background: 'rgba(108, 140, 255, 0.06)',
-                  border: '1px solid rgba(108, 140, 255, 0.18)',
+                  background: 'rgba(var(--accent-rgb), 0.06)',
+                  border: '1px solid rgba(var(--accent-rgb), 0.18)',
                   borderRadius: 6, fontSize: 11,
                 }}>
                   <div style={{ opacity: 0.6, marginBottom: 8, lineHeight: 1.4 }}>{t('flower.hint')}</div>
@@ -2117,7 +2129,7 @@ const App: React.FC = () => {
                       }}
                       onMouseEnter={(e) => { (e.currentTarget as HTMLButtonElement).style.textDecoration = 'underline'; }}
                       onMouseLeave={(e) => { (e.currentTarget as HTMLButtonElement).style.textDecoration = 'none'; }}
-                    >{wp.lat.toFixed(5)}, {wp.lng.toFixed(5)}</button>
+                    >{formatCoord(wp.lat, wp.lng, 5)}</button>
                     {!isStart && (
                       <>
                         <button
@@ -2161,7 +2173,7 @@ const App: React.FC = () => {
                       const wps = sim.waypoints
                       if (wps.length === 0) return
                       const txt = wps
-                        .map((w: any) => `${w.lat.toFixed(6)}, ${w.lng.toFixed(6)}`)
+                        .map((w: any) => formatCoord(w.lat, w.lng, 6))
                         .join('\n')
                       try {
                         await navigator.clipboard.writeText(txt)
@@ -2233,7 +2245,7 @@ const App: React.FC = () => {
               position: 'absolute',
               inset: 0,
               zIndex: 10000,
-              background: 'rgba(20, 22, 32, 0.85)',
+              background: 'var(--glass-float)',
               backdropFilter: 'blur(3px)',
               display: 'flex',
               alignItems: 'center',
@@ -2243,18 +2255,19 @@ const App: React.FC = () => {
           >
             <div
               style={{
-                background: '#23232a',
-                border: '1px solid #3a3a42',
-                borderRadius: 8,
-                padding: '20px 28px',
+                background: 'var(--glass-pop)',
+                backdropFilter: 'var(--glass-blur)', WebkitBackdropFilter: 'var(--glass-blur)',
+                border: '1px solid var(--glass-border)',
+                borderRadius: 16,
+                padding: '22px 28px',
                 maxWidth: 420,
                 textAlign: 'center',
-                boxShadow: '0 8px 24px rgba(0,0,0,0.5)',
+                boxShadow: 'var(--shadow-pop)', animation: 'var(--anim-pop)',
               }}
             >
               <svg
                 width="32" height="32" viewBox="0 0 24 24" fill="none"
-                stroke="#6c8cff" strokeWidth="2"
+                stroke="var(--accent-blue)" strokeWidth="2"
                 style={{ animation: 'spin 1s linear infinite', margin: '0 auto 10px' }}
               >
                 <circle cx="12" cy="12" r="10" strokeDasharray="32" strokeDashoffset="16" />
@@ -2292,7 +2305,7 @@ const App: React.FC = () => {
                     }}>
                       <div style={{
                         width: `${pct}%`, height: '100%',
-                        background: 'linear-gradient(90deg, #6c8cff, #4c6bd9)',
+                        background: 'linear-gradient(90deg, var(--accent-blue), var(--accent-deep))',
                         transition: 'width 300ms ease-out',
                       }} />
                     </div>
@@ -2309,71 +2322,32 @@ const App: React.FC = () => {
           </div>
         )}
         {sim.pauseRemaining != null && sim.pauseRemaining > 0 && (
-          <div
-            style={{
-              position: 'absolute',
-              top: 38,
-              left: '50%',
-              transform: 'translateX(-50%)',
-              zIndex: 901,
-              background: 'rgba(255, 152, 0, 0.95)',
-              color: '#1a1a1a',
-              padding: '6px 14px',
-              borderRadius: 18,
-              fontSize: 12,
-              fontWeight: 600,
-              boxShadow: '0 2px 8px rgba(0,0,0,0.35)',
-              display: 'flex',
-              alignItems: 'center',
-              gap: 8,
-            }}
-          >
-            <svg width="14" height="14" viewBox="0 0 24 24" fill="currentColor">
-              <rect x="6" y="4" width="4" height="16" rx="1" />
-              <rect x="14" y="4" width="4" height="16" rx="1" />
-            </svg>
-            {t('toast.pause_countdown', { n: sim.pauseRemaining })}
+          <div className="lw-banner warn below">
+            <span className="lw-banner-icon">
+              <svg width="13" height="13" viewBox="0 0 24 24" fill="currentColor">
+                <rect x="6" y="4" width="4" height="16" rx="1" />
+                <rect x="14" y="4" width="4" height="16" rx="1" />
+              </svg>
+            </span>
+            <span className="lw-banner-text">{t('toast.pause_countdown', { n: sim.pauseRemaining })}</span>
           </div>
         )}
         {insertAfterIndex !== null && (
-          <div
-            style={{
-              position: 'absolute',
-              top: 38,
-              left: '50%',
-              transform: 'translateX(-50%)',
-              zIndex: 901,
-              background: 'rgba(108, 140, 255, 0.95)',
-              color: '#fff',
-              padding: '6px 14px',
-              borderRadius: 18,
-              fontSize: 12,
-              fontWeight: 600,
-              boxShadow: '0 2px 8px rgba(0,0,0,0.35)',
-              display: 'flex',
-              alignItems: 'center',
-              gap: 8,
-            }}
-          >
-            <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.5">
-              <line x1="12" y1="5" x2="12" y2="19" />
-              <line x1="5" y1="12" x2="19" y2="12" />
-            </svg>
-            <span>
+          <div className="lw-banner info below">
+            <span className="lw-banner-icon">
+              <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.5" strokeLinecap="round">
+                <line x1="12" y1="5" x2="12" y2="19" />
+                <line x1="5" y1="12" x2="19" y2="12" />
+              </svg>
+            </span>
+            <span className="lw-banner-text">
               {t('panel.wp_insert_banner', {
                 label: insertAfterIndex === 0
                   ? t('panel.waypoint_start')
                   : `#${insertAfterIndex}`,
               })}
             </span>
-            <button
-              onClick={cancelInsertMode}
-              style={{
-                background: 'rgba(255,255,255,0.18)', color: '#fff',
-                border: '1px solid rgba(255,255,255,0.4)', borderRadius: 4,
-                padding: '2px 8px', fontSize: 11, cursor: 'pointer',
-              }}
-            >{t('panel.wp_insert_cancel')}</button>
+            <button type="button" className="lw-banner-action" onClick={cancelInsertMode}>{t('panel.wp_insert_cancel')}</button>
           </div>
         )}
         <MapView
@@ -2452,16 +2426,16 @@ const App: React.FC = () => {
             className="anim-scale-in"
             style={{
               position: 'fixed', top: 60, left: '50%', transform: 'translateX(-50%)',
-              zIndex: 1000, background: 'rgba(26, 29, 39, 0.96)',
-              backdropFilter: 'blur(14px)', WebkitBackdropFilter: 'blur(14px)',
-              border: '1px solid rgba(108, 140, 255, 0.2)',
+              zIndex: 1000, background: 'var(--glass-pop)',
+              backdropFilter: 'var(--glass-blur)', WebkitBackdropFilter: 'var(--glass-blur)',
+              border: '1px solid rgba(var(--accent-rgb), 0.2)',
               borderRadius: 12, padding: 16, width: 300,
-              boxShadow: '0 20px 60px rgba(12, 18, 40, 0.65), 0 0 0 1px rgba(255, 255, 255, 0.05) inset',
+              boxShadow: 'var(--shadow-pop)', animation: 'var(--anim-pop)',
             }}
           >
             <div style={{ fontSize: 13, fontWeight: 600, marginBottom: 8 }}>{t('bm.add')}</div>
             <div style={{ fontSize: 11, opacity: 0.6, marginBottom: 8 }}>
-              {addBmDialog.lat.toFixed(5)}, {addBmDialog.lng.toFixed(5)}
+              {formatCoord(addBmDialog.lat, addBmDialog.lng, 5)}
             </div>
             <div style={{ position: 'relative', marginBottom: 8 }}>
               <input
@@ -2480,7 +2454,7 @@ const App: React.FC = () => {
               {addBmDialog.nameResolving && (
                 <span style={{
                   position: 'absolute', right: 8, top: '50%', transform: 'translateY(-50%)',
-                  fontSize: 10, color: '#9ac0ff', fontFamily: 'monospace',
+                  fontSize: 10, color: 'var(--accent-soft)', fontFamily: 'monospace',
                   animation: 'pulse 1.2s ease-in-out infinite',
                 }}>
                   {t('bm.name_resolving_short')}
@@ -2532,7 +2506,7 @@ const App: React.FC = () => {
                 onClick={() => { if (!bulkPasteBusy) setBulkPasteOpen(false) }}
                 style={{
                   position: 'fixed', inset: 0, zIndex: 2000,
-                  background: 'rgba(8, 10, 20, 0.55)', backdropFilter: 'blur(4px)',
+                  background: 'rgba(8, 10, 20, 0.55)', backdropFilter: 'blur(4px)', animation: 'var(--anim-scrim)',
                   display: 'flex', alignItems: 'center', justifyContent: 'center',
                 }}
               >
@@ -2541,10 +2515,10 @@ const App: React.FC = () => {
                   style={{
                     width: 460, maxWidth: '92vw', maxHeight: '86vh',
                     display: 'flex', flexDirection: 'column',
-                    background: 'rgba(26, 29, 39, 0.96)',
-                    border: '1px solid rgba(108, 140, 255, 0.25)', borderRadius: 12,
+                    background: 'var(--glass-pop)',
+                    border: '1px solid rgba(var(--accent-rgb), 0.25)', borderRadius: 12,
                     padding: 22, color: '#e8eaf0',
-                    boxShadow: '0 20px 60px rgba(12, 18, 40, 0.65)',
+                    boxShadow: 'var(--shadow-pop)', animation: 'var(--anim-pop)',
                     fontSize: 13,
                   }}
                 >
@@ -2552,7 +2526,7 @@ const App: React.FC = () => {
                     {t('bm.bulk_paste_title')}
                   </div>
                   <div style={{ fontSize: 11, opacity: 0.65, marginBottom: 10, whiteSpace: 'pre-line', lineHeight: 1.5 }}>
-                    {t('bm.bulk_paste_hint')}
+                    {t('bm.bulk_paste_hint')}{coordInputHint(t)}
                   </div>
                   <textarea
                     value={bulkPasteText}
@@ -2562,7 +2536,7 @@ const App: React.FC = () => {
                       width: '100%', boxSizing: 'border-box',
                       minHeight: 160, maxHeight: 240, resize: 'vertical',
                       background: 'rgba(10, 12, 18, 0.7)',
-                      border: '1px solid rgba(108, 140, 255, 0.3)',
+                      border: '1px solid rgba(var(--accent-rgb), 0.3)',
                       borderRadius: 6, color: '#e8eaf0',
                       padding: '8px 10px', fontFamily: 'monospace', fontSize: 12, lineHeight: 1.5,
                       outline: 'none',
@@ -2604,7 +2578,7 @@ const App: React.FC = () => {
                       style={{
                         padding: '6px 14px', fontSize: 12, fontWeight: 600,
                         cursor: (bulkPasteBusy || valid.length === 0) ? 'not-allowed' : 'pointer',
-                        background: valid.length === 0 ? 'rgba(108,140,255,0.3)' : '#6c8cff',
+                        background: valid.length === 0 ? 'rgba(var(--accent-rgb),0.3)' : 'var(--accent-blue)',
                         color: '#fff',
                         border: 'none', borderRadius: 6,
                         opacity: bulkPasteBusy ? 0.6 : 1,
@@ -2624,7 +2598,7 @@ const App: React.FC = () => {
             onClick={() => setWpFlyConfirm(null)}
             style={{
               position: 'fixed', inset: 0, zIndex: 2000,
-              background: 'rgba(8, 10, 20, 0.55)', backdropFilter: 'blur(4px)',
+              background: 'rgba(8, 10, 20, 0.55)', backdropFilter: 'blur(4px)', animation: 'var(--anim-scrim)',
               display: 'flex', alignItems: 'center', justifyContent: 'center',
             }}
           >
@@ -2632,10 +2606,10 @@ const App: React.FC = () => {
               onClick={(e) => e.stopPropagation()}
               style={{
                 width: 360, maxWidth: '92vw',
-                background: 'rgba(26, 29, 39, 0.96)',
-                border: '1px solid rgba(108, 140, 255, 0.25)', borderRadius: 12,
+                background: 'var(--glass-pop)',
+                border: '1px solid rgba(var(--accent-rgb), 0.25)', borderRadius: 12,
                 padding: 22, color: '#e8eaf0',
-                boxShadow: '0 20px 60px rgba(12, 18, 40, 0.65)',
+                boxShadow: 'var(--shadow-pop)', animation: 'var(--anim-pop)',
                 fontSize: 13,
               }}
             >
@@ -2649,10 +2623,10 @@ const App: React.FC = () => {
                 fontFamily: 'monospace', fontSize: 13,
                 padding: '8px 10px', marginBottom: 4,
                 background: 'rgba(10, 12, 18, 0.5)',
-                border: '1px solid rgba(108, 140, 255, 0.2)',
+                border: '1px solid rgba(var(--accent-rgb), 0.2)',
                 borderRadius: 6,
               }}>
-                {wpFlyConfirm.lat.toFixed(6)}, {wpFlyConfirm.lng.toFixed(6)}
+                {formatCoord(wpFlyConfirm.lat, wpFlyConfirm.lng, 6)}
               </div>
               <div style={{ fontSize: 11, opacity: 0.55, marginBottom: 16 }}>
                 {t('panel.wp_fly_keep_mode')}
@@ -2675,7 +2649,7 @@ const App: React.FC = () => {
                     }}
                     style={{
                       padding: '6px 14px', fontSize: 12, fontWeight: 600, cursor: 'pointer',
-                      background: '#6c8cff', color: '#fff',
+                      background: 'var(--accent-blue)', color: '#fff',
                       border: 'none', borderRadius: 6,
                     }}
                     title={t('panel.waypoints_set_as_start')}
@@ -2688,7 +2662,7 @@ const App: React.FC = () => {
                     onClick={confirmWpFly}
                     style={{
                       padding: '6px 14px', fontSize: 12, fontWeight: 600, cursor: 'pointer',
-                      background: '#6c8cff', color: '#fff',
+                      background: 'var(--accent-blue)', color: '#fff',
                       border: 'none', borderRadius: 6,
                     }}
                   >{t('panel.wp_fly_confirm')}</button>
@@ -2703,7 +2677,7 @@ const App: React.FC = () => {
             onClick={() => setRouteLoadConfirm(null)}
             style={{
               position: 'fixed', inset: 0, zIndex: 2000,
-              background: 'rgba(8, 10, 20, 0.55)', backdropFilter: 'blur(4px)',
+              background: 'rgba(8, 10, 20, 0.55)', backdropFilter: 'blur(4px)', animation: 'var(--anim-scrim)',
               display: 'flex', alignItems: 'center', justifyContent: 'center',
             }}
           >
@@ -2711,10 +2685,10 @@ const App: React.FC = () => {
               onClick={(e) => e.stopPropagation()}
               style={{
                 width: 380, maxWidth: '92vw',
-                background: 'rgba(26, 29, 39, 0.96)',
-                border: '1px solid rgba(108, 140, 255, 0.25)', borderRadius: 12,
+                background: 'var(--glass-pop)',
+                border: '1px solid rgba(var(--accent-rgb), 0.25)', borderRadius: 12,
                 padding: 22, color: '#e8eaf0',
-                boxShadow: '0 20px 60px rgba(12, 18, 40, 0.65)',
+                boxShadow: 'var(--shadow-pop)', animation: 'var(--anim-pop)',
                 fontSize: 13,
               }}
             >
@@ -2724,8 +2698,8 @@ const App: React.FC = () => {
               {routeLoadConfirm.name && (
                 <div style={{
                   fontSize: 13, marginBottom: 8, padding: '6px 10px',
-                  background: 'rgba(108, 140, 255, 0.1)',
-                  border: '1px solid rgba(108, 140, 255, 0.2)', borderRadius: 6,
+                  background: 'rgba(var(--accent-rgb), 0.1)',
+                  border: '1px solid rgba(var(--accent-rgb), 0.2)', borderRadius: 6,
                 }}>
                   {routeLoadConfirm.name}
                 </div>
@@ -2738,9 +2712,9 @@ const App: React.FC = () => {
                   fontFamily: 'monospace', fontSize: 12,
                   padding: '8px 10px', marginBottom: 16,
                   background: 'rgba(10, 12, 18, 0.5)',
-                  border: '1px solid rgba(108, 140, 255, 0.2)', borderRadius: 6,
+                  border: '1px solid rgba(var(--accent-rgb), 0.2)', borderRadius: 6,
                 }}>
-                  {t('panel.route_load_start')} {routeLoadConfirm.waypoints[0].lat.toFixed(6)}, {routeLoadConfirm.waypoints[0].lng.toFixed(6)}
+                  {t('panel.route_load_start')} {formatCoord(routeLoadConfirm.waypoints[0].lat, routeLoadConfirm.waypoints[0].lng, 6)}
                 </div>
               )}
               <div style={{ display: 'flex', gap: 8, justifyContent: 'flex-end', flexWrap: 'wrap' }}>
@@ -2757,14 +2731,14 @@ const App: React.FC = () => {
                   style={{
                     padding: '6px 14px', fontSize: 12, cursor: 'pointer',
                     background: 'transparent', color: '#e8eaf0',
-                    border: '1px solid rgba(108, 140, 255, 0.5)', borderRadius: 6,
+                    border: '1px solid rgba(var(--accent-rgb), 0.5)', borderRadius: 6,
                   }}
                 >{t('panel.route_load_show_only')}</button>
                 <button
                   onClick={() => void confirmRouteLoad(true)}
                   style={{
                     padding: '6px 14px', fontSize: 12, fontWeight: 600, cursor: 'pointer',
-                    background: '#6c8cff', color: '#fff',
+                    background: 'var(--accent-blue)', color: '#fff',
                     border: 'none', borderRadius: 6,
                   }}
                 >{t('panel.route_load_fly_start')}</button>
@@ -2781,7 +2755,7 @@ const App: React.FC = () => {
                 onClick={() => setRoutePasteOpen(false)}
                 style={{
                   position: 'fixed', inset: 0, zIndex: 2000,
-                  background: 'rgba(8, 10, 20, 0.55)', backdropFilter: 'blur(4px)',
+                  background: 'rgba(8, 10, 20, 0.55)', backdropFilter: 'blur(4px)', animation: 'var(--anim-scrim)',
                   display: 'flex', alignItems: 'center', justifyContent: 'center',
                 }}
               >
@@ -2790,10 +2764,10 @@ const App: React.FC = () => {
                   style={{
                     width: 460, maxWidth: '92vw', maxHeight: '86vh',
                     display: 'flex', flexDirection: 'column',
-                    background: 'rgba(26, 29, 39, 0.96)',
-                    border: '1px solid rgba(108, 140, 255, 0.25)', borderRadius: 12,
+                    background: 'var(--glass-pop)',
+                    border: '1px solid rgba(var(--accent-rgb), 0.25)', borderRadius: 12,
                     padding: 22, color: '#e8eaf0',
-                    boxShadow: '0 20px 60px rgba(12, 18, 40, 0.65)',
+                    boxShadow: 'var(--shadow-pop)', animation: 'var(--anim-pop)',
                     fontSize: 13,
                   }}
                 >
@@ -2801,7 +2775,7 @@ const App: React.FC = () => {
                     {t('panel.route_paste_title')}
                   </div>
                   <div style={{ fontSize: 11, opacity: 0.65, marginBottom: 10, whiteSpace: 'pre-line', lineHeight: 1.5 }}>
-                    {t('panel.route_paste_hint')}
+                    {t('panel.route_paste_hint')}{coordInputHint(t)}
                   </div>
                   <textarea
                     value={routePasteText}
@@ -2811,7 +2785,7 @@ const App: React.FC = () => {
                       width: '100%', boxSizing: 'border-box',
                       minHeight: 180, maxHeight: 280, resize: 'vertical',
                       background: 'rgba(10, 12, 18, 0.7)',
-                      border: '1px solid rgba(108, 140, 255, 0.3)',
+                      border: '1px solid rgba(var(--accent-rgb), 0.3)',
                       borderRadius: 6, color: '#e8eaf0',
                       padding: '8px 10px', fontFamily: 'monospace', fontSize: 12, lineHeight: 1.5,
                       outline: 'none',
@@ -2839,8 +2813,8 @@ const App: React.FC = () => {
                       title={t('panel.route_paste_from_clipboard_tooltip')}
                       style={{
                         padding: '6px 12px', fontSize: 12, cursor: 'pointer',
-                        background: 'rgba(108, 140, 255, 0.18)', color: '#9bb0ff',
-                        border: '1px solid rgba(108, 140, 255, 0.4)', borderRadius: 6,
+                        background: 'rgba(var(--accent-rgb), 0.18)', color: '#9bb0ff',
+                        border: '1px solid rgba(var(--accent-rgb), 0.4)', borderRadius: 6,
                         display: 'inline-flex', alignItems: 'center', gap: 5,
                       }}
                     >
@@ -2866,7 +2840,7 @@ const App: React.FC = () => {
                       style={{
                         padding: '6px 14px', fontSize: 12, fontWeight: 600,
                         cursor: valid.length === 0 ? 'not-allowed' : 'pointer',
-                        background: valid.length === 0 ? 'rgba(108,140,255,0.3)' : '#6c8cff',
+                        background: valid.length === 0 ? 'rgba(var(--accent-rgb),0.3)' : 'var(--accent-blue)',
                         color: '#fff',
                         border: 'none', borderRadius: 6,
                       }}
@@ -2880,16 +2854,20 @@ const App: React.FC = () => {
           document.body,
         )}
         {sim.error && (
-          <div
-            style={{
-              position: 'absolute', top: 12, left: '50%', transform: 'translateX(-50%)',
-              zIndex: 2000, background: '#e53935', color: '#fff', padding: '8px 20px',
-              borderRadius: 6, fontSize: 13, boxShadow: '0 4px 12px rgba(0,0,0,0.4)',
-              cursor: 'pointer', maxWidth: '80%', textAlign: 'center',
-            }}
-            onClick={sim.clearError}
-          >
-            {sim.error}
+          <div className="lw-banner error" role="alert" key={sim.error}>
+            <span className="lw-banner-icon">
+              <svg width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.4" strokeLinecap="round" strokeLinejoin="round">
+                <path d="M12 3l9.5 16.5h-19z" />
+                <line x1="12" y1="10" x2="12" y2="14" />
+                <line x1="12" y1="17" x2="12.01" y2="17" />
+              </svg>
+            </span>
+            <span className="lw-banner-text">{sim.error}</span>
+            <button type="button" className="lw-banner-close" title={t('generic.close')} onClick={sim.clearError}>
+              <svg width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.4" strokeLinecap="round">
+                <line x1="18" y1="6" x2="6" y2="18" /><line x1="6" y1="6" x2="18" y2="18" />
+              </svg>
+            </button>
           </div>
         )}
         <StatusBar
@@ -2919,6 +2897,7 @@ const App: React.FC = () => {
           onLocatePcPanOnly={handleMapPanOnly}
         />
 
+        <UpdateDialog />
         {toastMsg && (
           <div
             key={toastMsg}
@@ -2929,9 +2908,9 @@ const App: React.FC = () => {
               left: '50%',
               transform: 'translateX(-50%)',
               zIndex: 1500,
-              background: 'rgba(26, 29, 39, 0.92)',
-              backdropFilter: 'blur(10px)',
-              WebkitBackdropFilter: 'blur(10px)',
+              background: 'var(--glass-pop)',
+              backdropFilter: 'var(--glass-blur)',
+              WebkitBackdropFilter: 'var(--glass-blur)',
               color: '#fff',
               padding: '10px 18px',
               borderRadius: 10,
@@ -2939,7 +2918,7 @@ const App: React.FC = () => {
               fontWeight: 500,
               letterSpacing: '-0.005em',
               boxShadow: '0 10px 32px rgba(12, 18, 40, 0.55), 0 0 0 1px rgba(255, 255, 255, 0.06) inset',
-              border: '1px solid rgba(108, 140, 255, 0.3)',
+              border: '1px solid rgba(var(--accent-rgb), 0.3)',
               maxWidth: '70vw',
               textAlign: 'center',
               whiteSpace: 'pre-line',

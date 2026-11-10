@@ -23,7 +23,7 @@ const PauseControl: React.FC<PauseControlProps> = ({ labelKey, value, onChange }
       marginBottom: 8,
       padding: '8px 10px',
       background: 'rgba(255,255,255,0.03)',
-      border: '1px solid rgba(108, 140, 255, 0.10)',
+      border: '1px solid rgba(var(--accent-rgb), 0.10)',
       borderRadius: 6,
     }}>
       <label className="lw-checkbox">

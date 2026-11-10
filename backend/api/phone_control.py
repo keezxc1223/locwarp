@@ -27,7 +27,7 @@ import time
 from pathlib import Path
 
 from fastapi import APIRouter, HTTPException, Request, Header
-from fastapi.responses import HTMLResponse
+from fastapi.responses import FileResponse, HTMLResponse, JSONResponse
 from pydantic import BaseModel, Field
 
 logger = logging.getLogger("locwarp.phone")
@@ -356,6 +356,8 @@ class _AuthRequest(BaseModel):
 class _TeleportBody(BaseModel):
     lat: float = Field(ge=-90.0, le=90.0)
     lng: float = Field(ge=-180.0, le=180.0)
+    # Optional label (bookmark / search-result name) for the recent list.
+    name: str | None = Field(default=None, max_length=200)
 
 
 class _NavigateBody(BaseModel):
@@ -364,6 +366,36 @@ class _NavigateBody(BaseModel):
     mode: str = "walking"  # walking / running / driving
     # Optional: explicit speed in km/h, overrides the mode preset.
     speed_kmh: float | None = Field(default=None, ge=0.1, le=300.0)
+    name: str | None = Field(default=None, max_length=200)
+
+
+class _SpeedBody(BaseModel):
+    mode: str = "walking"  # walking / running / driving
+    speed_kmh: float | None = Field(default=None, ge=0.1, le=300.0)
+
+
+class _CoordFormatBody(BaseModel):
+    datum: str = "wgs84"   # wgs84 / gcj02 / bd09
+    order: str = "latlng"  # latlng / lnglat
+
+
+# Coordinate text format chosen in the desktop UI (設定 > 座標格式). The
+# desktop keeps it in its own localStorage, which the phone page cannot
+# read, so the desktop pushes it here on launch and on every change and
+# the phone picks it up from /api/phone/status. Coordinates on the wire
+# are always WGS84 lat/lng; this only tells the phone page how to show
+# and parse coordinate text.
+_coord_format: dict[str, str] = {"datum": "wgs84", "order": "latlng"}
+
+
+def _push_recent(lat: float, lng: float, kind: str, name: str | None) -> None:
+    """Record a phone-initiated move in the shared recent list. Never
+    lets a bookkeeping failure break the move itself."""
+    try:
+        from services.recent import get_manager
+        get_manager().push(lat, lng, kind, name or None)  # type: ignore[arg-type]
+    except Exception:
+        logger.debug("phone: recent push failed", exc_info=True)
 
 
 # ── Pairing endpoints (localhost-only or PIN-gated) ──────────
@@ -387,6 +419,45 @@ async def phone_info(request: Request):
         "pin": _auth.pin,
         "last_phone_hit_ago_s": _last_phone_hit_seconds_ago(),
     }
+
+
+@router.post("/api/phone/coord_format")
+async def phone_set_coord_format(body: _CoordFormatBody, request: Request):
+    """Desktop-only: mirror the desktop's coordinate format setting so the
+    phone page shows and parses coordinates the same way."""
+    if not _is_localhost(request):
+        raise HTTPException(status_code=403, detail="Localhost only")
+    _coord_format["datum"] = body.datum if body.datum in ("wgs84", "gcj02", "bd09") else "wgs84"
+    _coord_format["order"] = body.order if body.order in ("latlng", "lnglat") else "latlng"
+    return dict(_coord_format)
+
+
+class _AppearanceBody(BaseModel):
+    accent_rgb: str = Field(max_length=20)  # "R, G, B"
+
+
+# Theme accent chosen in the desktop UI (設定 > 外觀), mirrored the same
+# way as the coordinate format so the phone page matches the desktop.
+_DEFAULT_ACCENT = "108, 140, 255"
+_appearance: dict[str, str] = {"accent_rgb": _DEFAULT_ACCENT}
+
+
+def _clean_accent(raw: str) -> str:
+    """Accept only three 0-255 integers; the value ends up inside a CSS
+    custom property on the phone page."""
+    parts = [p.strip() for p in raw.split(",")]
+    if len(parts) != 3 or not all(p.isdigit() and int(p) <= 255 for p in parts):
+        return _DEFAULT_ACCENT
+    return ", ".join(str(int(p)) for p in parts)
+
+
+@router.post("/api/phone/appearance")
+async def phone_set_appearance(body: _AppearanceBody, request: Request):
+    """Desktop-only: mirror the desktop's theme accent colour."""
+    if not _is_localhost(request):
+        raise HTTPException(status_code=403, detail="Localhost only")
+    _appearance["accent_rgb"] = _clean_accent(body.accent_rgb)
+    return dict(_appearance)
 
 
 @router.post("/api/phone/firewall_repair")
@@ -516,6 +587,8 @@ async def phone_status(
             "state": "disconnected",
             "current_position": None,
             "route_path": None,
+            "coord_format": dict(_coord_format),
+            "accent_rgb": _appearance["accent_rgb"],
         }
     s = eng.get_status()
     pos = None
@@ -528,6 +601,15 @@ async def phone_status(
         "state": s.state.value if s.state else "idle",
         "current_position": pos,
         "route_path": route_path,
+        # Progress of the primary engine's active route, for the phone's
+        # "now moving" bar. All zero while idle.
+        "is_paused": bool(s.is_paused),
+        "progress": s.progress,
+        "distance_remaining": s.distance_remaining,
+        "eta_seconds": s.eta_seconds,
+        "speed_kmh": round((s.speed_mps or 0.0) * 3.6, 1),
+        "coord_format": dict(_coord_format),
+        "accent_rgb": _appearance["accent_rgb"],
     }
 
 
@@ -543,6 +625,7 @@ async def phone_teleport(
     iPhones move together, matching the desktop UI's behaviour."""
     _check_token(_resolve_token(request, x_locwarp_token, t))
     await _fanout("teleport", lambda e: e.teleport(body.lat, body.lng))
+    _push_recent(body.lat, body.lng, "teleport", body.name)
     return {"status": "ok", "lat": body.lat, "lng": body.lng}
 
 
@@ -606,12 +689,100 @@ async def phone_navigate(
         if e.current_position is None:
             continue
         asyncio.create_task(e.navigate(dest, mode, speed_kmh=body.speed_kmh))
+    _push_recent(body.lat, body.lng, "navigate", body.name)
     return {
         "status": "started",
         "destination": {"lat": body.lat, "lng": body.lng},
         "mode": mode.value,
         "speed_kmh": body.speed_kmh,
     }
+
+
+@router.post("/api/phone/pause")
+async def phone_pause(
+    request: Request,
+    x_locwarp_token: str | None = Header(default=None, alias="X-LocWarp-Token"),
+    t: str | None = None,
+):
+    _check_token(_resolve_token(request, x_locwarp_token, t))
+    await _fanout("pause", lambda e: e.pause())
+    return {"status": "paused"}
+
+
+@router.post("/api/phone/resume")
+async def phone_resume(
+    request: Request,
+    x_locwarp_token: str | None = Header(default=None, alias="X-LocWarp-Token"),
+    t: str | None = None,
+):
+    _check_token(_resolve_token(request, x_locwarp_token, t))
+    await _fanout("resume", lambda e: e.resume())
+    return {"status": "resumed"}
+
+
+@router.post("/api/phone/speed")
+async def phone_speed(
+    body: _SpeedBody,
+    request: Request,
+    x_locwarp_token: str | None = Header(default=None, alias="X-LocWarp-Token"),
+    t: str | None = None,
+):
+    """Change the speed of whatever route is currently running, on every
+    connected engine. 400 when nothing is moving."""
+    _check_token(_resolve_token(request, x_locwarp_token, t))
+    from config import resolve_speed_profile
+    from models.schemas import MovementMode
+    try:
+        mode = MovementMode(body.mode)
+    except ValueError:
+        mode = MovementMode.WALKING
+    profile = resolve_speed_profile(mode.value, speed_kmh=body.speed_kmh)
+    applied = 0
+    for e in _all_engines():
+        try:
+            if e.apply_speed(profile):
+                applied += 1
+        except Exception:
+            logger.warning("phone speed: apply failed on one engine", exc_info=True)
+    if applied == 0:
+        raise HTTPException(status_code=400, detail={
+            "code": "no_active_route",
+            "message": "目前沒有進行中的路線,無法套用新速度",
+        })
+    return {"status": "applied", "speed_kmh": round(profile["speed_mps"] * 3.6, 1)}
+
+
+@router.get("/api/phone/bookmarks")
+async def phone_bookmarks(
+    request: Request,
+    x_locwarp_token: str | None = Header(default=None, alias="X-LocWarp-Token"),
+    t: str | None = None,
+):
+    """Read-only copy of the desktop's saved coordinates, in the same
+    category / item order the desktop shows."""
+    _check_token(_resolve_token(request, x_locwarp_token, t))
+    from main import app_state
+    bm = app_state.bookmark_manager
+    cats = sorted(bm.list_categories(), key=lambda c: c.sort_order)
+    return {
+        "categories": [{"id": c.id, "name": c.name, "color": c.color} for c in cats],
+        "bookmarks": [
+            {"id": b.id, "name": b.name, "lat": b.lat, "lng": b.lng,
+             "category_id": b.category_id, "country_code": b.country_code}
+            for b in bm.list_bookmarks()
+        ],
+    }
+
+
+@router.get("/api/phone/recent")
+async def phone_recent(
+    request: Request,
+    x_locwarp_token: str | None = Header(default=None, alias="X-LocWarp-Token"),
+    t: str | None = None,
+):
+    _check_token(_resolve_token(request, x_locwarp_token, t))
+    from services.recent import get_manager
+    return get_manager().list()
 
 
 @router.get("/api/phone/geocode")
@@ -659,19 +830,53 @@ async def phone_geocode(
 # ── Mobile page ──────────────────────────────────────────────
 
 
-def _phone_page_path() -> Path:
-    """Resolve phone.html in both dev (./backend/static/phone.html) and
-    PyInstaller-packaged (sys._MEIPASS/static/phone.html) layouts."""
+def _static_path(name: str) -> Path:
+    """Resolve a bundled static file in both dev (./backend/static/) and
+    PyInstaller-packaged (sys._MEIPASS/static/) layouts."""
     import sys
     candidates: list[Path] = []
     meipass = getattr(sys, "_MEIPASS", None)
     if meipass:
-        candidates.append(Path(meipass) / "static" / "phone.html")
-    candidates.append(Path(__file__).resolve().parent.parent / "static" / "phone.html")
+        candidates.append(Path(meipass) / "static" / name)
+    candidates.append(Path(__file__).resolve().parent.parent / "static" / name)
     for c in candidates:
         if c.exists():
             return c
     return candidates[-1]
+
+
+def _phone_page_path() -> Path:
+    return _static_path("phone.html")
+
+
+@router.get("/phone/manifest.webmanifest")
+async def phone_manifest():
+    """Web app manifest so "Add to Home Screen" opens the page full
+    screen, without browser chrome. No secrets in here."""
+    return JSONResponse(
+        {
+            "name": "LocWarp",
+            "short_name": "LocWarp",
+            "start_url": "/phone",
+            "scope": "/phone",
+            "display": "standalone",
+            "orientation": "portrait",
+            "background_color": "#0e1015",
+            "theme_color": "#0e1015",
+            "icons": [
+                {"src": "/phone/icon.png", "sizes": "256x256", "type": "image/png", "purpose": "any"},
+            ],
+        },
+        media_type="application/manifest+json",
+    )
+
+
+@router.get("/phone/icon.png")
+async def phone_icon():
+    path = _static_path("phone-icon.png")
+    if not path.exists():
+        raise HTTPException(status_code=404, detail="icon missing")
+    return FileResponse(path, media_type="image/png", headers={"Cache-Control": "public, max-age=86400"})
 
 
 @router.get("/phone", response_class=HTMLResponse)

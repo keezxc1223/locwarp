@@ -1,6 +1,6 @@
 {
   "name": "locwarp",
-  "version": "0.2.205",
+  "version": "0.2.206",
   "description": "iOS Virtual Location Simulator",
   "author": "keezxc1223",
   "main": "electron/main.js",
@@ -9,28 +9,26 @@
     "build": "tsc && vite build",
     "electron": "electron .",
     "start": "concurrently \"vite\" \"wait-on http://localhost:5173 && electron .\"",
-    "dist": "electron-builder --win nsis"
-  },
-  "dependencies": {
-    "@maplibre/maplibre-gl-leaflet": "^0.1.3",
-    "leaflet": "^1.9.4",
-    "maplibre-gl": "^6.16.0",
-    "react": "^19.3.1",
-    "react-dom": "^19.3.1",
-    "s2-geometry": "^1.2.10",
-    "supercluster": "^9.0.0"
+    "dist": "electron-builder --win nsis --publish never"
   },
   "devDependencies": {
+    "@maplibre/maplibre-gl-leaflet": "^0.1.3",
     "@types/leaflet": "^1.9.12",
     "@types/react": "^19.2.17",
     "@types/react-dom": "^19.2.3",
     "@types/supercluster": "^7.1.3",
-    "@vitejs/plugin-react": "^6.0.4",
-    "concurrently": "^10.0.3",
-    "electron": "^45.2.1",
+    "@vitejs/plugin-react": "^6.3.0",
+    "concurrently": "^10.0.7",
+    "electron": "^45.2.3",
     "electron-builder": "^26.18.0",
+    "leaflet": "^1.9.4",
+    "maplibre-gl": "^6.17.0",
+    "react": "^19.3.1",
+    "react-dom": "^19.3.1",
+    "s2-geometry": "^1.2.10",
+    "supercluster": "^9.0.0",
     "typescript": "^7.0.2",
-    "vite": "^8.3.5",
+    "vite": "^8.3.7",
     "wait-on": "^9.1.0"
   },
   "build": {
@@ -39,6 +37,14 @@
     "directories": {
       "output": "release"
     },
+    "afterPack": "build/after-pack.js",
+    "publish": [
+      {
+        "provider": "github",
+        "owner": "keezxc1223",
+        "repo": "locwarp"
+      }
+    ],
     "files": [
       "dist/**/*",
       "electron/**/*"
@@ -65,6 +71,7 @@
       "icon": "build/icon.ico"
     },
     "nsis": {
+      "artifactName": "LocWarp-Setup-${version}.${ext}",
       "oneClick": false,
       "perMachine": true,
       "allowToChangeInstallationDirectory": true,
@@ -78,6 +85,14 @@
       "installerSidebar": "build/installerSidebar.bmp",
       "uninstallerSidebar": "build/uninstallerSidebar.bmp",
       "include": "build/installer.nsh"
-    }
+    },
+    "electronLanguages": [
+      "zh-TW",
+      "zh-CN",
+      "en-US"
+    ]
+  },
+  "dependencies": {
+    "electron-updater": "^6.8.11"
   }
 }

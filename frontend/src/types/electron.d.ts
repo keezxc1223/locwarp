@@ -16,6 +16,11 @@ export interface RenderModeInfo {
   isWin10: boolean
 }
 
+export type UpdateStatusEvent =
+  | { phase: 'downloading'; percent: number; transferred: number; total: number }
+  | { phase: 'ready'; version: string }
+  | { phase: 'error'; message: string }
+
 declare global {
   interface Window {
     electronAPI?: {
@@ -23,6 +28,10 @@ declare global {
       getRenderMode(): Promise<RenderModeInfo>
       setRenderMode(mode: RenderMode): Promise<{ ok: boolean }>
       relaunchApp(): Promise<void>
+      updateSupported?(): Promise<boolean>
+      updateDownload?(): Promise<{ ok: boolean; version?: string; code?: 'UNSUPPORTED' | 'NO_UPDATE' | 'ERROR'; message?: string }>
+      updateInstall?(): Promise<{ ok: boolean }>
+      onUpdateStatus?(cb: (s: UpdateStatusEvent) => void): () => void
     }
   }
 }

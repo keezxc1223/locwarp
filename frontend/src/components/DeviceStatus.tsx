@@ -295,8 +295,8 @@ const DeviceStatus: React.FC<DeviceStatusProps> = ({
                   <span>iOS {device.iosVersion}</span>
                   <span style={{
                     padding: '1px 6px', borderRadius: 3, fontSize: 11,
-                    background: isWifi ? 'rgba(76, 175, 80, 0.15)' : 'rgba(108, 140, 255, 0.15)',
-                    color: isWifi ? '#4caf50' : '#6c8cff',
+                    background: isWifi ? 'rgba(76, 175, 80, 0.15)' : 'rgba(var(--accent-rgb), 0.15)',
+                    color: isWifi ? '#4caf50' : 'var(--accent-blue)',
                   }}>
                     {isWifi ? 'WiFi' : 'USB'}
                   </span>
@@ -314,9 +314,9 @@ const DeviceStatus: React.FC<DeviceStatusProps> = ({
                         title={pinned ? t('wifi.pin_on_tooltip') : t('wifi.pin_off_tooltip')}
                         style={{
                           fontSize: 11, padding: '3px 10px', borderRadius: 4, cursor: 'pointer', whiteSpace: 'nowrap',
-                          border: pinned ? '1px solid rgba(108, 140, 255, 0.6)' : '1px solid rgba(255,255,255,0.18)',
-                          background: pinned ? 'rgba(108, 140, 255, 0.18)' : 'transparent',
-                          color: pinned ? '#9ac0ff' : 'var(--text-muted)',
+                          border: pinned ? '1px solid rgba(var(--accent-rgb), 0.6)' : '1px solid rgba(255,255,255,0.18)',
+                          background: pinned ? 'rgba(var(--accent-rgb), 0.18)' : 'transparent',
+                          color: pinned ? 'var(--accent-soft)' : 'var(--text-muted)',
                         }}
                       >
                         {pinned ? t('wifi.pin_on') : t('wifi.pin_off')}
@@ -377,6 +377,29 @@ const DeviceStatus: React.FC<DeviceStatusProps> = ({
       </button>
 
       {/* WiFi tunnel cards for additional devices not shown in the top row */}
+      {/* Pins narrow launch auto-connect to the pinned phones only. If a
+          different phone is the one in use, say so here: otherwise the
+          app just silently stops auto-connecting and nothing explains why. */}
+      {onTogglePin && pinnedUdids.length > 0 && tunnels.filter((tn) => !pinnedUdids.includes(tn.udid)).map((tn) => {
+        const name = devices.find((d) => d.id === tn.udid)?.name || savedNameByUdid[tn.udid] || tn.udid.slice(0, 12);
+        return (
+          <div key={`pin-hint-${tn.udid}`} style={{
+            display: 'flex', alignItems: 'center', gap: 8, marginBottom: 8, padding: '7px 9px',
+            fontSize: 11, lineHeight: 1.45, color: '#ffd27a',
+            background: 'rgba(255, 180, 60, 0.1)', border: '1px solid rgba(255, 180, 60, 0.3)', borderRadius: 9,
+          }}>
+            <span style={{ flex: 1, minWidth: 0, overflowWrap: 'anywhere' }}>{t('wifi.pin_hint', { name })}</span>
+            <button
+              onClick={() => onTogglePin(tn.udid)}
+              style={{
+                flexShrink: 0, padding: '3px 9px', fontSize: 11, fontWeight: 600, cursor: 'pointer',
+                color: '#ffd27a', background: 'rgba(255, 180, 60, 0.16)',
+                border: '1px solid rgba(255, 180, 60, 0.4)', borderRadius: 7,
+              }}
+            >{t('wifi.pin_off')}</button>
+          </div>
+        );
+      })}
       {tunnels.filter((tn) => tn.udid !== device?.id).length > 0 && (
         <div style={{ marginBottom: 8 }}>
           {tunnels.filter((tn) => tn.udid !== device?.id).map((tn) => {
@@ -408,9 +431,9 @@ const DeviceStatus: React.FC<DeviceStatusProps> = ({
                         title={pinned ? t('wifi.pin_on_tooltip') : t('wifi.pin_off_tooltip')}
                         style={{
                           fontSize: 11, padding: '3px 10px', borderRadius: 4, cursor: 'pointer', whiteSpace: 'nowrap',
-                          border: pinned ? '1px solid rgba(108, 140, 255, 0.6)' : '1px solid rgba(255,255,255,0.18)',
-                          background: pinned ? 'rgba(108, 140, 255, 0.18)' : 'transparent',
-                          color: pinned ? '#9ac0ff' : 'var(--text-muted)',
+                          border: pinned ? '1px solid rgba(var(--accent-rgb), 0.6)' : '1px solid rgba(255,255,255,0.18)',
+                          background: pinned ? 'rgba(var(--accent-rgb), 0.18)' : 'transparent',
+                          color: pinned ? 'var(--accent-soft)' : 'var(--text-muted)',
                         }}
                       >
                         {pinned ? t('wifi.pin_on') : t('wifi.pin_off')}
@@ -536,8 +559,8 @@ const DeviceStatus: React.FC<DeviceStatusProps> = ({
                           fontSize: 9,
                           padding: '0 3px',
                           borderRadius: 2,
-                          background: d.connectionType === 'Network' ? 'rgba(76, 175, 80, 0.15)' : 'rgba(108, 140, 255, 0.15)',
-                          color: d.connectionType === 'Network' ? '#4caf50' : '#6c8cff',
+                          background: d.connectionType === 'Network' ? 'rgba(76, 175, 80, 0.15)' : 'rgba(var(--accent-rgb), 0.15)',
+                          color: d.connectionType === 'Network' ? '#4caf50' : 'var(--accent-blue)',
                         }}>
                           {d.connectionType === 'Network' ? 'WiFi' : 'USB'}
                         </span>
@@ -602,9 +625,9 @@ const DeviceStatus: React.FC<DeviceStatusProps> = ({
                   onClick={() => setShowIpHelp(!showIpHelp)}
                   style={{
                     flex: 1, fontSize: 11, padding: '5px 0', borderRadius: 5,
-                    border: `1px solid ${showIpHelp ? 'rgba(108,140,255,0.5)' : 'rgba(255,255,255,0.18)'}`,
-                    background: showIpHelp ? 'rgba(108,140,255,0.12)' : 'rgba(255,255,255,0.05)',
-                    color: showIpHelp ? '#9ac0ff' : 'rgba(255,255,255,0.75)',
+                    border: `1px solid ${showIpHelp ? 'rgba(var(--accent-rgb),0.5)' : 'rgba(255,255,255,0.18)'}`,
+                    background: showIpHelp ? 'rgba(var(--accent-rgb),0.12)' : 'rgba(255,255,255,0.05)',
+                    color: showIpHelp ? 'var(--accent-soft)' : 'rgba(255,255,255,0.75)',
                     cursor: 'pointer', display: 'inline-flex', alignItems: 'center', justifyContent: 'center', gap: 4,
                   }}
                 >
@@ -619,9 +642,9 @@ const DeviceStatus: React.FC<DeviceStatusProps> = ({
                   title={t('wifi.detect_tooltip')}
                   style={{
                     flex: 1, fontSize: 11, padding: '5px 0', borderRadius: 5,
-                    border: '1px solid rgba(108, 140, 255, 0.5)',
-                    background: 'rgba(108, 140, 255, 0.12)',
-                    color: '#6c8cff', cursor: discovering ? 'wait' : 'pointer',
+                    border: '1px solid rgba(var(--accent-rgb), 0.5)',
+                    background: 'rgba(var(--accent-rgb), 0.12)',
+                    color: 'var(--accent-blue)', cursor: discovering ? 'wait' : 'pointer',
                     display: 'inline-flex', alignItems: 'center', justifyContent: 'center', gap: 4,
                     opacity: (discovering || tunnels.length >= MAX_TUNNEL_DEVICES) ? 0.5 : 1,
                   }}
@@ -652,11 +675,11 @@ const DeviceStatus: React.FC<DeviceStatusProps> = ({
               {showIpHelp && (
                 <div style={{
                   fontSize: 11, padding: '8px 10px', marginBottom: 8,
-                  background: 'rgba(108, 140, 255, 0.08)',
-                  border: '1px solid rgba(108, 140, 255, 0.3)',
+                  background: 'rgba(var(--accent-rgb), 0.08)',
+                  border: '1px solid rgba(var(--accent-rgb), 0.3)',
                   borderRadius: 4, lineHeight: 1.6,
                 }}>
-                  <div style={{ fontWeight: 600, marginBottom: 4, color: '#6c8cff' }}>
+                  <div style={{ fontWeight: 600, marginBottom: 4, color: 'var(--accent-blue)' }}>
                     {t('wifi.help_title')}
                   </div>
                   <div style={{ opacity: 0.85 }}>
@@ -672,11 +695,11 @@ const DeviceStatus: React.FC<DeviceStatusProps> = ({
               {discoverResults.length > 0 && (
                 <div style={{
                   fontSize: 11, padding: '6px 8px', marginBottom: 8,
-                  background: 'rgba(108, 140, 255, 0.06)',
-                  border: '1px solid rgba(108, 140, 255, 0.3)',
+                  background: 'rgba(var(--accent-rgb), 0.06)',
+                  border: '1px solid rgba(var(--accent-rgb), 0.3)',
                   borderRadius: 4,
                 }}>
-                  <div style={{ fontWeight: 600, marginBottom: 4, color: '#6c8cff' }}>
+                  <div style={{ fontWeight: 600, marginBottom: 4, color: 'var(--accent-blue)' }}>
                     {t('wifi.tunnel_detect_multiple', { n: discoverResults.length })}
                   </div>
                   {discoverResults.map((r) => (
@@ -692,8 +715,8 @@ const DeviceStatus: React.FC<DeviceStatusProps> = ({
                         onClick={() => pickDiscoverResult(r)}
                         style={{
                           fontSize: 10, padding: '2px 6px', borderRadius: 3,
-                          border: '1px solid rgba(108, 140, 255, 0.5)',
-                          background: 'rgba(108, 140, 255, 0.12)', color: '#6c8cff',
+                          border: '1px solid rgba(var(--accent-rgb), 0.5)',
+                          background: 'rgba(var(--accent-rgb), 0.12)', color: 'var(--accent-blue)',
                           cursor: 'pointer',
                         }}
                       >
@@ -709,8 +732,8 @@ const DeviceStatus: React.FC<DeviceStatusProps> = ({
                 style={{
                   display: 'flex', alignItems: 'center', gap: 8,
                   fontSize: 11, padding: '5px 8px', marginBottom: 6,
-                  background: 'rgba(108, 140, 255, 0.06)',
-                  border: '1px solid rgba(108, 140, 255, 0.2)',
+                  background: 'rgba(var(--accent-rgb), 0.06)',
+                  border: '1px solid rgba(var(--accent-rgb), 0.2)',
                   borderRadius: 4, cursor: 'pointer',
                 }}
                 title={t('wifi.autoconnect_tooltip')}
@@ -719,7 +742,7 @@ const DeviceStatus: React.FC<DeviceStatusProps> = ({
                 <span style={{
                   position: 'relative', display: 'inline-flex', alignItems: 'center',
                   width: 28, height: 15, borderRadius: 8, flexShrink: 0,
-                  background: autoConnectEnabled ? '#6c8cff' : 'rgba(255,255,255,0.18)',
+                  background: autoConnectEnabled ? 'var(--accent-blue)' : 'rgba(255,255,255,0.18)',
                   transition: 'background 0.2s',
                 }}>
                   <span style={{
@@ -738,8 +761,8 @@ const DeviceStatus: React.FC<DeviceStatusProps> = ({
                 style={{
                   display: 'flex', alignItems: 'center', gap: 8,
                   fontSize: 11, padding: '5px 8px', marginBottom: 8,
-                  background: 'rgba(108, 140, 255, 0.06)',
-                  border: '1px solid rgba(108, 140, 255, 0.2)',
+                  background: 'rgba(var(--accent-rgb), 0.06)',
+                  border: '1px solid rgba(var(--accent-rgb), 0.2)',
                   borderRadius: 4, cursor: 'pointer',
                 }}
                 title={t('wifi.keepalive_tooltip')}
@@ -748,7 +771,7 @@ const DeviceStatus: React.FC<DeviceStatusProps> = ({
                 <span style={{
                   position: 'relative', display: 'inline-flex', alignItems: 'center',
                   width: 28, height: 15, borderRadius: 8, flexShrink: 0,
-                  background: keepaliveEnabled ? '#6c8cff' : 'rgba(255,255,255,0.18)',
+                  background: keepaliveEnabled ? 'var(--accent-blue)' : 'rgba(255,255,255,0.18)',
                   transition: 'background 0.2s',
                 }}>
                   <span style={{
@@ -792,9 +815,9 @@ const DeviceStatus: React.FC<DeviceStatusProps> = ({
                             title={t('wifi.recent_ips_tooltip')}
                             style={{
                               padding: '2px 6px', fontSize: 10, lineHeight: 1.2,
-                              background: 'rgba(108, 140, 255, 0.12)',
-                              border: '1px solid rgba(108, 140, 255, 0.35)',
-                              color: '#9ac0ff', borderRadius: 3,
+                              background: 'rgba(var(--accent-rgb), 0.12)',
+                              border: '1px solid rgba(var(--accent-rgb), 0.35)',
+                              color: 'var(--accent-soft)', borderRadius: 3,
                               cursor: tunnelConnecting ? 'not-allowed' : 'pointer',
                               display: 'inline-flex', alignItems: 'center', gap: 3,
                               whiteSpace: 'nowrap',
@@ -813,7 +836,7 @@ const DeviceStatus: React.FC<DeviceStatusProps> = ({
                               position: 'absolute', top: '100%', right: 0, left: 42,
                               marginTop: 4, zIndex: 30,
                               background: '#2a2a2e',
-                              border: '1px solid rgba(108, 140, 255, 0.35)',
+                              border: '1px solid rgba(var(--accent-rgb), 0.35)',
                               borderRadius: 4,
                               boxShadow: '0 6px 14px rgba(0,0,0,0.45)',
                               maxHeight: 180, overflowY: 'auto',
@@ -935,9 +958,9 @@ const DeviceStatus: React.FC<DeviceStatusProps> = ({
                         style={{
                           width: '100%', fontSize: 13, fontWeight: 600, padding: '9px 12px',
                           borderRadius: 7, border: 'none',
-                          background: (tunnelConnecting || portScanning) ? 'rgba(108,140,255,0.45)' : 'linear-gradient(135deg, #6c8cff 0%, #4f6fe8 100%)',
+                          background: (tunnelConnecting || portScanning) ? 'rgba(var(--accent-rgb),0.45)' : 'linear-gradient(135deg, var(--accent-blue) 0%, #4f6fe8 100%)',
                           color: '#fff', cursor: (tunnelConnecting || portScanning) ? 'wait' : 'pointer',
-                          boxShadow: (tunnelConnecting || portScanning) ? 'none' : '0 4px 14px rgba(108,140,255,0.45)',
+                          boxShadow: (tunnelConnecting || portScanning) ? 'none' : '0 4px 14px rgba(var(--accent-rgb),0.45)',
                           letterSpacing: '0.02em', transition: 'all 0.15s',
                         }}
                       >
@@ -975,7 +998,7 @@ const DeviceStatus: React.FC<DeviceStatusProps> = ({
           style={{
             position: 'fixed', top: 0, left: 0, right: 0, bottom: 0,
             background: 'rgba(8, 10, 20, 0.55)',
-            backdropFilter: 'blur(4px)', WebkitBackdropFilter: 'blur(4px)',
+            backdropFilter: 'blur(4px)', animation: 'var(--anim-scrim)', WebkitBackdropFilter: 'blur(4px)',
             display: 'flex', alignItems: 'center', justifyContent: 'center',
             zIndex: 1000, padding: 20,
           }}
@@ -984,13 +1007,13 @@ const DeviceStatus: React.FC<DeviceStatusProps> = ({
             onClick={(e) => e.stopPropagation()}
             className="anim-scale-in"
             style={{
-              background: 'rgba(26, 29, 39, 0.96)',
-              backdropFilter: 'blur(14px)', WebkitBackdropFilter: 'blur(14px)',
-              border: '1px solid rgba(108, 140, 255, 0.2)', borderRadius: 14,
+              background: 'var(--glass-pop)',
+              backdropFilter: 'var(--glass-blur)', WebkitBackdropFilter: 'var(--glass-blur)',
+              border: '1px solid rgba(var(--accent-rgb), 0.2)', borderRadius: 14,
               padding: 26, maxWidth: 560, width: '100%',
               maxHeight: '80vh', overflowY: 'auto',
               color: '#e8e8e8',
-              boxShadow: '0 20px 60px rgba(12, 18, 40, 0.65), 0 0 0 1px rgba(255, 255, 255, 0.05) inset',
+              boxShadow: 'var(--shadow-pop)', animation: 'var(--anim-pop)',
             }}
           >
             <div style={{ display: 'flex', alignItems: 'center', gap: 12, marginBottom: 16 }}>
@@ -1011,7 +1034,7 @@ const DeviceStatus: React.FC<DeviceStatusProps> = ({
                 onClick={() => setShowWifiWarning(false)}
                 style={{
                   padding: '8px 20px', fontSize: 13, borderRadius: 5,
-                  background: '#6c8cff', color: '#fff', border: 'none', cursor: 'pointer',
+                  background: 'var(--accent-blue)', color: '#fff', border: 'none', cursor: 'pointer',
                   fontWeight: 600,
                 }}
               >{t('wifi.warning_ok')}</button>
@@ -1028,7 +1051,7 @@ const DeviceStatus: React.FC<DeviceStatusProps> = ({
           style={{
             position: 'fixed', top: 0, left: 0, right: 0, bottom: 0,
             background: 'rgba(8, 10, 20, 0.55)',
-            backdropFilter: 'blur(4px)', WebkitBackdropFilter: 'blur(4px)',
+            backdropFilter: 'blur(4px)', animation: 'var(--anim-scrim)', WebkitBackdropFilter: 'blur(4px)',
             display: 'flex', alignItems: 'center', justifyContent: 'center',
             zIndex: 1000, padding: 20,
           }}
@@ -1037,20 +1060,20 @@ const DeviceStatus: React.FC<DeviceStatusProps> = ({
             onClick={(e) => e.stopPropagation()}
             className="anim-scale-in"
             style={{
-              background: 'rgba(26, 29, 39, 0.96)',
-              backdropFilter: 'blur(14px)', WebkitBackdropFilter: 'blur(14px)',
-              border: '1px solid rgba(108, 140, 255, 0.2)', borderRadius: 14,
+              background: 'var(--glass-pop)',
+              backdropFilter: 'var(--glass-blur)', WebkitBackdropFilter: 'var(--glass-blur)',
+              border: '1px solid rgba(var(--accent-rgb), 0.2)', borderRadius: 14,
               padding: 26, maxWidth: 460, width: '100%',
               color: '#e8e8e8',
-              boxShadow: '0 20px 60px rgba(12, 18, 40, 0.65), 0 0 0 1px rgba(255, 255, 255, 0.05) inset',
+              boxShadow: 'var(--shadow-pop)', animation: 'var(--anim-pop)',
             }}
           >
             <div style={{ display: 'flex', alignItems: 'center', gap: 12, marginBottom: 16 }}>
               <span style={{
                 display: 'inline-flex', alignItems: 'center', justifyContent: 'center',
                 width: 32, height: 32, borderRadius: '50%',
-                background: 'rgba(108, 140, 255, 0.15)', color: '#6c8cff',
-                fontSize: 18, fontWeight: 700, border: '1px solid rgba(108,140,255,0.5)',
+                background: 'rgba(var(--accent-rgb), 0.15)', color: 'var(--accent-blue)',
+                fontSize: 18, fontWeight: 700, border: '1px solid rgba(var(--accent-rgb),0.5)',
                 flexShrink: 0,
               }}>↻</span>
               <strong style={{ fontSize: 15 }}>{t('wifi.repair_confirm_title')}</strong>
@@ -1070,7 +1093,7 @@ const DeviceStatus: React.FC<DeviceStatusProps> = ({
                   <button
                     onClick={handleRepair}
                     style={{ padding: '7px 16px', fontSize: 12, borderRadius: 5,
-                      background: '#6c8cff', color: '#fff', border: 'none', cursor: 'pointer', fontWeight: 600 }}
+                      background: 'var(--accent-blue)', color: '#fff', border: 'none', cursor: 'pointer', fontWeight: 600 }}
                   >{t('wifi.repair_ok')}</button>
                 </div>
               </>
@@ -1080,8 +1103,8 @@ const DeviceStatus: React.FC<DeviceStatusProps> = ({
               <div style={{ fontSize: 13, lineHeight: 1.7, textAlign: 'center', padding: '20px 0' }}>
                 <div style={{
                   width: 32, height: 32, margin: '0 auto 12px',
-                  border: '3px solid rgba(108,140,255,0.25)',
-                  borderTopColor: '#6c8cff', borderRadius: '50%',
+                  border: '3px solid rgba(var(--accent-rgb),0.25)',
+                  borderTopColor: 'var(--accent-blue)', borderRadius: '50%',
                   animation: 'spin 0.8s linear infinite',
                 }} />
                 <div style={{ color: '#ffc107' }}>{t('wifi.repair_running')}</div>
@@ -1101,7 +1124,7 @@ const DeviceStatus: React.FC<DeviceStatusProps> = ({
                   <button
                     onClick={() => setShowRepairConfirm(false)}
                     style={{ padding: '7px 16px', fontSize: 12, borderRadius: 5,
-                      background: '#6c8cff', color: '#fff', border: 'none', cursor: 'pointer', fontWeight: 600 }}
+                      background: 'var(--accent-blue)', color: '#fff', border: 'none', cursor: 'pointer', fontWeight: 600 }}
                   >{t('wifi.warning_ok')}</button>
                 </div>
               </>
@@ -1126,7 +1149,7 @@ const DeviceStatus: React.FC<DeviceStatusProps> = ({
                   <button
                     onClick={handleRepair}
                     style={{ padding: '7px 16px', fontSize: 12, borderRadius: 5,
-                      background: '#6c8cff', color: '#fff', border: 'none', cursor: 'pointer', fontWeight: 600 }}
+                      background: 'var(--accent-blue)', color: '#fff', border: 'none', cursor: 'pointer', fontWeight: 600 }}
                   >{t('wifi.repair_ok')}</button>
                 </div>
               </>
