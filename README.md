@@ -1,44 +1,85 @@
-# LocWarp
+<a id="top"></a>
 
-**在 Windows 上控制 iPhone / iPad GPS 定位的虛擬定位工具。** 免越獄,透過 USB 或 WiFi 連線,支援瞬移、導航、多點路徑、花農繞圈、隨機漫步與搖桿操作,最多可同時控制三台裝置。
+<p align="center">
+  <img src="frontend/build/icon.png" width="112" alt="LocWarp">
+</p>
 
-<p align="right">
-  <a href="README.md"><img alt="繁體中文" src="https://img.shields.io/badge/繁體中文-active-2d3748?style=flat-square"></a>
-  <a href="README.en.md"><img alt="English" src="https://img.shields.io/badge/English-gray?style=flat-square"></a>
+<h1 align="center">LocWarp</h1>
+
+<p align="center">
+  <b>在 Windows 上控制 iPhone / iPad GPS 定位的虛擬定位工具</b><br>
+  免越獄 · USB 或 WiFi 連線 · 最多同時三台裝置 · 免費開源
 </p>
 
 <p align="center">
-  <img src="frontend/build/icon.png" width="128" alt="LocWarp">
+  <a href="https://github.com/keezxc1223/locwarp/releases/latest"><img alt="release" src="https://img.shields.io/github/v/release/keezxc1223/locwarp?style=flat-square&color=6c8cff"></a>
+  <a href="https://github.com/keezxc1223/locwarp/releases"><img alt="downloads" src="https://img.shields.io/github/downloads/keezxc1223/locwarp/total?style=flat-square&color=4ecdc4"></a>
+  <img alt="platform" src="https://img.shields.io/badge/Windows-10%20%7C%2011-2d3748?style=flat-square">
+  <img alt="iOS" src="https://img.shields.io/badge/iOS-17%2B-2d3748?style=flat-square">
+  <a href="LICENSE"><img alt="license" src="https://img.shields.io/github/license/keezxc1223/locwarp?style=flat-square"></a>
 </p>
 
 <p align="center">
-  <a href="https://github.com/keezxc1223/locwarp/releases">
-    <img alt="下載安裝檔" src="https://img.shields.io/badge/下載安裝檔-4285f4?style=for-the-badge&logo=github&logoColor=white">
-  </a>
-  <a href="#安裝與前置設定">
-    <img alt="安裝說明" src="https://img.shields.io/badge/安裝說明-2d3748?style=for-the-badge&logo=readthedocs&logoColor=white">
-  </a>
-  <a href="https://lin.ee/UwdCrmf" target="_blank">
-    <img alt="LINE" src="https://img.shields.io/badge/LINE-聯絡作者-06C755?style=for-the-badge&logo=line&logoColor=white">
-  </a>
+  <b>繁體中文</b> · <a href="README.en.md">English</a>
 </p>
+
+<p align="center">
+  <a href="#下載">下載</a> ·
+  <a href="#快速開始">快速開始</a> ·
+  <a href="#功能">功能</a> ·
+  <a href="#疑難排解">疑難排解</a> ·
+  <a href="#開發者文件">開發者文件</a> ·
+  <a href="https://lin.ee/UwdCrmf">LINE 聯絡作者</a>
+</p>
+
+<p align="center">
+  <img src="docs/screenshot-library.jpg" width="820" alt="LocWarp">
+</p>
+
+> [!WARNING]
+> **使用前請注意**:LocWarp 僅供研究與開發測試。用在以位置為基礎的遊戲或服務可能違反該平台的服務條款,並導致帳號受限或停權,風險由使用者自行承擔。完整條款見[免責聲明](#disclaimer免責聲明)。
+
+## 特色
+
+- **六種移動模式**:瞬移、導航、多點路徑、花農專用、隨機漫步、搖桿,速度可用預設檔位、固定值或隨機範圍。
+- **USB 與 WiFi**:插上 USB 自動連線;iOS 17 以上可改用 WiFi Tunnel 拔線使用,釘選後每次啟動自動連上。
+- **多裝置同步**:最多三台裝置同時操作,所有動作同步套用,走的路線完全相同。
+- **座標與路線收藏**:搜尋、分類、拖曳排序,單擊即移動;支援 JSON 與 GPX 匯入匯出。
+- **手機網頁操控**:人不在電腦旁時,用手機瀏覽器就能瞬移、導航、暫停與變速。
+- **座標格式**:WGS84、GCJ02、BD09 與經緯度順序可切換,顯示、複製、輸入一致。
+- **程式內更新**:有新版時在程式內下載並重新啟動即可,不會自動下載。
+- **不需要註冊**:路線規劃、地址搜尋、地圖圖層全部使用免費的公共服務,無遙測。
+
+---
+
+## 介面預覽
+
+| 主畫面與移動模式 | 收藏視窗 | 主題與外觀設定 |
+| :---: | :---: | :---: |
+| <img src="docs/screenshot-main.jpg" alt="主畫面與移動模式"> | <img src="docs/screenshot-library.jpg" alt="收藏視窗"> | <img src="docs/screenshot-theme.jpg" alt="主題與外觀設定"> |
+
+<details>
+<summary>操作示範(錄製於較早的版本,介面外觀已更新)</summary>
 
 <p align="center">
   <img src="docs/demo-v2.gif" width="720" alt="LocWarp demo">
 </p>
 
-## 目錄
+</details>
 
-- [快速開始](#快速開始)
-- [系統需求與相容性](#系統需求與相容性)
-- [功能](#功能)
-- [安裝與前置設定](#安裝與前置設定)
-- [疑難排解](#疑難排解)
-- [開發者文件](#開發者文件)
-- [支持與聯絡](#支持與聯絡)
-- [專案性質聲明](#專案性質聲明)
-- [License](#license)
-- [Disclaimer(免責聲明)](#disclaimer免責聲明)
+---
+
+## 下載
+
+目前只提供 Windows 10 / 11(64 位元)安裝檔。安裝檔已包含所有需要的元件,不用另外安裝 Python 或 Node。
+
+| 來源 | 連結 | 說明 |
+| --- | --- | --- |
+| GitHub Releases | [下載最新版](https://github.com/keezxc1223/locwarp/releases/latest) | 主要發布位置,附更新內容 |
+| Google 雲端 | [開啟資料夾](https://drive.google.com/drive/folders/1bqVnNnSbwrVaf2GT6fEhW6R0ZlhE-fc3) | 內容相同,連不上 GitHub 時使用 |
+
+> [!NOTE]
+> 安裝檔沒有數位簽章,Windows 可能顯示 SmartScreen 警告,防毒軟體也可能誤判後端程式。遇到時請把安裝資料夾加入排除清單後重新安裝。
 
 ---
 
@@ -80,7 +121,10 @@
 
 ## 功能
 
-### 移動模式
+點擊各項目展開詳細說明。
+
+<details>
+<summary><b>移動模式</b></summary>
 
 | 模式 | 說明 |
 | --- | --- |
@@ -93,14 +137,20 @@
 
 多點路徑可以勾選「**點對點跳躍**」,改成逐點瞬移而不走道路,適合只需要 GPS 依序停在每個點上的情況。跳躍前延遲(預設 2 秒)與跳躍後延遲(預設 4 秒)都可以調整,暫停時兩段延遲都會凍結。
 
-### 速度控制
+</details>
+
+<details>
+<summary><b>速度控制</b></summary>
 
 - 三檔預設:走路 10.8、腳踏車 19.8、開車 60 km/h。
 - 可輸入任意固定速度,或輸入最小到最大的隨機範圍(例如 40 到 80 km/h),每段路重新抽一次,模擬真實路況。
 - 移動進行中可以修改速度後按「套用新速度」,會從目前位置以新速度接續,不用停下重來。
 - 選過的速度會記住,下次開啟沿用。到點暫停時地圖上方會顯示倒數。
 
-### 路徑來源
+</details>
+
+<details>
+<summary><b>路徑來源</b></summary>
 
 導航與多點路徑使用的道路路線,可以在四個免費、免註冊的路徑引擎之間切換:
 
@@ -113,7 +163,10 @@
 
 任何引擎失敗時,該段路自動改走直線,下一段再重試,不會卡住。也可以直接勾選「使用直線路徑」完全不查詢引擎。多點路徑另有「最佳順序」功能,一鍵算出最短的走訪順序。
 
-### 連線方式
+</details>
+
+<details>
+<summary><b>連線方式</b></summary>
 
 - **USB**:插上自動連線,iPhone 鎖定螢幕不受影響。拔除約 4 秒內偵測到,重新插上自動恢復,不用重新整理。
 - **WiFi Tunnel**(iOS 17+,需先用 USB 配對過一次):
@@ -124,7 +177,10 @@
   - 「重新配對」可在配對記錄損毀時,透過 USB 一鍵重建。
   - 停止 Tunnel 時若 USB 還插著,會自動切回 USB。
 
-### 多裝置群組模式
+</details>
+
+<details>
+<summary><b>多裝置群組模式</b></summary>
 
 可同時連接**最多三台**裝置。瞬移、導航、各種移動模式、暫停、繼續、停止、套用速度、還原,都會同步送到所有裝置,桌面與手機網頁操控都適用。
 
@@ -133,7 +189,10 @@
 - 後來才接上的裝置,會自動同步到目前位置並接續正在執行的任務。
 - 每台裝置可以個別還原、中斷或開啟開發者模式選項。
 
-### 地圖
+</details>
+
+<details>
+<summary><b>地圖</b></summary>
 
 - **圖層切換**(右上角):OSM、Google 圖磚(測試)、ESRI 街道、ESRI 衛星、OpenFreeMap Liberty / Bright / Positron(向量圖)、VersaTiles Colorful、NLSC 台灣電子地圖、GSI 日本地理院地圖。全部免 API key。
 - 路徑點以 S / 1 / 2 / 3 標示,路徑線有流動箭頭可以看出方向。
@@ -141,7 +200,10 @@
 - 地圖上的使用者圖示可以換成內建的 6 組角色,或上傳自己的 PNG(自動去除透明邊界)。
 - **座標格式**(設定頁):座標系統可選 WGS84 / CGCS2000(預設)、GCJ02(高德、騰訊)、BD09(百度),經緯度順序可選緯度在前或經度在前。設定套用於座標的顯示、複製與輸入,手機網頁操控同步套用;地圖、已儲存的座標與路線、GPX 與備份檔一律維持 WGS84。GCJ02 只在中國大陸與港澳有偏移,BD09 另外包含台灣,其他地區等同 WGS84。
 
-### 收藏視窗
+</details>
+
+<details>
+<summary><b>收藏視窗</b></summary>
 
 上方導覽列的「收藏」會開啟一個可拖曳的浮動視窗,分成「座標」與「路線」兩個分頁,操作方式相同:
 
@@ -151,7 +213,10 @@
 - 直接拖曳項目即可調整順序,拖到另一個分類上就是移過去;分類本身也能拖曳排序。
 - 排序可選手動、名稱、新增時間、最後使用(路線為更新時間)。
 
-### 座標收藏
+</details>
+
+<details>
+<summary><b>座標收藏</b></summary>
 
 - 「新增」可以儲存目前位置、輸入座標新增、批次貼上多筆座標,或從檔案匯入。新增時自動帶入國旗。
 - 刪除座標後視窗下方會出現「復原」。
@@ -159,26 +224,38 @@
 - 可把所有座標顯示在地圖上,數萬筆也不會卡頓,密集的點會自動聚合。
 - 「點擊座標時移動 GPS」關閉後,單擊座標只會把地圖畫面移過去,不會移動 GPS。
 
-### 儲存路線
+</details>
+
+<details>
+<summary><b>儲存路線</b></summary>
 
 - 「新增」可以把地圖上目前的路線存起來;同名時可選擇覆蓋或另存。
 - 支援 GPX 與 JSON 的匯入匯出。
 - 可以把路徑點依目前順序複製成一行一筆的座標文字。
 
-### 地址搜尋
+</details>
+
+<details>
+<summary><b>地址搜尋</b></summary>
 
 - **免費版**:預設來源,使用 OpenStreetMap 開放資料,不用 API key。設定裡另有 Photon 選項,模糊搜尋與錯字容錯較強。
 - **Google Geocoding**:輸入自己的 API key(只存在本機),中文地名與店家結果最精準,每月有免費額度。
 - 座標輸入框可以直接貼上座標文字,會自動辨識出有效的經緯度。
 - 手機網頁操控會沿用電腦端的設定。
 
-### 手機網頁操控
+</details>
+
+<details>
+<summary><b>手機網頁操控</b></summary>
 
 人不在電腦旁時,可以用手機瀏覽器操控。按狀態列的「手機操控」會顯示區域網路網址與 6 位數 PIN,手機輸入後就能使用行動版地圖:瞬移、導航到指定點(走路 / 腳踏車 / 開車或自訂速度)、搜尋地址、輸入座標、停止與還原,並即時顯示桌面上同一條路徑。移動中會顯示進度、剩餘距離與時間,可以暫停、繼續或變更速度。電腦上儲存的座標與最近紀錄可以直接取用。頁面可以加到手機主畫面,像 app 一樣全螢幕開啟,配色與座標格式跟隨電腦端的設定。
 
 > 手機必須跟電腦連在**同一個 WiFi**,電腦防火牆需放行 8777 port。按「重新產生」可立刻更換 PIN,讓之前配對過的手機失效。
 
-### 狀態列資訊
+</details>
+
+<details>
+<summary><b>狀態列資訊</b></summary>
 
 - 目前模擬位置的**國旗、地名、當地天氣與溫度**。
 - 跨時區時顯示時差,點開可看完整時區資訊。
@@ -186,7 +263,10 @@
 - 版本號:有新版本時旁邊出現 `NEW` 標示。點擊後可以按「下載更新」在程式內下載(顯示進度),完成後按「重新啟動」即為新版;也可以改從 GitHub 或 Google 雲端自行下載安裝檔。程式不會自動下載,按了才會開始。
 - 「Log 資料夾」按鈕:一鍵開啟 `~/.locwarp/logs/`,方便把 backend.log 附到 Issue。
 
-### 其他
+</details>
+
+<details>
+<summary><b>其他</b></summary>
 
 - **Cooldown**:依瞬移距離自動計算冷卻時間,降低被偵測為異常移動的風險。
 - 介面語言可在繁體中文與 English 之間即時切換。
@@ -194,6 +274,8 @@
 - 設定頁的外觀、座標格式與提示音變更,需按「儲存設定」才會保留。
 - 路線完成提示音、硬體加速開關(部分顯示卡驅動下關閉可解決殘影或黑畫面,見 [Issue #24](https://github.com/keezxc1223/locwarp/issues/24))。
 - 所有資料(座標收藏、路線、設定)都存在 `~/.locwarp/`,重新安裝不會遺失。
+
+</details>
 
 ---
 
@@ -248,6 +330,17 @@ iOS 17 以上需要 iPhone 上掛有 Personalized DDI 才能模擬定位。LocWa
 
 ---
 
+## 更新方式
+
+有新版本時,視窗右下角的版本號旁會出現 `NEW`。點擊後:
+
+1. 按「**下載更新**」,程式會在背景下載並顯示進度。
+2. 下載完成後按「**重新啟動**」,重新開啟後就是新版本,座標與設定都會保留。
+
+程式不會自動下載,按了才會開始。也可以從對話框裡的 GitHub 或 Google 雲端連結自行下載安裝檔覆蓋安裝。v0.2.205 以前的版本沒有程式內更新,需要手動安裝一次新版。
+
+---
+
 ## 疑難排解
 
 | 症狀 | 可能原因與解法 |
@@ -275,6 +368,9 @@ iOS 17 以上需要 iPhone 上掛有 Personalized DDI 才能模擬定位。LocWa
 ---
 
 ## 開發者文件
+
+<details>
+<summary>展開開發者文件(架構、技術組成、開發環境、打包、專案結構)</summary>
 
 ### 架構
 
@@ -426,6 +522,8 @@ locwarp/
 └── build-installer.bat      # 一鍵建置安裝檔
 ```
 
+</details>
+
 ---
 
 ## 支持與聯絡
@@ -443,6 +541,19 @@ TTLi4YcPcDw5R8Mr4H4u5rDuFwTZjtCQXk
 <p>
   <img src="docs/donate-usdt-tron-qr.png" alt="USDT TRC-20 QR" width="260">
 </p>
+
+---
+
+## 致謝
+
+LocWarp 建立在這些開源專案與公共服務之上:
+
+- [pymobiledevice3](https://github.com/doronz88/pymobiledevice3):與 iOS 裝置溝通的所有協議實作
+- [Leaflet](https://leafletjs.com/) 與 [MapLibre GL](https://maplibre.org/):地圖顯示
+- [OpenStreetMap](https://www.openstreetmap.org/copyright) 貢獻者:地圖資料
+- [OSRM](https://project-osrm.org/)、[Valhalla](https://github.com/valhalla/valhalla)、[BRouter](https://brouter.de/):路線規劃
+- [Photon](https://photon.komoot.io/)、[Open-Meteo](https://open-meteo.com/):地址搜尋與天氣
+- 回報問題、測試各個 iOS 版本與貢獻程式碼的每一位使用者
 
 ---
 
@@ -498,3 +609,7 @@ LocWarp 是個人獨立維護的開源專案,不是商業產品,也沒有專職�
 **下載、安裝或執行本軟體,即視為您已完整閱讀並同意上述全部免責條款。**
 
 **若不同意,請立即停止使用並移除本軟體。**
+
+---
+
+<p align="right"><a href="#top">回到頂端</a></p>

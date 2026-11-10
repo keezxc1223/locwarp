@@ -1,44 +1,85 @@
-# LocWarp
+<a id="top"></a>
 
-**A Windows tool that controls the GPS location of an iPhone or iPad.** No jailbreak. Works over USB or Wi-Fi, with Teleport, Navigate, Multi-point Route, Flower Farmer circling, Random Walk, and Joystick modes, and can drive up to three devices at once.
+<p align="center">
+  <img src="frontend/build/icon.png" width="112" alt="LocWarp">
+</p>
 
-<p align="right">
-  <a href="README.md"><img alt="繁體中文" src="https://img.shields.io/badge/繁體中文-gray?style=flat-square"></a>
-  <a href="README.en.md"><img alt="English" src="https://img.shields.io/badge/English-active-2d3748?style=flat-square"></a>
+<h1 align="center">LocWarp</h1>
+
+<p align="center">
+  <b>A virtual location tool that controls iPhone / iPad GPS from Windows</b><br>
+  No jailbreak · USB or Wi-Fi · Up to three devices at once · Free and open source
 </p>
 
 <p align="center">
-  <img src="frontend/build/icon.png" width="128" alt="LocWarp">
+  <a href="https://github.com/keezxc1223/locwarp/releases/latest"><img alt="release" src="https://img.shields.io/github/v/release/keezxc1223/locwarp?style=flat-square&color=6c8cff"></a>
+  <a href="https://github.com/keezxc1223/locwarp/releases"><img alt="downloads" src="https://img.shields.io/github/downloads/keezxc1223/locwarp/total?style=flat-square&color=4ecdc4"></a>
+  <img alt="platform" src="https://img.shields.io/badge/Windows-10%20%7C%2011-2d3748?style=flat-square">
+  <img alt="iOS" src="https://img.shields.io/badge/iOS-17%2B-2d3748?style=flat-square">
+  <a href="LICENSE"><img alt="license" src="https://img.shields.io/github/license/keezxc1223/locwarp?style=flat-square"></a>
 </p>
 
 <p align="center">
-  <a href="https://github.com/keezxc1223/locwarp/releases">
-    <img alt="Download installer" src="https://img.shields.io/badge/Download_installer-4285f4?style=for-the-badge&logo=github&logoColor=white">
-  </a>
-  <a href="#installation-and-setup">
-    <img alt="Setup guide" src="https://img.shields.io/badge/Setup_guide-2d3748?style=for-the-badge&logo=readthedocs&logoColor=white">
-  </a>
-  <a href="https://lin.ee/UwdCrmf" target="_blank">
-    <img alt="LINE" src="https://img.shields.io/badge/LINE-Contact_the_author-06C755?style=for-the-badge&logo=line&logoColor=white">
-  </a>
+  <a href="README.md">繁體中文</a> · <b>English</b>
 </p>
+
+<p align="center">
+  <a href="#download">Download</a> ·
+  <a href="#quick-start">Quick start</a> ·
+  <a href="#features">Features</a> ·
+  <a href="#troubleshooting">Troubleshooting</a> ·
+  <a href="#developer-documentation">Developer docs</a> ·
+  <a href="https://lin.ee/UwdCrmf">Contact on LINE</a>
+</p>
+
+<p align="center">
+  <img src="docs/screenshot-library.jpg" width="820" alt="LocWarp">
+</p>
+
+> [!WARNING]
+> **Before you use it**: LocWarp is meant for research and development testing. Using it with location-based games or services may break their terms of service and get an account restricted or banned. You use it at your own risk. The full terms are in the [Disclaimer](#disclaimer).
+
+## Highlights
+
+- **Six movement modes**: Teleport, navigate, multi-stop routes, flower-farming circles, random walk and joystick, at preset, fixed or randomised speeds.
+- **USB and Wi-Fi**: Plug in and it connects. On iOS 17 and later a Wi-Fi Tunnel lets you unplug, and a pinned device reconnects on every launch.
+- **Multi-device sync**: Up to three devices at once. Every action is applied to all of them and they walk exactly the same route.
+- **Saved coordinates and routes**: Search, categories and drag-and-drop ordering; one click to go. JSON and GPX import and export.
+- **Phone web control**: Away from the PC, a phone browser can teleport, navigate, pause and change speed.
+- **Coordinate formats**: Switch between WGS84, GCJ02 and BD09 and choose the axis order; display, copy and input stay consistent.
+- **In-app updates**: Download a new version inside the app and restart into it. Nothing is downloaded on its own.
+- **No sign-up**: Routing, address search and map layers all use free public services. No telemetry.
+
+---
+
+## Screenshots
+
+| Main window and movement modes | Library window | Themes and appearance |
+| :---: | :---: | :---: |
+| <img src="docs/screenshot-main.jpg" alt="Main window and movement modes"> | <img src="docs/screenshot-library.jpg" alt="Library window"> | <img src="docs/screenshot-theme.jpg" alt="Themes and appearance"> |
+
+<details>
+<summary>Demo (recorded on an earlier version; the look of the interface has since been updated)</summary>
 
 <p align="center">
   <img src="docs/demo-v2.gif" width="720" alt="LocWarp demo">
 </p>
 
-## Contents
+</details>
 
-- [Quick start](#quick-start)
-- [Requirements and compatibility](#requirements-and-compatibility)
-- [Features](#features)
-- [Installation and setup](#installation-and-setup)
-- [Troubleshooting](#troubleshooting)
-- [Developer documentation](#developer-documentation)
-- [Support and contact](#support-and-contact)
-- [About this project](#about-this-project)
-- [License](#license)
-- [Disclaimer](#disclaimer)
+---
+
+## Download
+
+Only a Windows 10 / 11 (64-bit) installer is provided. It contains everything it needs; there is no Python or Node to install.
+
+| Source | Link | Notes |
+| --- | --- | --- |
+| GitHub Releases | [Latest release](https://github.com/keezxc1223/locwarp/releases/latest) | The main channel, with release notes |
+| Google Drive | [Open folder](https://drive.google.com/drive/folders/1bqVnNnSbwrVaf2GT6fEhW6R0ZlhE-fc3) | Same files, for when GitHub is hard to reach |
+
+> [!NOTE]
+> The installer is not code-signed. Windows may show a SmartScreen warning, and antivirus software may flag the backend program. If that happens, add the install folder to the exclusion list and install again.
 
 ---
 
@@ -80,7 +121,10 @@ Each step is covered in detail under [Installation and setup](#installation-and-
 
 ## Features
 
-### Movement modes
+Click an item to expand its details.
+
+<details>
+<summary><b>Movement modes</b></summary>
 
 | Mode | Description |
 | --- | --- |
@@ -93,14 +137,20 @@ Each step is covered in detail under [Installation and setup](#installation-and-
 
 Multi-point Route has a **point-to-point jump** option that teleports from waypoint to waypoint instead of following roads, for cases where the GPS only needs to sit at each point in turn. The delay before each jump (default 2 seconds) and after it (default 4 seconds) are adjustable, and both freeze while paused.
 
-### Speed control
+</details>
+
+<details>
+<summary><b>Speed control</b></summary>
 
 - Three presets: walking 10.8, cycling 19.8, driving 60 km/h.
 - Enter any fixed speed, or a min to max range (for example 40 to 80 km/h) that is re-rolled for every leg to mimic real traffic.
 - Change the speed while moving and press "Apply new speed". Movement continues from the current position at the new speed, with no restart.
 - The last speed you picked is remembered for the next launch. A countdown banner appears above the map while paused at a stop.
 
-### Routing source
+</details>
+
+<details>
+<summary><b>Routing source</b></summary>
 
 The road routes used by Navigate and Multi-point Route can come from any of four free, no-signup routing engines:
 
@@ -113,7 +163,10 @@ The road routes used by Navigate and Multi-point Route can come from any of four
 
 When an engine fails, that leg falls back to a straight line and the next leg tries the engine again, so a run never stalls. You can also tick "Use straight-line path" to skip the engines altogether. Multi-point Route has an "optimal order" button that finds the shortest visiting order.
 
-### Connection
+</details>
+
+<details>
+<summary><b>Connection</b></summary>
 
 - **USB**: connects automatically when plugged in, and locking the iPhone screen has no effect. Unplugging is detected within about 4 seconds, and plugging back in recovers without a refresh.
 - **Wi-Fi Tunnel** (iOS 17+, requires one prior USB pairing):
@@ -124,7 +177,10 @@ When an engine fails, that leg falls back to a straight line and the next leg tr
   - "Re-pair" rebuilds a damaged pairing record over USB in one click.
   - Stopping the tunnel while USB is still plugged in switches back to USB automatically.
 
-### Multi-device group mode
+</details>
+
+<details>
+<summary><b>Multi-device group mode</b></summary>
 
 Connect **up to three** devices at once. Teleport, Navigate, every movement mode, pause, resume, stop, apply speed, and restore are sent to all devices together, from both the desktop UI and the phone web control.
 
@@ -133,7 +189,10 @@ Connect **up to three** devices at once. Teleport, Navigate, every movement mode
 - A device plugged in later syncs to the current position and joins the task already running.
 - Each device can be restored, disconnected, or have its Developer Mode option revealed on its own.
 
-### Map
+</details>
+
+<details>
+<summary><b>Map</b></summary>
 
 - **Layer switcher** (top right): OSM, Google Tiles (Beta), ESRI Street Map, ESRI Satellite, OpenFreeMap Liberty / Bright / Positron (vector), VersaTiles Colorful, NLSC (Taiwan), GSI (Japan). None of them need an API key.
 - Waypoints are labelled S / 1 / 2 / 3, and the route line has flowing arrows that show direction.
@@ -141,7 +200,10 @@ Connect **up to three** devices at once. Teleport, Navigate, every movement mode
 - The map marker can be swapped for one of six built-in characters or your own PNG (transparent borders are trimmed automatically).
 - **Coordinate format** (Settings): the coordinate system can be WGS84 / CGCS2000 (default), GCJ02 (Amap, Tencent) or BD09 (Baidu), and the axis order can be latitude first or longitude first. The setting applies to coordinates that are shown, copied and typed in, and phone web control follows it. The map, saved coordinates and routes, GPX and backup files always stay in WGS84. GCJ02 is only offset in mainland China, Hong Kong and Macau; BD09 additionally covers Taiwan; elsewhere both equal WGS84.
 
-### Library window
+</details>
+
+<details>
+<summary><b>Library window</b></summary>
 
 "Library" in the top navigation opens a draggable floating window with two tabs, Coordinates and Routes, that work the same way:
 
@@ -151,7 +213,10 @@ Connect **up to three** devices at once. Teleport, Navigate, every movement mode
 - Drag an item to reorder it, or onto another category to move it there. Categories can be dragged into a new order as well.
 - Sort manually, by name, by date added, or by last used (last updated for routes).
 
-### Saved coordinates
+</details>
+
+<details>
+<summary><b>Saved coordinates</b></summary>
 
 - "Add" saves the current position, adds an entry from typed coordinates, bulk-pastes many coordinates, or imports a file. New entries pick up a country flag automatically.
 - After deleting a coordinate, an Undo offer appears at the bottom of the window.
@@ -159,26 +224,38 @@ Connect **up to three** devices at once. Teleport, Navigate, every movement mode
 - Show every saved coordinate on the map. Tens of thousands stay smooth, and dense areas cluster automatically.
 - With "Clicking a coordinate moves GPS" turned off, a click only pans the map and the GPS stays put.
 
-### Saved routes
+</details>
+
+<details>
+<summary><b>Saved routes</b></summary>
 
 - "Add" saves the route currently on the map. If the name already exists you can overwrite it or save a new one.
 - GPX and JSON import and export.
 - Copy the waypoints in their current order as coordinate text, one per line.
 
-### Address search
+</details>
+
+<details>
+<summary><b>Address search</b></summary>
 
 - **Free**: the default provider, built on OpenStreetMap open data, no API key needed. A Photon option in the settings offers stronger fuzzy matching and typo tolerance.
 - **Google Geocoding**: enter your own API key (stored only on your machine) for the most accurate results on Chinese place names and businesses. There is a free monthly quota.
 - The coordinate box accepts pasted coordinate text and picks out the valid latitude and longitude.
 - The phone web control follows the provider chosen on the desktop.
 
-### Phone web control
+</details>
+
+<details>
+<summary><b>Phone web control</b></summary>
 
 Control LocWarp from a phone browser when you are away from the PC. The "Phone control" button in the status bar shows a LAN address and a 6-digit PIN. Enter them on the phone to get a mobile map with teleport, navigate to a point (walk / bike / drive or a custom speed), address search, coordinate input, stop, and restore, plus a live view of the route running on the desktop. While moving it shows progress, remaining distance and time, and lets you pause, resume or change the speed. The coordinates saved on the PC and the recent list are available directly. The page can be added to the phone's home screen to open full screen like an app, and it follows the desktop's theme colour and coordinate format.
 
 > The phone must be on the **same Wi-Fi** as the PC, and the PC firewall must allow port 8777. "Regenerate" issues a new PIN at once and invalidates phones paired earlier.
 
-### Status bar
+</details>
+
+<details>
+<summary><b>Status bar</b></summary>
 
 - **Country flag, place name, local weather, and temperature** for the current simulated position.
 - A time difference indicator after crossing time zones. Click it for full time zone details.
@@ -186,7 +263,10 @@ Control LocWarp from a phone browser when you are away from the PC. The "Phone c
 - Version number, with a `NEW` badge when an update is available. Click it and press Download update to fetch the new version inside the app with a progress bar, then press Restart to switch to it. You can also get the installer yourself from GitHub or Google Drive. Nothing is downloaded until you ask for it.
 - "Log folder" button: opens `~/.locwarp/logs/` so you can attach backend.log to an issue.
 
-### Other
+</details>
+
+<details>
+<summary><b>Other</b></summary>
 
 - **Cooldown**: a cooldown based on teleport distance, to lower the risk of being flagged for impossible movement.
 - The interface switches between Traditional Chinese and English on the fly.
@@ -194,6 +274,8 @@ Control LocWarp from a phone browser when you are away from the PC. The "Phone c
 - Changes to appearance, coordinate format and the alert sound on the Settings page are kept only after pressing Save settings.
 - Route completion sound, and a hardware acceleration switch (turning it off fixes ghosting or a black window on some GPU drivers, see [Issue #24](https://github.com/keezxc1223/locwarp/issues/24)).
 - All data (saved coordinates, routes, settings) lives in `~/.locwarp/` and survives a reinstall.
+
+</details>
 
 ---
 
@@ -248,6 +330,17 @@ With the Wi-Fi Tunnel, set Settings → Display & Brightness → Auto-Lock to **
 
 ---
 
+## Updating
+
+When a new version is out, a `NEW` badge appears next to the version number at the bottom right. Click it, then:
+
+1. Press **Download update**. The app downloads in the background and shows progress.
+2. When it finishes, press **Restart**. The app reopens on the new version with your coordinates and settings intact.
+
+Nothing is downloaded until you ask for it. You can also get the installer yourself from the GitHub or Google Drive links in the same dialog and install over the old version. Versions up to v0.2.205 have no in-app update and need one manual install.
+
+---
+
 ## Troubleshooting
 
 | Symptom | Likely cause and fix |
@@ -275,6 +368,9 @@ When reporting a problem, include the iOS version, the connection type, and `~/.
 ---
 
 ## Developer documentation
+
+<details>
+<summary>Expand the developer docs (architecture, stack, development setup, building, project layout)</summary>
 
 ### Architecture
 
@@ -426,6 +522,8 @@ locwarp/
 └── build-installer.bat      # One-shot installer build
 ```
 
+</details>
+
 ---
 
 ## Support and contact
@@ -443,6 +541,19 @@ TTLi4YcPcDw5R8Mr4H4u5rDuFwTZjtCQXk
 <p>
   <img src="docs/donate-usdt-tron-qr.png" alt="USDT TRC-20 QR" width="260">
 </p>
+
+---
+
+## Acknowledgements
+
+LocWarp is built on these open-source projects and public services:
+
+- [pymobiledevice3](https://github.com/doronz88/pymobiledevice3): every protocol used to talk to iOS devices
+- [Leaflet](https://leafletjs.com/) and [MapLibre GL](https://maplibre.org/): map rendering
+- [OpenStreetMap](https://www.openstreetmap.org/copyright) contributors: map data
+- [OSRM](https://project-osrm.org/), [Valhalla](https://github.com/valhalla/valhalla) and [BRouter](https://brouter.de/): routing
+- [Photon](https://photon.komoot.io/) and [Open-Meteo](https://open-meteo.com/): address search and weather
+- Everyone who reported issues, tested iOS versions and contributed code
 
 ---
 
@@ -498,3 +609,7 @@ You are responsible for complying with the laws and regulations where you live, 
 **By downloading, installing, or running this software, you confirm that you have read and agree to all of the terms above.**
 
 **If you do not agree, stop using the software and remove it at once.**
+
+---
+
+<p align="right"><a href="#top">Back to top</a></p>
