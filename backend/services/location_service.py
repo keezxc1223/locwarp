@@ -8,7 +8,7 @@ iOS versions, wrapping pymobiledevice3's location simulation capabilities.
 from __future__ import annotations
 
 import logging
-import inspect
+import struct
 from abc import ABC, abstractmethod
 from typing import Awaitable, Callable
 
@@ -241,46 +241,59 @@ class LegacyLocationService(LocationService):
         A lockdown service provider (LockdownClient) for the target device.
     """
 
+    SERVICE_NAME = DtSimulateLocation.SERVICE_NAME
+
     def __init__(self, lockdown_client) -> None:
         self._lockdown = lockdown_client
-        self._service: DtSimulateLocation | None = None
         self._active = False
+        # Connections whose close is still in flight; the set only keeps the
+        # tasks referenced until they finish.
+        self._closing: set[asyncio.Task] = set()
 
-    def _ensure_service(self) -> DtSimulateLocation:
-        """Lazily create and cache the DtSimulateLocation service."""
-        if self._service is None:
-            self._service = DtSimulateLocation(self._lockdown)
-            logger.debug("Legacy DtSimulateLocation service initialised")
-        return self._service
+    def _close_later(self, service) -> None:
+        """Close a command connection without holding up the caller.
 
-    async def _maybe_await(self, result) -> None:
-        """Support both sync and async DtSimulateLocation methods."""
-        if inspect.isawaitable(result):
-            await result
+        The service takes one command per connection, and an iOS 16 device
+        never answers the TLS close, so awaiting it costs the full 1 s close
+        timeout on every position push: a 0.5 s tick turned into 1.08 s and
+        the device fell behind the others on the same route (issue #51).
+        """
+        task = asyncio.create_task(service.close())
+        self._closing.add(task)
+        task.add_done_callback(self._closing.discard)
 
-    def _reset_service(self) -> None:
-        """Drop the cached DtSimulateLocation so the next call reconstructs it."""
+    async def _send(self, *chunks: bytes) -> None:
+        """Open a fresh command connection and send ``chunks`` on it."""
+        service = await self._lockdown.start_lockdown_developer_service(self.SERVICE_NAME)
         try:
-            if self._service is not None and hasattr(self._service, "close"):
-                self._service.close()
-        except Exception:
-            logger.debug("Error closing stale DtSimulateLocation", exc_info=True)
-        self._service = None
+            for chunk in chunks:
+                await service.sendall(chunk)
+        finally:
+            self._close_later(service)
+
+    async def _send_set(self, lat: float, lng: float) -> None:
+        enc_lat = str(lat).encode()
+        enc_lng = str(lng).encode()
+        await self._send(
+            struct.pack(">I", 0),
+            struct.pack(">I", len(enc_lat)) + enc_lat,
+            struct.pack(">I", len(enc_lng)) + enc_lng,
+        )
+
+    async def _send_clear(self) -> None:
+        await self._send(struct.pack(">I", 1))
 
     async def set(self, lat: float, lng: float) -> None:
         """Simulate the device location using the legacy service."""
         try:
-            svc = self._ensure_service()
-            await self._maybe_await(svc.set(lat, lng))
+            await self._send_set(lat, lng)
             self._active = True
             logger.info("Legacy location set to (%.6f, %.6f)", lat, lng)
         except (OSError, EOFError, BrokenPipeError, ConnectionResetError) as exc:
             logger.warning("Legacy location channel dropped (%s: %s); reconnecting and retrying",
                            type(exc).__name__, exc)
-            self._reset_service()
             try:
-                svc = self._ensure_service()
-                await self._maybe_await(svc.set(lat, lng))
+                await self._send_set(lat, lng)
                 self._active = True
                 logger.info("Legacy location set to (%.6f, %.6f) after reconnect", lat, lng)
             except Exception as retry_exc:
@@ -299,17 +312,14 @@ class LegacyLocationService(LocationService):
             logger.debug("Legacy clear called but no simulation is active")
             return
         try:
-            svc = self._ensure_service()
-            await self._maybe_await(svc.clear())
+            await self._send_clear()
             self._active = False
             logger.info("Legacy simulated location cleared")
         except (OSError, EOFError, BrokenPipeError, ConnectionResetError) as exc:
             logger.warning("Legacy clear channel dropped (%s: %s); reconnecting",
                            type(exc).__name__, exc)
-            self._reset_service()
             try:
-                svc = self._ensure_service()
-                await self._maybe_await(svc.clear())
+                await self._send_clear()
                 self._active = False
             except Exception:
                 logger.exception("Legacy clear failed after reconnect")

@@ -1,6 +1,9 @@
 import React from 'react';
 import { useT } from '../i18n';
 import type { RuntimesMap } from '../hooks/useSimulation';
+import { DEVICE_COLORS, type DeviceLetter } from './DeviceChip';
+
+const DEVICE_LETTERS: DeviceLetter[] = ['A', 'B', 'C'];
 
 interface EtaBarProps {
   state: string;
@@ -11,6 +14,9 @@ interface EtaBarProps {
   legRemainingDistance?: number; // meters to next waypoint (multi_stop / loop)
   legEta?: number; // seconds to next waypoint
   runtimes?: RuntimesMap;
+  // Connected device udids in chip order, so the per-device ETAs carry the
+  // same A / B / C letter and colour as the device chips.
+  deviceOrder?: string[];
 }
 
 const ACTIVE_STATES = ['navigating', 'looping', 'multi_stop', 'random_walk', 'flower'];
@@ -41,6 +47,7 @@ const EtaBar: React.FC<EtaBarProps> = ({
   legRemainingDistance,
   legEta,
   runtimes,
+  deviceOrder,
 }) => {
   const t = useT();
 
@@ -50,6 +57,14 @@ const EtaBar: React.FC<EtaBarProps> = ({
     ? Object.values(runtimes).filter((r) => ACTIVE_STATES.includes(r.state))
     : [];
   const isGroup = activeRuntimes.length >= 2;
+  const groupEtas = activeRuntimes
+    .map((r, i) => {
+      const pos = deviceOrder ? deviceOrder.indexOf(r.udid) : -1;
+      return { r, slot: pos >= 0 ? pos : i };
+    })
+    .filter((x) => x.slot < DEVICE_LETTERS.length)
+    .sort((a, b) => a.slot - b.slot)
+    .map((x) => ({ r: x.r, letter: DEVICE_LETTERS[x.slot] }));
 
   if (!isGroup && !ACTIVE_STATES.includes(state)) return null;
   if (isGroup && activeRuntimes.length === 0) return null;
@@ -210,9 +225,9 @@ const EtaBar: React.FC<EtaBarProps> = ({
           {separator}
           <div style={{ display: 'flex', alignItems: 'center', gap: 6, fontSize: 11, opacity: 0.85 }}>
             <span style={{ opacity: 0.6 }}>{t('eta.group_progress')}</span>
-            {activeRuntimes.slice(0, 2).map((r, i) => (
-              <span key={r.udid} style={{ color: i === 0 ? '#4285f4' : '#ff9800', fontWeight: 600 }}>
-                {i === 0 ? 'A' : 'B'} {formatTime(r.eta || 0)}
+            {groupEtas.map(({ r, letter }) => (
+              <span key={r.udid} style={{ color: DEVICE_COLORS[letter], fontWeight: 600 }}>
+                {letter} {formatTime(r.eta || 0)}
               </span>
             ))}
           </div>

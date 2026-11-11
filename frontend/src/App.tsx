@@ -1451,7 +1451,7 @@ const App: React.FC = () => {
           devices={device.connectedDevices}
           runtimes={sim.runtimes}
           onAdd={() => {
-            if (device.connectedDevices.length >= 2) {
+            if (device.connectedDevices.length >= 3) {
               setToastMsg(t('device.max_reached'))
               return
             }
@@ -2114,6 +2114,7 @@ const App: React.FC = () => {
       <div className="map-container">
         <EtaBar
           runtimes={sim.runtimes}
+          deviceOrder={device.connectedDevices.map((d) => d.udid)}
           state={sim.status?.state ?? 'idle'}
           progress={sim.progress}
           remainingDistance={sim.status?.distance_remaining ?? 0}
