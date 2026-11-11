@@ -4,14 +4,13 @@ LocWarp 的「蘑菇地圖」圖層需要 pipimushroom.com 的登入 Cookie。�
 
 ## 安裝
 
-1. Chrome 網址列輸入 `chrome://extensions`
-2. 右上角打開「開發人員模式」
-3. 按「載入未封裝項目」，選這個資料夾 (`extensions/pipi-cookie-sync`)
-4. 建議把它釘選到工具列 (拼圖圖示 → 圖釘)，方便看同步狀態
+從 Chrome 線上應用程式商店安裝：https://chromewebstore.google.com/detail/gdnekjckhabkheedihakapkcnnilikjb
+
+建議把它釘選到工具列 (拼圖圖示 → 圖釘)，方便看同步狀態。
 
 接著在 Chrome 登入 https://pipimushroom.com/ (已登入就不用)，再啟動 LocWarp，就會自動同步。
 
-更新擴充功能的檔案後，要到 `chrome://extensions` 在這張卡片上按 ↻ 重新載入才會生效。
+要從原始碼載入 (開發用) 時：`chrome://extensions` 右上角打開「開發人員模式」，按「載入未封裝項目」選這個資料夾 (`extensions/pipi-cookie-sync`)；改過檔案後要在這張卡片上按 ↻ 重新載入才會生效。
 
 **有多個 Chrome 設定檔 (profile) 時**：擴充功能只看得到「它所在的那個設定檔」的登入狀態，請在工具列有這個擴充功能的視窗登入 pipimushroom.com。
 

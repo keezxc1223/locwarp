@@ -30,10 +30,9 @@ interface Props {
   t: (key: any, vars?: Record<string, string | number>) => string;
 }
 
-// Chrome Web Store page of the cookie-sync extension. Empty until it is
-// published; while empty the guide explains loading the bundled folder
-// unpacked. Fill it in and the guide becomes "install from the store".
-const EXTENSION_STORE_URL = '';
+// Chrome Web Store page of the cookie-sync extension. When empty the guide
+// falls back to explaining how to load the bundled folder unpacked.
+const EXTENSION_STORE_URL = 'https://chromewebstore.google.com/detail/gdnekjckhabkheedihakapkcnnilikjb';
 
 const KIND_COLORS: Record<PipiKind, string> = {
   mushroom: '#ff9f43',

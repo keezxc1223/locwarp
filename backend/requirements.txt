@@ -1,4 +1,4 @@
-﻿pymobiledevice3>=11.50.3
+﻿pymobiledevice3>=11.51.0
 fastapi>=0.162.4
 starlette>=1.10.0
 uvicorn[standard]>=0.54.0

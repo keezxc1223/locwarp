@@ -251,7 +251,7 @@
 
 **登入**:這個網站要登入後才提供資料。按面板裡的「**登入教學**」會開啟步驟說明,有兩種方式:
 
-1. **Chrome 擴充功能(建議)**:按教學裡的「開啟資料夾」找到隨程式附上的擴充功能,到 Chrome 的 `chrome://extensions` 開啟開發人員模式並「載入未封裝項目」,再於同一個 Chrome 登入 pipimushroom.com。登入狀態會自動同步。這個網站的登入約 15 分鐘沒使用就會過期,LocWarp 執行期間與擴充功能都會定時續期;若仍然過期(例如電腦休眠後),面板會顯示「登入已過期」,在 Chrome 重新登入網站後約一分鐘內會自動恢復。
+1. **Chrome 擴充功能(建議)**:從 Chrome 線上應用程式商店安裝「[LocWarp 蘑菇地圖 Cookie 同步](https://chromewebstore.google.com/detail/gdnekjckhabkheedihakapkcnnilikjb)」(教學裡的「前往商店」也會開啟這一頁),再於同一個 Chrome 登入 pipimushroom.com。不想從商店安裝時,也可以用隨程式附上的擴充功能:它在安裝目錄的 `resources\extensions\pipi-cookie-sync`,到 Chrome 的 `chrome://extensions` 開啟開發人員模式並「載入未封裝項目」選這個資料夾即可,兩種方式擇一。登入狀態會自動同步。這個網站的登入約 15 分鐘沒使用就會過期,LocWarp 執行期間與擴充功能都會定時續期;若仍然過期(例如電腦休眠後),面板會顯示「登入已過期」,在 Chrome 重新登入網站後約一分鐘內會自動恢復。
 2. **手動貼上 Cookie**:不用 Chrome 時,依教學裡的說明從瀏覽器複製 Cookie 貼上。
 
 LocWarp 不會經手你的 Google 帳號密碼。登入資料只存在本機(`~/.locwarp/settings.json`),只會送到 pipimushroom.com。擴充功能的隱私權說明見 [docs/pipi-extension-privacy.md](docs/pipi-extension-privacy.md)。

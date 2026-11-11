@@ -6,7 +6,9 @@
 py -3.13 extensions/pack.py
 ```
 
-上架後,把商店網址填進 `frontend/src/components/PipiMushroomPanel.tsx` 的 `EXTENSION_STORE_URL`,登入教學的第一步就會變成「從商店安裝」,不再需要載入未封裝項目。
+已上架:https://chromewebstore.google.com/detail/gdnekjckhabkheedihakapkcnnilikjb
+
+這個網址寫在 `frontend/src/components/PipiMushroomPanel.tsx` 的 `EXTENSION_STORE_URL`,登入教學的第一步是「從商店安裝」。
 
 ## 商店資訊
 
