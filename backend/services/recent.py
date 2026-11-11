@@ -1,4 +1,4 @@
-"""Recently visited places: FIFO-capped 20-entry history of teleport /
+"""Recently visited places: FIFO-capped 50-entry history of teleport /
 navigate / search destinations. Persisted to RECENT_PLACES_FILE so the
 list survives LocWarp restarts."""
 
@@ -16,7 +16,7 @@ from services.json_safe import safe_load_json, safe_write_json
 
 logger = logging.getLogger(__name__)
 
-MAX_ENTRIES = 20
+MAX_ENTRIES = 50
 DEDUPE_DIST_M = 10.0  # same spot if within 10m of the most-recent entry
 
 Kind = Literal[

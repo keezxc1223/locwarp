@@ -460,6 +460,26 @@ async def phone_set_appearance(body: _AppearanceBody, request: Request):
     return dict(_appearance)
 
 
+class _MapLayerBody(BaseModel):
+    key: str = Field(max_length=32)
+
+
+# Base map chosen in the desktop's layer picker, mirrored like the accent
+# so the phone page can follow it. Keys match MapView's layerDefs.
+_MAP_LAYER_KEYS = ("osm", "google", "esri_street", "esri", "liberty", "bright",
+                   "positron", "versa", "nlsc", "gsi")
+_map_layer: dict[str, str] = {"key": "osm"}
+
+
+@router.post("/api/phone/map_layer")
+async def phone_set_map_layer(body: _MapLayerBody, request: Request):
+    """Desktop-only: mirror the desktop's base map choice."""
+    if not _is_localhost(request):
+        raise HTTPException(status_code=403, detail="Localhost only")
+    _map_layer["key"] = body.key if body.key in _MAP_LAYER_KEYS else "osm"
+    return dict(_map_layer)
+
+
 @router.post("/api/phone/firewall_repair")
 async def phone_firewall_repair(request: Request):
     """Desktop-only: add a Windows Firewall inbound TCP rule for API_PORT
@@ -645,6 +665,7 @@ async def phone_status(
             "route_path": None,
             "coord_format": dict(_coord_format),
             "accent_rgb": _appearance["accent_rgb"],
+            "map_layer": _map_layer["key"],
         }
     s = eng.get_status()
     pos = None
@@ -666,6 +687,7 @@ async def phone_status(
         "speed_kmh": round((s.speed_mps or 0.0) * 3.6, 1),
         "coord_format": dict(_coord_format),
         "accent_rgb": _appearance["accent_rgb"],
+        "map_layer": _map_layer["key"],
     }
 
 
@@ -852,6 +874,15 @@ async def phone_routes(
     }
 
 
+class _FlowerOpts(BaseModel):
+    """種花模式 settings; same meaning as the desktop's 花農設定."""
+    radius_m: float = Field(default=30.0, ge=1.0, le=1000.0)
+    circles: float = Field(default=1.0, ge=0.5, le=50.0)
+    rounds: int = Field(default=1, ge=1, le=100)
+    # True: teleport between waypoints. False: walk there.
+    teleport: bool = False
+
+
 class _RouteStartBody(BaseModel):
     route_id: str = Field(min_length=1, max_length=100)
     mode: str = "walking"  # walking / running / driving
@@ -862,6 +893,9 @@ class _RouteStartBody(BaseModel):
     # True: jump to the first waypoint before starting. False: walk there
     # from the current virtual position (engines without one still jump).
     teleport_to_start: bool = True
+    # Set to run the route in 種花模式 (circle around every waypoint)
+    # instead of walking along it. `loop` is ignored then.
+    flower: _FlowerOpts | None = None
 
 
 @router.post("/api/phone/route/start")
@@ -902,12 +936,66 @@ async def phone_route_start(
     # waypoint list so nothing a sim does can touch the saved route.
     for e in engines:
         wps = [Coordinate(lat=w.lat, lng=w.lng) for w in route.waypoints]
-        if body.loop:
+        if body.flower is not None:
+            f = body.flower
+            _spawn(e.flower(wps, mode, radius_m=f.radius_m, circles=f.circles, rounds=f.rounds,
+                            teleport=f.teleport, speed_kmh=body.speed_kmh))
+        elif body.loop:
             _spawn(e.start_loop(wps, mode, speed_kmh=body.speed_kmh, pause_enabled=False))
         else:
             _spawn(e.multi_stop(wps, mode, 0, False, speed_kmh=body.speed_kmh, pause_enabled=False))
     return {"status": "started", "name": route.name, "waypoints": len(route.waypoints),
-            "loop": body.loop, "mode": mode.value}
+            "loop": body.loop, "flower": body.flower is not None, "mode": mode.value}
+
+
+class _RandomWalkBody(BaseModel):
+    radius_m: float = Field(default=500.0, ge=10.0, le=50000.0)
+    mode: str = "walking"  # walking / running / driving
+    speed_kmh: float | None = Field(default=None, ge=0.1, le=300.0)
+
+
+@router.post("/api/phone/randomwalk")
+async def phone_random_walk(
+    body: _RandomWalkBody,
+    request: Request,
+    x_locwarp_token: str | None = Header(default=None, alias="X-LocWarp-Token"),
+    t: str | None = None,
+):
+    """Wander at random inside a circle around the current virtual
+    position, on every connected device. 400 when there is no position
+    to centre the circle on."""
+    _check_token(_resolve_token(request, x_locwarp_token, t))
+    engines = _all_engines()
+    from main import app_state
+    primary = app_state.simulation_engine
+    anchor = primary.current_position if primary is not None else None
+    if anchor is None:
+        anchor = next((e.current_position for e in engines if e.current_position is not None), None)
+    if anchor is None:
+        raise HTTPException(status_code=400, detail={
+            "code": "no_position",
+            "message": "尚未有虛擬位置,請先瞬移或飛座標",
+        })
+    from api.location import _spawn
+    from models.schemas import Coordinate, MovementMode
+    try:
+        mode = MovementMode(body.mode)
+    except ValueError:
+        mode = MovementMode.WALKING
+    center = Coordinate(lat=anchor.lat, lng=anchor.lng)
+
+    async def _to_center(e):
+        if e.current_position is None:
+            await e.teleport(center.lat, center.lng)
+
+    await _fanout("random walk", _to_center)
+    # One seed for every device so they pick the same destinations and
+    # stay together, as the desktop does in group mode.
+    seed = secrets.randbelow(2 ** 31)
+    for e in engines:
+        _spawn(e.random_walk(center, body.radius_m, mode, speed_kmh=body.speed_kmh,
+                             pause_enabled=False, seed=seed))
+    return {"status": "started", "radius_m": body.radius_m, "mode": mode.value}
 
 
 @router.get("/api/phone/recent")

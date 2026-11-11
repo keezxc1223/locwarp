@@ -1,4 +1,4 @@
-"""Recent places API: stores the last 20 teleport / navigate / search
+"""Recent places API: stores the last 50 teleport / navigate / search
 destinations the user actually flew to, so the map's Recent button can
 re-fly to any of them with one click.
 """

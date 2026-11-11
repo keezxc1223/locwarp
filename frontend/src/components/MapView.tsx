@@ -118,7 +118,7 @@ interface MapViewProps {
   // owns both the map-pan and the preview-pin state so we route through
   // it instead of touching mapRef locally.
   onCoordPreview?: (lat: number, lng: number) => void;
-  // Recent destinations (last 20 teleport / navigate / search actions).
+  // Recent destinations (last 50 teleport / navigate / search actions).
   // Rendered in a topright popover so the user can re-fly in one click.
   recentPlaces?: Array<{ lat: number; lng: number; kind: 'teleport' | 'navigate' | 'search' | 'coord_teleport' | 'coord_navigate'; name: string; ts: number }>;
   onRecentReFly?: (entry: { lat: number; lng: number; kind: 'teleport' | 'navigate' | 'search' | 'coord_teleport' | 'coord_navigate'; name: string }) => void;
@@ -852,7 +852,14 @@ const MapView: React.FC<MapViewProps> = ({
     const layers: Record<string, L.Layer> = {};
     for (const [, label, layer] of layerDefs) layers[label] = layer;
     // Unknown / retired keys (e.g. the removed 'carto') fall back to OSM.
-    (layerDefs.find(([key]) => key === savedLayer) ?? layerDefs[0])[2].addTo(map);
+    const initialLayer = layerDefs.find(([key]) => key === savedLayer) ?? layerDefs[0];
+    initialLayer[2].addTo(map);
+    // The phone control page cannot read this window's localStorage, so
+    // the choice is mirrored to the backend on launch and on every change.
+    const mirrorLayerToPhone = (key: string) => {
+      import('../services/api').then(({ setPhoneMapLayer }) => setPhoneMapLayer(key)).catch(() => { /* ignore */ });
+    };
+    mirrorLayerToPhone(initialLayer[0]);
     const layersControl = L.control.layers(layers, undefined, { position: 'topright', collapsed: true }).addTo(map);
     // Switching to a layer for the first time pays DNS + TLS to a new host
     // before the first tile can arrive. The picker expands on hover, so
@@ -891,6 +898,7 @@ const MapView: React.FC<MapViewProps> = ({
     map.on('baselayerchange', (e: any) => {
       try {
         const key = layerDefs.find(([, label]) => label === e?.name)?.[0] ?? 'osm';
+        mirrorLayerToPhone(key);
         localStorage.setItem('locwarp.tile_layer', key);
       } catch { /* storage disabled */ }
     });
@@ -2367,7 +2375,7 @@ const MapView: React.FC<MapViewProps> = ({
       )}
 
       {/* Recent destinations button + popover (topright, below tile layer
-          switcher). Click the clock to toggle a list of the last 20
+          switcher). Click the clock to toggle a list of the last 50
           places the user flew to; click an entry to re-fly using that
           entry's original action (teleport / navigate / search). */}
       {(recentPlaces && recentPlaces.length > 0) && (

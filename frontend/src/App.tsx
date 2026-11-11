@@ -523,7 +523,7 @@ const App: React.FC = () => {
   }
   const clampLat = (lat: number): number => Math.max(-90, Math.min(90, lat))
 
-  // Recent places list (last 20 destinations the user flew to). Loaded
+  // Recent places list (last 50 destinations the user flew to). Loaded
   // once on mount; refreshed after each push so the map's recent-button
   // popover is always current.
   const [recentPlaces, setRecentPlaces] = useState<api.RecentEntry[]>([])

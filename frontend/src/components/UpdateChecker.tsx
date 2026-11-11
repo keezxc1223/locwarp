@@ -64,21 +64,48 @@ const set = (patch: Partial<UpdateState>) => {
 const subscribe = (fn: () => void) => { listeners.add(fn); return () => { listeners.delete(fn); }; };
 const getState = () => state;
 
+// LocWarp is often left running for days, so the check repeats while it
+// is open instead of only running at launch. GitHub allows 60 anonymous
+// API calls per hour per address; one every 30 minutes stays far below.
+const RECHECK_MS = 30 * 60 * 1000;
+let lastCheckAt = 0;
+let checking = false;
+
+async function checkLatest(): Promise<void> {
+  if (checking) return;
+  checking = true;
+  lastCheckAt = Date.now();
+  try {
+    const r = await fetch(API_URL, { headers: { Accept: 'application/vnd.github+json' }, cache: 'no-store' });
+    if (!r.ok) return;
+    const data = await r.json();
+    const tag: string | undefined = data?.tag_name;
+    if (!tag || !isNewer(tag, CURRENT)) return;
+    // Nothing to do when this release is already known. A release newer
+    // than the one already shown just moves the badge to it, unless that
+    // one is being downloaded or is waiting to install.
+    if (tag === state.latest) return;
+    if (state.latest && state.phase !== 'idle' && state.phase !== 'error') return;
+    set({ latest: tag, releaseUrl: data?.html_url || RELEASES_URL });
+  } catch { /* offline / rate-limited / DNS: stay quiet */ } finally {
+    checking = false;
+  }
+}
+
 let started = false;
 function startOnce(): void {
   if (started) return;
   started = true;
 
-  (async () => {
-    try {
-      const r = await fetch(API_URL, { headers: { Accept: 'application/vnd.github+json' } });
-      if (!r.ok) return;
-      const data = await r.json();
-      const tag: string | undefined = data?.tag_name;
-      if (!tag || !isNewer(tag, CURRENT)) return;
-      set({ latest: tag, releaseUrl: data?.html_url || RELEASES_URL });
-    } catch { /* offline / rate-limited / DNS: stay quiet */ }
-  })();
+  void checkLatest();
+  window.setInterval(() => { void checkLatest(); }, RECHECK_MS);
+  // Timers are throttled or paused while the PC sleeps or the window is
+  // in the background, so also check when the user comes back to it.
+  const onReturn = () => {
+    if (document.visibilityState === 'visible' && Date.now() - lastCheckAt >= RECHECK_MS) void checkLatest();
+  };
+  window.addEventListener('focus', onReturn);
+  document.addEventListener('visibilitychange', onReturn);
 
   window.electronAPI?.onUpdateStatus?.((s) => {
     if (s.phase === 'downloading') {

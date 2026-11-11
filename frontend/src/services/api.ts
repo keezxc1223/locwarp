@@ -304,7 +304,11 @@ export const setPhoneCoordFormat = (datum: string, order: string) =>
 // Theme accent as "R, G, B", so the phone control page matches the desktop.
 export const setPhoneAppearance = (accentRgb: string) =>
   request<any>('POST', '/api/phone/appearance', { accent_rgb: accentRgb })
-export const lookupTimezone = (lat: number, lng: number) =>
+// Base map picked in the layer switcher, so the phone control page can
+// follow the desktop's choice.
+export const setPhoneMapLayer = (key: string) =>
+  request<any>('POST', '/api/phone/map_layer', { key })
+export const lookupTimezone =(lat: number, lng: number) =>
   request<{ zone: string; gmt_offset_seconds: number; abbreviation: string; timestamp: number } | null>(
     'GET', `/api/geocode/timezone?lat=${lat}&lng=${lng}`,
   )
@@ -364,7 +368,7 @@ export const bookmarkCategoryGpxExportUrl = (categoryId: string) => `${API}/api/
 export const bookmarkCategoriesGpxZipUrl = (categoryIds: string[]) =>
   `${API}/api/bookmarks/gpx/categories/export.zip?ids=${encodeURIComponent(categoryIds.join(','))}`
 
-// Recent places: last 20 flights.
+// Recent places: last 50 flights.
 // kind distinguishes the entry point AND the action, so the UI can show
 // a clear label ("座標 / 瞬移 / 導航 / 地址") and re-fly with the same
 // action the user originally invoked.
