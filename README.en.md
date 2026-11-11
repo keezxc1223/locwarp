@@ -110,7 +110,7 @@ Each step is covered in detail under [Installation and setup](#installation-and-
 
 | Major | Verified versions |
 | --- | --- |
-| **iOS 27.x** | 27.0 (tested by the developer on iPhone 18 Pro Max) · 27.3 Beta (user report) |
+| **iOS 27.x** | 27.2.1 · 27.0 (both tested by the developer on iPhone 18 Pro Max) · 27.3 Beta (user report) |
 | **iOS 26.x** | 26.5 · 26.4.2 · 26.4.1 · 26.4.1 iPadOS · 26.4 · 26.3.1 · 26.2 · 26.2.1 iPadOS (M1 iPad) |
 | **iOS 18.x** | 18.7.8 · 18.7.7 · 18.7.1 · 18.6.2 · 18.5 iPadOS · 18.3.1 · 18.1.1 |
 | **iOS 17.x** | 17.6.1 |
@@ -597,7 +597,7 @@ LocWarp is built on these open-source projects and public services:
 
 LocWarp is an open-source project maintained by one person. It is not a commercial product and has no dedicated team. The developer will do their best to add features, answer issues, fix bugs, and keep up with iOS and pymobiledevice3 releases within a reasonable time. However:
 
-- The project is only guaranteed to work in **the developer's own test environment** (currently iPhone 18 Pro Max / iOS 27.0 + Windows 11 Pro);
+- The project is only guaranteed to work in **the developer's own test environment** (currently iPhone 18 Pro Max / iOS 27.2.1 + Windows 11 Pro);
 - It is **not guaranteed to run reliably on other devices, iOS patch versions, networks, or system configurations**;
 - If you run into a problem, please open an [Issue](https://github.com/keezxc1223/locwarp/issues) with full environment details and logs to help track it down;
 - Ongoing maintenance is not guaranteed, and no liability is accepted for anything arising from use of this tool.
