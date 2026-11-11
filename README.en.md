@@ -114,7 +114,7 @@ Each step is covered in detail under [Installation and setup](#installation-and-
 | **iOS 26.x** | 26.5 · 26.4.2 · 26.4.1 · 26.4.1 iPadOS · 26.4 · 26.3.1 · 26.2 · 26.2.1 iPadOS (M1 iPad) |
 | **iOS 18.x** | 18.7.8 · 18.7.7 · 18.7.1 · 18.6.2 · 18.5 iPadOS · 18.3.1 · 18.1.1 |
 | **iOS 17.x** | 17.6.1 |
-| **iOS 16.x** (community) | 16.7.15 · 16.7.12 |
+| **iOS 16.x** (community) | 16.7.16 · 16.7.15 · 16.7.12 |
 
 "Reported working" means **at least one user ran it successfully in their own environment**. It is not a general compatibility guarantee. Stability depends on the iOS patch version, pymobiledevice3 support for that version, whether the Developer Disk Image is mounted, and the drivers, VPN, firewall, and antivirus setup on the Windows side. An iOS 16+ version missing from the table simply has no report yet. Reports are welcome in [Issues](https://github.com/keezxc1223/locwarp/issues).
 
@@ -189,6 +189,8 @@ Connect **up to three** devices at once. Teleport, Navigate, every movement mode
 
 - Before any action starts, all devices are teleported to the same coordinate so their paths match.
 - Random Walk shares one random seed, so every device walks the same route.
+- With a speed range or random pauses, every device draws the same speed and pause length, so they do not drift apart.
+- While moving, the progress bar lists each device's own estimated arrival time as A / B / C.
 - A device plugged in later syncs to the current position and joins the task already running.
 - Each device can be restored, disconnected, or have its Developer Mode option revealed on its own.
 
