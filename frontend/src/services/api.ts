@@ -188,12 +188,15 @@ export const teleport = (lat: number, lng: number, udid?: string) =>
   request<any>('POST', '/api/location/teleport', { lat, lng, ...ud(udid) })
 export const goldDittoCycle = (lat: number, lng: number, udid?: string) =>
   request<any>('POST', '/api/location/goldditto/cycle', { lat, lng, ...ud(udid) })
-export interface SpeedOpts { speed_kmh?: number | null; speed_min_kmh?: number | null; speed_max_kmh?: number | null }
+// `seed` is set when several devices start together, so they all draw the
+// same random speed / pause values.
+export interface SpeedOpts { speed_kmh?: number | null; speed_min_kmh?: number | null; speed_max_kmh?: number | null; seed?: number | null }
 export interface PauseOpts { pause_enabled?: boolean; pause_min?: number; pause_max?: number }
 const sp = (o?: SpeedOpts) => ({
   speed_kmh: o?.speed_kmh ?? null,
   speed_min_kmh: o?.speed_min_kmh ?? null,
   speed_max_kmh: o?.speed_max_kmh ?? null,
+  ...(o?.seed != null ? { seed: o.seed } : {}),
 })
 const pp = (o?: PauseOpts) => (o ? {
   pause_enabled: o.pause_enabled ?? true,
@@ -398,12 +401,13 @@ export const setInitialPosition = (lat: number | null, lng: number | null) =>
 export const openLog = () => request<{ status: string; path: string }>('POST', '/api/system/open-log')
 export const openLogFolder = () => request<{ status: string; path: string }>('POST', '/api/system/open-log-folder')
 
-export const applySpeed = (mode: string, opts: { speed_kmh?: number | null; speed_min_kmh?: number | null; speed_max_kmh?: number | null }, udid?: string) =>
+export const applySpeed = (mode: string, opts: SpeedOpts, udid?: string) =>
   request<{ status: string; speed_mps: number }>('POST', '/api/location/apply-speed', {
     mode,
     speed_kmh: opts.speed_kmh ?? null,
     speed_min_kmh: opts.speed_min_kmh ?? null,
     speed_max_kmh: opts.speed_max_kmh ?? null,
+    ...(opts.seed != null ? { seed: opts.seed } : {}),
     ...ud(udid),
   })
 

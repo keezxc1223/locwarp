@@ -261,6 +261,7 @@ class ApplySpeedRequest(BaseModel):
     speed_min_kmh: float | None = None
     speed_max_kmh: float | None = None
     udid: str | None = None
+    seed: int | None = None
 
 
 @router.post("/apply-speed")
@@ -268,6 +269,7 @@ async def apply_speed(req: ApplySpeedRequest):
     """Hot-swap the active navigation's speed profile. The current
     _move_along_route loop re-interpolates from the current position
     with the new speed; already-completed progress is kept."""
+    import random
     from config import resolve_speed_profile
     engine = await _engine(getattr(req, "udid", None) if 'req' in dir() else None)
     profile = resolve_speed_profile(
@@ -275,6 +277,7 @@ async def apply_speed(req: ApplySpeedRequest):
         speed_kmh=req.speed_kmh,
         speed_min_kmh=req.speed_min_kmh,
         speed_max_kmh=req.speed_max_kmh,
+        rng=random.Random(req.seed) if req.seed is not None else None,
     )
     swapped = engine.apply_speed(profile)
     if not swapped:
@@ -373,6 +376,7 @@ def _spawn(coro):
 @router.post("/navigate")
 async def navigate(req: NavigateRequest):
     engine = await _engine(getattr(req, "udid", None) if 'req' in dir() else None)
+    engine._sync_seed = req.seed
     _spawn(engine.navigate(
         Coordinate(lat=req.lat, lng=req.lng), req.mode,
         speed_kmh=req.speed_kmh,
@@ -386,6 +390,7 @@ async def navigate(req: NavigateRequest):
 @router.post("/loop")
 async def loop(req: LoopRequest):
     engine = await _engine(getattr(req, "udid", None) if 'req' in dir() else None)
+    engine._sync_seed = req.seed
     _spawn(engine.start_loop(
         req.waypoints, req.mode,
         speed_kmh=req.speed_kmh,
@@ -402,6 +407,7 @@ async def loop(req: LoopRequest):
 @router.post("/multistop")
 async def multi_stop(req: MultiStopRequest):
     engine = await _engine(getattr(req, "udid", None) if 'req' in dir() else None)
+    engine._sync_seed = req.seed
     _spawn(engine.multi_stop(
         req.waypoints, req.mode, req.stop_duration, req.loop,
         speed_kmh=req.speed_kmh,
@@ -417,6 +423,7 @@ async def multi_stop(req: MultiStopRequest):
 @router.post("/flower")
 async def flower(req: FlowerRequest):
     engine = await _engine(getattr(req, "udid", None) if 'req' in dir() else None)
+    engine._sync_seed = req.seed
     _spawn(engine.flower(
         req.waypoints, req.mode,
         radius_m=req.radius_m, segments=req.segments,

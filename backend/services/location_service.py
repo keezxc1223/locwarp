@@ -14,12 +14,20 @@ from typing import Awaitable, Callable
 
 import asyncio
 
-from pymobiledevice3.exceptions import ConnectionTerminatedError
+from pymobiledevice3.exceptions import ConnectionFailedError, ConnectionTerminatedError
 from pymobiledevice3.services.dvt.instruments.dvt_provider import DvtProvider
 from pymobiledevice3.services.dvt.instruments.location_simulation import LocationSimulation
 from pymobiledevice3.services.simulate_location import DtSimulateLocation
 
 logger = logging.getLogger(__name__)
+
+# Failures of one legacy command that are worth another try on a fresh
+# connection: socket errors, the device closing or refusing the connection,
+# and a command that hangs.
+_LEGACY_TRANSIENT_ERRORS = (
+    OSError, EOFError, ConnectionTerminatedError, ConnectionFailedError,
+    asyncio.TimeoutError,
+)
 
 
 class DeviceLostError(RuntimeError):
@@ -283,28 +291,46 @@ class LegacyLocationService(LocationService):
     async def _send_clear(self) -> None:
         await self._send(struct.pack(">I", 1))
 
+    # One command, connection setup included. A healthy iOS 16 device answers
+    # in under 0.1 s; issue #51's log shows a stuck one hanging 7.5 s before
+    # usbmuxd refused the connection.
+    _SEND_TIMEOUT_S = 3.0
+    _SEND_ATTEMPTS = 3
+
     async def set(self, lat: float, lng: float) -> None:
-        """Simulate the device location using the legacy service."""
-        try:
-            await self._send_set(lat, lng)
-            self._active = True
-            logger.info("Legacy location set to (%.6f, %.6f)", lat, lng)
-        except (OSError, EOFError, BrokenPipeError, ConnectionResetError) as exc:
-            logger.warning("Legacy location channel dropped (%s: %s); reconnecting and retrying",
-                           type(exc).__name__, exc)
+        """Simulate the device location using the legacy service.
+
+        Every command opens a new connection, and the device now and then
+        refuses one (usbmuxd answers ``ConnectionFailedError``) or leaves it
+        hanging. Those are retried here: left to propagate, a single refusal
+        made the movement loop abandon the rest of the current leg, so the
+        device jumped ahead of the others on the same route (issue #51).
+        """
+        last_exc: Exception | None = None
+        for attempt in range(1, self._SEND_ATTEMPTS + 1):
             try:
-                await self._send_set(lat, lng)
+                await asyncio.wait_for(self._send_set(lat, lng), timeout=self._SEND_TIMEOUT_S)
                 self._active = True
-                logger.info("Legacy location set to (%.6f, %.6f) after reconnect", lat, lng)
-            except Exception as retry_exc:
-                logger.error("Legacy reconnect failed — device likely lost (%s)", retry_exc)
-                raise DeviceLostError(
-                    f"Legacy reconnect failed: {retry_exc}",
-                    reason=DeviceLostError.REASON_LOCKDOWN_DEAD,
-                ) from retry_exc
-        except Exception:
-            logger.exception("Failed to set legacy simulated location")
-            raise
+                if attempt == 1:
+                    logger.info("Legacy location set to (%.6f, %.6f)", lat, lng)
+                else:
+                    logger.info("Legacy location set to (%.6f, %.6f) on attempt %d", lat, lng, attempt)
+                return
+            except _LEGACY_TRANSIENT_ERRORS as exc:
+                last_exc = exc
+                logger.warning("Legacy location push failed (attempt %d/%d, %s: %s)",
+                               attempt, self._SEND_ATTEMPTS, type(exc).__name__, exc)
+                if attempt < self._SEND_ATTEMPTS:
+                    await asyncio.sleep(0.2 * attempt)
+            except Exception:
+                logger.exception("Failed to set legacy simulated location")
+                raise
+        logger.error("Legacy location push failed %d times; device likely lost (%s)",
+                     self._SEND_ATTEMPTS, last_exc)
+        raise DeviceLostError(
+            f"Legacy location push failed: {last_exc}",
+            reason=DeviceLostError.REASON_LOCKDOWN_DEAD,
+        ) from last_exc
 
     async def clear(self) -> None:
         """Clear the simulated location using the legacy service."""
@@ -315,7 +341,7 @@ class LegacyLocationService(LocationService):
             await self._send_clear()
             self._active = False
             logger.info("Legacy simulated location cleared")
-        except (OSError, EOFError, BrokenPipeError, ConnectionResetError) as exc:
+        except _LEGACY_TRANSIENT_ERRORS as exc:
             logger.warning("Legacy clear channel dropped (%s: %s); reconnecting",
                            type(exc).__name__, exc)
             try:

@@ -1040,29 +1040,38 @@ export function useSimulation(subscribe?: WsSubscribe, primaryUdid?: string | nu
 
   const teleportAll = useCallback((udids: string[], lat: number, lng: number) =>
     fanout(udids, 'teleport', (u) => api.teleport(lat, lng, u)), [fanout])
+  // One seed per group action: every device then draws the same random
+  // speed (when a speed range is set) and the same pause lengths, so they
+  // stay together. Single-device actions keep the backend's own randomness.
+  const groupSeed = (udids: string[]): number | null => (udids.length >= 2 ? Date.now() : null)
+
   const navigateAll = useCallback(async (udids: string[], lat: number, lng: number) => {
     await preSyncStart(udids)
-    return fanout(udids, 'navigate', (u) => api.navigate(lat, lng, moveMode, { speed_kmh: customSpeedKmh, speed_min_kmh: speedMinKmh, speed_max_kmh: speedMaxKmh }, u, straightLine, routeEngine))
+    const seed = groupSeed(udids)
+    return fanout(udids, 'navigate', (u) => api.navigate(lat, lng, moveMode, { speed_kmh: customSpeedKmh, speed_min_kmh: speedMinKmh, speed_max_kmh: speedMaxKmh, seed }, u, straightLine, routeEngine))
   }, [fanout, preSyncStart, moveMode, customSpeedKmh, speedMinKmh, speedMaxKmh, straightLine, routeEngine])
   const startLoopAll = useCallback(async (udids: string[], wps: LatLng[]) => {
     await preSyncStart(udids)
+    const seed = groupSeed(udids)
     setLapProgress(null)
-    return fanout(udids, 'loop', (u) => api.startLoop(wps, moveMode, { speed_kmh: customSpeedKmh, speed_min_kmh: speedMinKmh, speed_max_kmh: speedMaxKmh }, { pause_enabled: pauseLoop.enabled, pause_min: pauseLoop.min, pause_max: pauseLoop.max }, u, straightLine, loopLapCount, routeEngine, { jump_mode: jumpMode, jump_pre_delay: jumpPreDelay, jump_post_delay: jumpPostDelay }))
+    return fanout(udids, 'loop', (u) => api.startLoop(wps, moveMode, { speed_kmh: customSpeedKmh, speed_min_kmh: speedMinKmh, speed_max_kmh: speedMaxKmh, seed }, { pause_enabled: pauseLoop.enabled, pause_min: pauseLoop.min, pause_max: pauseLoop.max }, u, straightLine, loopLapCount, routeEngine, { jump_mode: jumpMode, jump_pre_delay: jumpPreDelay, jump_post_delay: jumpPostDelay }))
   }, [fanout, preSyncStart, moveMode, customSpeedKmh, speedMinKmh, speedMaxKmh, pauseLoop, straightLine, loopLapCount, routeEngine, jumpMode, jumpPreDelay, jumpPostDelay])
   const multiStopAll = useCallback(async (udids: string[], wps: LatLng[], dur: number, loop: boolean) => {
     await preSyncStart(udids)
+    const seed = groupSeed(udids)
     // Single-pass path of the merged 路徑 mode — use the shared pauseLoop setting.
-    return fanout(udids, 'multistop', (u) => api.multiStop(wps, moveMode, dur, loop, { speed_kmh: customSpeedKmh, speed_min_kmh: speedMinKmh, speed_max_kmh: speedMaxKmh }, { pause_enabled: pauseLoop.enabled, pause_min: pauseLoop.min, pause_max: pauseLoop.max }, u, straightLine, routeEngine, { jump_mode: jumpMode, jump_pre_delay: jumpPreDelay, jump_post_delay: jumpPostDelay }))
+    return fanout(udids, 'multistop', (u) => api.multiStop(wps, moveMode, dur, loop, { speed_kmh: customSpeedKmh, speed_min_kmh: speedMinKmh, speed_max_kmh: speedMaxKmh, seed }, { pause_enabled: pauseLoop.enabled, pause_min: pauseLoop.min, pause_max: pauseLoop.max }, u, straightLine, routeEngine, { jump_mode: jumpMode, jump_pre_delay: jumpPreDelay, jump_post_delay: jumpPostDelay }))
   }, [fanout, preSyncStart, moveMode, customSpeedKmh, speedMinKmh, speedMaxKmh, pauseLoop, straightLine, routeEngine, jumpMode, jumpPreDelay, jumpPostDelay])
   const flowerAll = useCallback(async (udids: string[], wps: LatLng[]) => {
     await preSyncStart(udids)
+    const seed = groupSeed(udids)
     setLapProgress(null)
     return fanout(udids, 'flower', (u) => api.flower(wps, moveMode, {
       radius_m: flowerRadius, segments: flowerSegments,
       circles: flowerCircles, rounds: flowerRounds,
       pre_wait: flowerPreWait, post_wait: flowerPostWait,
       teleport: flowerTeleport,
-    }, { speed_kmh: customSpeedKmh, speed_min_kmh: speedMinKmh, speed_max_kmh: speedMaxKmh }, u, straightLine, routeEngine))
+    }, { speed_kmh: customSpeedKmh, speed_min_kmh: speedMinKmh, speed_max_kmh: speedMaxKmh, seed }, u, straightLine, routeEngine))
   }, [fanout, preSyncStart, moveMode, customSpeedKmh, speedMinKmh, speedMaxKmh, straightLine, routeEngine, flowerRadius, flowerSegments, flowerCircles, flowerRounds, flowerPreWait, flowerPostWait, flowerTeleport])
   const randomWalkAll = useCallback(async (udids: string[], center: LatLng, r: number) => {
     await preSyncStart(udids)
@@ -1071,7 +1080,8 @@ export function useSimulation(subscribe?: WsSubscribe, primaryUdid?: string | nu
     return fanout(udids, 'randomwalk', (u) => api.randomWalk(center, r, moveMode, { speed_kmh: customSpeedKmh, speed_min_kmh: speedMinKmh, speed_max_kmh: speedMaxKmh }, { pause_enabled: pauseRandomWalk.enabled, pause_min: pauseRandomWalk.min, pause_max: pauseRandomWalk.max }, u, seed, straightLine, routeEngine, randomWalkCenterMode, forwardWalk))
   }, [fanout, preSyncStart, moveMode, customSpeedKmh, speedMinKmh, speedMaxKmh, pauseRandomWalk, straightLine, routeEngine, randomWalkCenterMode, forwardWalk])
   const applySpeedAll = useCallback(async (udids: string[]) => {
-    const outcome = await fanout(udids, 'apply-speed', (u) => api.applySpeed(moveMode, { speed_kmh: customSpeedKmh, speed_min_kmh: speedMinKmh, speed_max_kmh: speedMaxKmh }, u))
+    const seed = groupSeed(udids)
+    const outcome = await fanout(udids, 'apply-speed', (u) => api.applySpeed(moveMode, { speed_kmh: customSpeedKmh, speed_min_kmh: speedMinKmh, speed_max_kmh: speedMaxKmh, seed }, u))
     if (outcome.ok.length > 0) {
       setEffectiveSpeed({ kmh: customSpeedKmh ?? MODE_DEFAULT_KMH[moveMode], min: speedMinKmh, max: speedMaxKmh })
     }

@@ -76,6 +76,9 @@ class MultiStopNavigator:
                 "Cannot start multi-stop: no current position. Teleport first."
             )
 
+        # Shared by every device in a group so speed and pause picks match.
+        sync_rng = engine.take_sync_rng()
+
         profile_name = mode.value
         osrm_profile = "foot" if mode in (MovementMode.WALKING, MovementMode.RUNNING) else "car"
 
@@ -86,6 +89,7 @@ class MultiStopNavigator:
                 return dict(engine._active_speed_profile)
             return resolve_speed_profile(
                 profile_name, speed_kmh, speed_min_kmh, speed_max_kmh,
+                rng=sync_rng,
             )
 
         # Resume support: when this engine is taking over from a peer
@@ -256,7 +260,7 @@ class MultiStopNavigator:
                     lo, hi = sorted((float(pause_min), float(pause_max)))
                     if lo < 0:
                         lo = 0.0
-                    this_pause = random.uniform(lo, hi) if hi > 0 else 0.0
+                    this_pause = (sync_rng or random).uniform(lo, hi) if hi > 0 else 0.0
                 else:
                     this_pause = 0.0
                 should_pause = this_pause > 0 and (not is_last or loop)

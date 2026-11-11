@@ -542,6 +542,18 @@ ipcMain.handle('open-pipi-extension-folder', async () => {
   return { ok: !err, path: dir }
 })
 
+// The differential download pairs the cached installer.exe with the cached
+// current.blockmap, but running an installer by hand replaces only the
+// former. With the two out of step the updater downloads the "changed"
+// ranges (about 109 MB), fails the checksum and downloads the whole
+// installer again. Without the cached blockmap it fetches the one for the
+// running version from the release, which always matches installer.exe.
+// The folder name is `updaterCacheDirName` in app-update.yml.
+function dropCachedBlockmap() {
+  const base = process.env.LOCALAPPDATA || path.join(os.homedir(), 'AppData', 'Local')
+  try { fs.rmSync(path.join(base, 'locwarp-updater', 'current.blockmap'), { force: true }) } catch { /* next update just downloads in full */ }
+}
+
 ipcMain.handle('update-supported', () => !!getUpdater())
 
 ipcMain.handle('update-download', async () => {
@@ -551,6 +563,7 @@ ipcMain.handle('update-download', async () => {
     const r = await u.checkForUpdates()
     const version = r && r.updateInfo && r.updateInfo.version
     if (!version || !isNewerVersion(version, app.getVersion())) return { ok: false, code: 'NO_UPDATE' }
+    dropCachedBlockmap()
     // Not awaited: progress, completion and failure all arrive as events.
     u.downloadUpdate().catch(() => { /* reported through the 'error' event */ })
     return { ok: true, version }

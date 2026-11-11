@@ -103,6 +103,7 @@ class RandomWalkHandler:
         # the frontend and therefore pick the exact same sequence of
         # destinations. Unseeded → use the global random for a fresh walk.
         rng: random.Random | None = random.Random(seed) if seed is not None else None
+        speed_rng: random.Random | None = random.Random(seed + 1) if seed is not None else None
         # On resume, fast-forward the rng past the legs the peer already
         # finished so the next destination matches what the peer would
         # have picked next.
@@ -169,6 +170,7 @@ class RandomWalkHandler:
                     else:
                         speed_profile = resolve_speed_profile(
                             profile_name, speed_kmh, speed_min_kmh, speed_max_kmh,
+                            rng=speed_rng,
                         )
                     # Random walk has no named waypoints — disable highlight
                     engine._user_waypoints = []

@@ -83,6 +83,9 @@ class FlowerHandler:
         pre_wait = max(0.0, float(pre_wait))
         post_wait = max(0.0, float(post_wait))
 
+        # Shared by every device in a group so speed picks match.
+        sync_rng = engine.take_sync_rng()
+
         profile_name = mode.value
         osrm_profile = "foot" if mode in (MovementMode.WALKING, MovementMode.RUNNING) else "car"
 
@@ -91,6 +94,7 @@ class FlowerHandler:
                 return dict(engine._active_speed_profile)
             return resolve_speed_profile(
                 profile_name, speed_kmh, speed_min_kmh, speed_max_kmh,
+                rng=sync_rng,
             )
 
         engine.state = SimulationState.FLOWER

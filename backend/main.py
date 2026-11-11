@@ -308,6 +308,7 @@ async def _auto_sync_new_device_to_primary(new_udid: str) -> None:
         SimulationState.LOOPING,
         SimulationState.MULTI_STOP,
         SimulationState.RANDOM_WALK,
+        SimulationState.FLOWER,
     }
     if primary_eng.state not in dynamic:
         return

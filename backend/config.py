@@ -79,6 +79,7 @@ def resolve_speed_profile(
     speed_kmh: float | None = None,
     speed_min_kmh: float | None = None,
     speed_max_kmh: float | None = None,
+    rng=None,
 ) -> SpeedProfile:
     """Return a speed profile, picking a random km/h from the range if provided.
     Precedence: range > fixed custom > mode default."""
@@ -87,7 +88,9 @@ def resolve_speed_profile(
         lo, hi = sorted((float(speed_min_kmh), float(speed_max_kmh)))
         if lo <= 0:
             lo = 0.1
-        return make_speed_profile(random.uniform(lo, hi))
+        # Devices moving as a group pass the same seeded rng so they all
+        # draw the same speed; without one each device would pick its own.
+        return make_speed_profile((rng or random).uniform(lo, hi))
     if speed_kmh:
         return make_speed_profile(speed_kmh)
     return SPEED_PROFILES[profile_name]

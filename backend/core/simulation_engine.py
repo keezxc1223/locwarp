@@ -172,6 +172,10 @@ class SimulationEngine:
         # "from beginning" preamble and continues from segment_index /
         # lap_count / random_walk_count captured by the dying engine.
         self._resume_snapshot: dict | None = None
+        # Seed for the next handler's random picks (speed from a range,
+        # pause length at a stop). The API sets it from the request; every
+        # device in a group gets the same value so their picks match.
+        self._sync_seed: int | None = None
         # Random-walk progress counter exposed on the engine so a
         # disconnect-promotion can capture it and restore on the new
         # leader. The handler increments this after each completed leg.
@@ -795,6 +799,16 @@ class SimulationEngine:
         self._pending_speed_profile = dict(speed_profile)
         self._speed_was_applied = True
         return True
+
+    def take_sync_rng(self):
+        """Return a ``random.Random`` seeded with the pending group seed, or
+        None when the action was not started with one. Clears the seed so
+        a later action cannot reuse it."""
+        seed, self._sync_seed = self._sync_seed, None
+        if seed is None:
+            return None
+        import random
+        return random.Random(seed)
 
     async def _move_along_route(
         self,

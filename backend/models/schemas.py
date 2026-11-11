@@ -56,6 +56,9 @@ class TeleportRequest(BaseModel):
 
 
 class NavigateRequest(BaseModel):
+    # Group mode: every device gets the same seed so random speed / pause
+    # picks match across devices.
+    seed: int | None = None
     lat: float = Field(ge=-90.0, le=90.0)
     lng: float = Field(ge=-180.0, le=180.0)
     mode: MovementMode = MovementMode.WALKING
@@ -68,6 +71,9 @@ class NavigateRequest(BaseModel):
 
 
 class LoopRequest(BaseModel):
+    # Group mode: every device gets the same seed so random speed / pause
+    # picks match across devices.
+    seed: int | None = None
     waypoints: list[Coordinate]
     mode: MovementMode = MovementMode.WALKING
     speed_kmh: float | None = None
@@ -91,6 +97,9 @@ class LoopRequest(BaseModel):
 
 
 class MultiStopRequest(BaseModel):
+    # Group mode: every device gets the same seed so random speed / pause
+    # picks match across devices.
+    seed: int | None = None
     waypoints: list[Coordinate]
     mode: MovementMode = MovementMode.WALKING
     stop_duration: int = 0
@@ -112,6 +121,9 @@ class MultiStopRequest(BaseModel):
 
 
 class FlowerRequest(BaseModel):
+    # Group mode: every device gets the same seed so random speed / pause
+    # picks match across devices.
+    seed: int | None = None
     """種花模式 — visit each waypoint and walk a circle around it.
 
     For every waypoint the device (optionally) travels there, waits, then

@@ -68,6 +68,9 @@ class RouteLooper:
             )
             return
 
+        # Shared by every device in a group so speed and pause picks match.
+        sync_rng = engine.take_sync_rng()
+
         profile_name = mode.value
         osrm_profile = "foot" if mode in (MovementMode.WALKING, MovementMode.RUNNING) else "car"
 
@@ -127,6 +130,7 @@ class RouteLooper:
                 return dict(engine._active_speed_profile)
             return resolve_speed_profile(
                 profile_name, speed_kmh, speed_min_kmh, speed_max_kmh,
+                rng=sync_rng,
             )
 
         # Per-station pause sampler. Returns a non-negative duration; 0 means
@@ -139,7 +143,7 @@ class RouteLooper:
                 lo = 0.0
             if hi <= 0:
                 return 0.0
-            return random.uniform(lo, hi)
+            return (sync_rng or random).uniform(lo, hi)
 
         async def _pause_at_stop(stop_index: int) -> bool:
             """Pause for a random duration. Returns True if the simulation was
