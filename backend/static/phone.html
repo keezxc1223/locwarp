@@ -215,6 +215,10 @@
   .sheet-head { display: flex; align-items: center; justify-content: space-between; gap: 10px; margin-bottom: 6px; flex-shrink: 0; }
   .sheet-head h2 { margin: 0; font-size: 18px; font-weight: 680; letter-spacing: 0.01em; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
   .sheet-sub { display: flex; align-items: center; gap: 6px; margin-top: 3px; font-size: 12px; color: var(--muted); }
+  .sheet-head > h2 { flex: 1; min-width: 0; }
+  /* Shown only when the sheet was reached from another sheet. */
+  .back-btn { display: none; flex-shrink: 0; color: var(--text); }
+  .back-btn.on { display: flex; }
   .head-actions { display: flex; align-items: center; gap: 6px; flex-shrink: 0; }
   .icon-btn {
     width: 40px; height: 40px; border-radius: 50%; border: none; cursor: pointer;
@@ -251,6 +255,7 @@
   .tile[data-kind="navigate"] .ic { background: rgba(77,210,138,0.18); color: var(--ok); }
   .tile[data-kind="bookmarks"] .ic { background: rgba(255,200,87,0.18); color: #ffd27a; }
   .tile[data-kind="randomwalk"] .ic { background: rgba(255,150,190,0.18); color: #ffa8c8; }
+  .tile[data-kind="locate"] .ic { background: rgba(140,220,120,0.18); color: #a5e58c; }
   .tile[data-kind="routes"] .ic { background: rgba(90,215,200,0.18); color: #7fe0d2; }
   .tile[data-kind="recent"] .ic { background: rgba(120,200,255,0.18); color: #8fd3ff; }
   .tile[data-kind="search"] .ic { background: rgba(170,150,240,0.2); color: #c3b1ff; }
@@ -505,9 +510,13 @@
       <span class="ic"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><circle cx="11" cy="11" r="7" /><path d="m21 21-4.3-4.3" /></svg></span>
       <span class="tx"><span class="tt" data-i18n="search"></span><span class="ds" data-i18n="search_ds"></span></span>
     </button>
-    <button type="button" class="tile wide" data-kind="coord" style="--i:6">
+    <button type="button" class="tile" data-kind="coord" style="--i:6">
       <span class="ic"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M20 10c0 6-8 12-8 12s-8-6-8-12a8 8 0 0 1 16 0z" /><circle cx="12" cy="10" r="3" /></svg></span>
       <span class="tx"><span class="tt" data-i18n="coord"></span><span class="ds" data-i18n="coord_ds"></span></span>
+    </button>
+    <button type="button" class="tile" data-kind="locate" style="--i:7">
+      <span class="ic"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><rect x="3" y="4" width="18" height="12" rx="2" /><path d="M8 20h8M12 16v4" /><circle cx="12" cy="10" r="2.2" /></svg></span>
+      <span class="tx"><span class="tt" data-i18n="locate_pc"></span><span class="ds" id="locate-ds"></span></span>
     </button>
   </div>
 
@@ -531,7 +540,7 @@
 <!-- Confirm / place sheet (no scrim: the map and the pin stay usable) -->
 <div id="confirm" class="sheet glass dense" role="dialog" aria-labelledby="confirm-title" tabindex="-1">
   <div class="grabber"></div>
-  <div class="sheet-head"><h2 id="confirm-title"></h2></div>
+  <div class="sheet-head"><button type="button" class="icon-btn press back-btn" data-back data-i18n-aria="back"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.4" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M15 6l-6 6 6 6" /></svg></button><h2 id="confirm-title"></h2></div>
   <div class="coord-line" id="confirm-coord"></div>
   <div id="confirm-route" style="display:none">
     <label class="field-label" data-i18n="route_start_label"></label>
@@ -580,6 +589,7 @@
 <div id="places" class="sheet glass dense tall" role="dialog" aria-modal="true" aria-labelledby="places-title" tabindex="-1">
   <div class="grabber"></div>
   <div class="sheet-head">
+    <button type="button" class="icon-btn press back-btn" data-back data-i18n-aria="back"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.4" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M15 6l-6 6 6 6" /></svg></button>
     <h2 id="places-title"></h2>
     <div class="head-actions">
       <button type="button" class="icon-btn press" data-close data-i18n-aria="close">
@@ -595,7 +605,7 @@
 <!-- Add to Home Screen instructions -->
 <div id="install" class="sheet glass dense" role="dialog" aria-modal="true" aria-labelledby="install-title" tabindex="-1">
   <div class="grabber"></div>
-  <div class="sheet-head"><h2 id="install-title" data-i18n="install"></h2></div>
+  <div class="sheet-head"><button type="button" class="icon-btn press back-btn" data-back data-i18n-aria="back"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.4" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M15 6l-6 6 6 6" /></svg></button><h2 id="install-title" data-i18n="install"></h2></div>
   <ol class="steps" id="install-steps"></ol>
   <div class="btn-row"><button type="button" class="btn primary press" data-close data-i18n="got_it"></button></div>
 </div>
@@ -622,7 +632,10 @@
     <h3 data-i18n="search"></h3>
     <input class="input" type="text" id="search-input" autocomplete="off" />
     <div class="list" id="search-results" style="max-height:50vh"></div>
-    <div class="btn-row"><button type="button" class="btn press" id="search-close" data-i18n="close"></button></div>
+    <div class="btn-row">
+      <button type="button" class="btn press" id="search-back" data-i18n="back"></button>
+      <button type="button" class="btn press" id="search-close" data-i18n="close"></button>
+    </div>
   </div>
 </div>
 
@@ -633,7 +646,7 @@
     <input class="input" type="text" id="coord-input" autocomplete="off" />
     <div class="format-note" id="coord-format-note"></div>
     <div class="btn-row">
-      <button type="button" class="btn press" id="coord-close" data-i18n="cancel"></button>
+      <button type="button" class="btn press" id="coord-close" data-i18n="back"></button>
       <button type="button" class="btn primary press" id="coord-go" data-i18n="next"></button>
     </div>
   </div>
@@ -691,7 +704,7 @@
   // ── i18n ──────────────────────────────────────────────────
   const STR = {
     zh: {
-      menu_title: '功能', close: '關閉', cancel: '取消', apply: '套用', next: '下一步', got_it: '知道了',
+      menu_title: '功能', back: '返回', close: '關閉', cancel: '取消', apply: '套用', next: '下一步', got_it: '知道了',
       g_move: '移動', g_places: '地點', g_control: '控制',
       teleport: '瞬移', teleport_ds: '點地圖直接跳過去',
       navigate: '導航', navigate_ds: '沿著道路走過去', navigate_blocked: '需要先瞬移取得位置',
@@ -705,6 +718,8 @@
       flower_move_label: '點與點之間', flower_walk: '走過去', flower_tp: '瞬移過去', sent_flower: '已開始種花',
       randomwalk: '隨機漫步', randomwalk_ds: '在目前位置附近隨意走', c_randomwalk_ds: '以目前位置為中心,在範圍內隨機走動',
       rw_radius: '範圍半徑 (公尺)', sent_randomwalk: '已開始隨機漫步',
+      locate_pc: '定位電腦', locate_pc_ds: '找出電腦的實際位置', locate_busy: '取得位置中...',
+      locate_title: '電腦目前位置', locate_note: '誤差約 ±{m} 公尺', locate_note_ip: 'IP 定位,只到城市等級',
       layers_title: '地圖圖層', layer_auto: '跟隨電腦', layer_auto_ds: '目前: {name}', layer_failed: '圖層載入失敗',
       recent: '最近去過', recent_ds: '再去一次',
       search: '搜尋地址', search_ds: '用地名或地址找', search_ph: '輸入地名或地址',
@@ -740,7 +755,7 @@
       lang_other: 'EN',
     },
     en: {
-      menu_title: 'Actions', close: 'Close', cancel: 'Cancel', apply: 'Apply', next: 'Next', got_it: 'Got it',
+      menu_title: 'Actions', back: 'Back', close: 'Close', cancel: 'Cancel', apply: 'Apply', next: 'Next', got_it: 'Got it',
       g_move: 'MOVE', g_places: 'PLACES', g_control: 'CONTROL',
       teleport: 'Teleport', teleport_ds: 'Tap the map to jump there',
       navigate: 'Navigate', navigate_ds: 'Walk there along roads', navigate_blocked: 'Teleport first to get a position',
@@ -754,6 +769,8 @@
       flower_move_label: 'Between points', flower_walk: 'Walk', flower_tp: 'Teleport', sent_flower: 'Flower run started',
       randomwalk: 'Random walk', randomwalk_ds: 'Wander around the current position', c_randomwalk_ds: 'Wanders at random inside a circle around the current position',
       rw_radius: 'Radius (meters)', sent_randomwalk: 'Random walk started',
+      locate_pc: 'Locate PC', locate_pc_ds: 'Find where the PC really is', locate_busy: 'Getting the location...',
+      locate_title: 'PC location', locate_note: 'accurate to about ±{m} m', locate_note_ip: 'from the IP address, city level only',
       layers_title: 'Map layer', layer_auto: 'Same as the PC', layer_auto_ds: 'Now: {name}', layer_failed: 'Could not load that layer',
       recent: 'Recent', recent_ds: 'Go there again',
       search: 'Search', search_ds: 'Find by name or address', search_ph: 'Place name or address',
@@ -1086,11 +1103,17 @@
   // the pin can still be moved.
   const scrim = $('scrim'), fab = $('fab'), recenter = $('recenter'), nowbar = $('nowbar'), layerbtn = $('layerbtn');
   let openId = null;
-  function showSheet(id) {
+  // `back`, when given, is what the sheet's back button does: return to
+  // the sheet this one was opened from instead of dropping to the map.
+  let sheetBack = null;
+  function showSheet(id, back) {
     if (openId && openId !== id) $(openId).classList.remove('open');
     openId = id;
     const el = $(id);
     el.classList.add('open');
+    sheetBack = back || null;
+    const backBtn = el.querySelector('[data-back]');
+    if (backBtn) backBtn.classList.toggle('on', !!sheetBack);
     scrim.classList.toggle('show', id !== 'confirm');
     fab.classList.add('hidden'); recenter.classList.add('hidden'); nowbar.classList.add('hidden'); layerbtn.classList.add('hidden');
     fab.setAttribute('aria-expanded', id === 'menu' ? 'true' : 'false');
@@ -1108,6 +1131,14 @@
   }
   scrim.addEventListener('click', hideSheet);
   document.querySelectorAll('.sheet [data-close]').forEach((b) => b.addEventListener('click', hideSheet));
+  document.querySelectorAll('[data-back]').forEach((b) => b.addEventListener('click', () => { if (sheetBack) sheetBack(); }));
+  function openMenu() { refreshMenu(); showSheet('menu'); }
+  // Going from the confirm sheet to another sheet skips hideSheet, so the
+  // pin / route preview it put on the map is cleared here.
+  function leaveConfirm() { pendingAction = null; setPendingMode(null); clearPendingPin(); clearPreview(); }
+  const backToMenu = () => { leaveConfirm(); openMenu(); };
+  // The list is still rendered underneath, so it comes back as it was.
+  const backToPlaces = () => { leaveConfirm(); showSheet('places', openMenu); };
   document.addEventListener('keydown', (e) => {
     if (e.key !== 'Escape') return;
     const m = document.querySelector('.modal.open');
@@ -1218,6 +1249,7 @@
     }
     document.querySelector('.tile[data-kind="navigate"]').classList.toggle('blocked', !hasPosition());
     $('navigate-ds').textContent = hasPosition() ? t('navigate_ds') : t('navigate_blocked');
+    $('locate-ds').textContent = t(locating ? 'locate_busy' : 'locate_pc_ds');
     document.querySelector('.tile[data-kind="randomwalk"]').classList.toggle('blocked', !hasPosition());
     $('randomwalk-ds').textContent = hasPosition() ? t('randomwalk_ds') : t('navigate_blocked');
     document.querySelector('.tile[data-kind="stop"]').classList.toggle('live', moving);
@@ -1370,14 +1402,14 @@
     ]);
     $('confirm-flower').style.display = routeStyle === 'flower' ? '' : 'none';
   }
-  function openConfirm(kind, place, route) {
+  function openConfirm(kind, place, route, back) {
     pendingAction = { kind, place: place || null, route: route || null };
     const title = $('confirm-title'), coord = $('confirm-coord'), row = $('confirm-buttons');
     $('confirm-speed').style.display = (kind === 'navigate' || kind === 'route' || kind === 'randomwalk') ? '' : 'none';
     $('confirm-rw').style.display = kind === 'randomwalk' ? '' : 'none';
     $('confirm-route').style.display = kind === 'route' ? '' : 'none';
     row.innerHTML = '';
-    if (place) coord.textContent = formatCoord(place.lat, place.lng);
+    if (place) coord.textContent = formatCoord(place.lat, place.lng) + (place.note ? ' · ' + place.note : '');
     const cancel = button('', t('cancel'), hideSheet);
     if (kind === 'route') {
       title.textContent = route.name;
@@ -1396,7 +1428,7 @@
       title.textContent = place.name || formatCoord(place.lat, place.lng, 5);
       const nav = button('go', t('navigate'), () => {
         if (!hasPosition()) { toast(t('no_position'), 'err'); return; }
-        openConfirm('navigate', place);
+        openConfirm('navigate', place, null, () => openConfirm('place', place, null, back));
       });
       row.append(cancel, nav, button('primary', t('teleport'), () => runConfirm('teleport')));
     } else if (kind === 'teleport') {
@@ -1413,7 +1445,7 @@
       title.textContent = t('c_restore'); coord.textContent = t('c_restore_ds');
       row.append(cancel, button('danger', t('restore'), () => runConfirm('restore')));
     }
-    showSheet('confirm');
+    showSheet('confirm', back);
   }
   let busy = false;
   async function runConfirm(kind) {
@@ -1474,10 +1506,10 @@
     } finally { busy = false; }
   }
   // Show a place on the map and offer teleport / navigate for it.
-  function offerPlace(place) {
+  function offerPlace(place, back) {
     setPendingPin(place.lat, place.lng);
     map.setView([place.lat, place.lng], Math.max(map.getZoom(), 15));
-    openConfirm('place', place);
+    openConfirm('place', place, null, back);
   }
 
   // Outline a saved route on the map and offer to run it.
@@ -1491,7 +1523,7 @@
     map.fitBounds(previewLine.getBounds(), {
       paddingTopLeft: [30, 70], paddingBottomRight: [30, Math.round(size.y * 0.55)], maxZoom: 17,
     });
-    openConfirm('route', null, route);
+    openConfirm('route', null, route, backToPlaces);
   }
 
   // ── Now-moving bar actions ────────────────────────────────
@@ -1579,7 +1611,7 @@
           }));
         } else {
           frag.appendChild(placeRow(lead, b.name, catPrefix + formatCoord(b.lat, b.lng, 5),
-            () => offerPlace({ lat: b.lat, lng: b.lng, name: b.name })));
+            () => offerPlace({ lat: b.lat, lng: b.lng, name: b.name }, backToPlaces)));
         }
       });
     } else {
@@ -1590,7 +1622,7 @@
         const coord = formatCoord(r.lat, r.lng, 5);
         const lead = '<span class="rc">' + (isNav ? ICON_NAV : ICON_BOLT) + '</span>';
         frag.appendChild(placeRow(lead, r.name || coord, (r.name ? coord + ' · ' : '') + timeAgo(r.ts),
-          () => offerPlace({ lat: r.lat, lng: r.lng, name: r.name || null })));
+          () => offerPlace({ lat: r.lat, lng: r.lng, name: r.name || null }, backToPlaces)));
       });
     }
     list.appendChild(frag);
@@ -1602,7 +1634,7 @@
     $('places-chips').style.display = kind === 'recent' ? 'none' : '';
     $('places-chips').innerHTML = '';
     $('places-list').innerHTML = '';
-    showSheet('places');
+    showSheet('places', openMenu);
     try {
       const data = await api('/api/phone/' + kind);
       if (openId !== 'places' || placesKind !== kind) return;
@@ -1614,6 +1646,28 @@
     }
   }
   $('places-filter').addEventListener('input', renderPlaces);
+
+  // ── Locate PC ─────────────────────────────────────────────
+  // Same idea as the desktop's 定位電腦: ask the PC where it really is,
+  // show that spot on the map, and let the user decide whether to move
+  // there. Cancelling leaves the map on the spot without moving the GPS.
+  let locating = false;
+  async function locatePc() {
+    if (locating) return;
+    locating = true;
+    refreshMenu();
+    try {
+      // Windows can take up to 15 s to get a fix.
+      const r = await api('/api/phone/locate_pc');
+      const note = r.via === 'windows' ? t('locate_note', { m: Math.round(r.accuracy) }) : t('locate_note_ip');
+      locating = false;
+      offerPlace({ lat: r.lat, lng: r.lng, name: t('locate_title'), note }, backToMenu);
+    } catch (e) {
+      locating = false;
+      refreshMenu();
+      fail(e);
+    }
+  }
 
   // ── Base map picker ───────────────────────────────────────
   const ICON_CHECK = '<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.6" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M5 12.5l4.5 4.5L19 7.5" /></svg>';
@@ -1651,7 +1705,7 @@
       li.textContent = t(k);
       steps.appendChild(li);
     });
-    showSheet('install');
+    showSheet('install', openMenu);
   }
 
   // ── Menu tiles ────────────────────────────────────────────
@@ -1668,12 +1722,13 @@
       else if (kind === 'randomwalk') {
         // The walk is centred on the current virtual position.
         if (!hasPosition()) { toast(t('no_position'), 'err'); return; }
-        openConfirm('randomwalk');
+        openConfirm('randomwalk', null, null, backToMenu);
       }
       else if (kind === 'bookmarks' || kind === 'routes' || kind === 'recent') openPlaces(kind);
       else if (kind === 'search') { hideSheet(); openSearch(); }
       else if (kind === 'coord') { hideSheet(); openCoord(); }
-      else if (kind === 'stop' || kind === 'restore') openConfirm(kind);
+      else if (kind === 'locate') locatePc();
+      else if (kind === 'stop' || kind === 'restore') openConfirm(kind, null, null, backToMenu);
       else if (kind === 'install') openInstall();
     });
   });
@@ -1681,6 +1736,7 @@
   // ── Search ────────────────────────────────────────────────
   const searchModal = $('search-modal'), searchInput = $('search-input'), searchResults = $('search-results');
   $('search-close').addEventListener('click', () => searchModal.classList.remove('open'));
+  $('search-back').addEventListener('click', () => { searchModal.classList.remove('open'); openMenu(); });
   searchModal.addEventListener('click', (e) => { if (e.target === searchModal) searchModal.classList.remove('open'); });
   function openSearch() {
     searchInput.value = ''; searchResults.innerHTML = '';
@@ -1704,7 +1760,8 @@
           searchResults.appendChild(placeRow('', name, it.display_name, () => {
             searchModal.classList.remove('open');
             searchInput.blur();
-            offerPlace({ lat: it.lat, lng: it.lng, name });
+            // Back returns to the results, which are still in the card.
+            offerPlace({ lat: it.lat, lng: it.lng, name }, () => { hideSheet(); searchModal.classList.add('open'); });
           }));
         });
       } catch (e) {
@@ -1717,7 +1774,7 @@
 
   // ── Enter coordinate ──────────────────────────────────────
   const coordModal = $('coord-modal'), coordInput = $('coord-input');
-  $('coord-close').addEventListener('click', () => coordModal.classList.remove('open'));
+  $('coord-close').addEventListener('click', () => { coordModal.classList.remove('open'); openMenu(); });
   coordModal.addEventListener('click', (e) => { if (e.target === coordModal) coordModal.classList.remove('open'); });
   function openCoord() {
     coordInput.value = '';
@@ -1729,7 +1786,7 @@
     if (!parsed) { toast(t('bad_coord'), 'err'); return; }
     coordModal.classList.remove('open');
     coordInput.blur();
-    offerPlace({ lat: parsed.lat, lng: parsed.lng, name: null });
+    offerPlace({ lat: parsed.lat, lng: parsed.lng, name: null }, () => { hideSheet(); coordModal.classList.add('open'); });
   }
   $('coord-go').addEventListener('click', submitCoord);
   coordInput.addEventListener('keydown', (e) => { if (e.key === 'Enter') submitCoord(); });

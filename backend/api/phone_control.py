@@ -998,6 +998,101 @@ async def phone_random_walk(
     return {"status": "started", "radius_m": body.radius_m, "mode": mode.value}
 
 
+# Same Windows Location query the desktop's 定位電腦 button runs from the
+# Electron main process (frontend/electron/main.js LOCATE_PS_SCRIPT). The
+# phone cannot reach that process, so the backend runs it here; keep the
+# two scripts in step.
+_LOCATE_PS_SCRIPT = r"""
+$ErrorActionPreference = 'Stop'
+try {
+  Add-Type -AssemblyName System.Device
+  $watcher = New-Object System.Device.Location.GeoCoordinateWatcher([System.Device.Location.GeoPositionAccuracy]::High)
+  $watcher.Start()
+  $deadline = (Get-Date).AddSeconds(15)
+  while ((Get-Date) -lt $deadline) {
+    if ($watcher.Permission -eq 'Denied') { Write-Output 'DENIED'; exit 0 }
+    if ($watcher.Status -eq 'Ready' -and -not $watcher.Position.Location.IsUnknown) { break }
+    Start-Sleep -Milliseconds 200
+  }
+  if ($watcher.Permission -eq 'Denied') { Write-Output 'DENIED'; exit 0 }
+  $loc = $watcher.Position.Location
+  if ($loc.IsUnknown) { Write-Output ('NODATA,status=' + $watcher.Status); exit 0 }
+  Write-Output ('OK,' + $loc.Latitude.ToString([cultureinfo]::InvariantCulture) + ',' + $loc.Longitude.ToString([cultureinfo]::InvariantCulture) + ',' + $loc.HorizontalAccuracy.ToString([cultureinfo]::InvariantCulture))
+  $watcher.Stop()
+} catch {
+  Write-Output ('ERROR,' + $_.Exception.Message)
+}
+"""
+
+
+def _windows_location() -> dict:
+    """Blocking; call through asyncio.to_thread. Returns {"ok": True, lat,
+    lng, accuracy} or {"ok": False, "code": ...}."""
+    import platform
+    if platform.system() != "Windows":
+        return {"ok": False, "code": "UNSUPPORTED"}
+    import subprocess
+    try:
+        proc = subprocess.run(
+            ["powershell.exe", "-NoProfile", "-NonInteractive", "-ExecutionPolicy", "Bypass",
+             "-Command", _LOCATE_PS_SCRIPT],
+            capture_output=True, text=True, encoding="utf-8", errors="replace",
+            timeout=18.0, creationflags=0x08000000,  # CREATE_NO_WINDOW
+        )
+    except subprocess.TimeoutExpired:
+        return {"ok": False, "code": "TIMEOUT"}
+    except Exception as e:
+        logger.debug("locate-pc: powershell failed to run", exc_info=True)
+        return {"ok": False, "code": "SPAWN_FAILED", "message": str(e)}
+    out = (proc.stdout or "").strip()
+    if out.startswith("OK,"):
+        try:
+            _, lat, lng, acc = out.split(",")[:4]
+            lat_f, lng_f = float(lat), float(lng)
+            if -90 <= lat_f <= 90 and -180 <= lng_f <= 180:
+                try:
+                    acc_f = float(acc)
+                except ValueError:
+                    acc_f = 100.0
+                return {"ok": True, "lat": lat_f, "lng": lng_f,
+                        "accuracy": acc_f if acc_f == acc_f and acc_f > 0 else 100.0}
+        except ValueError:
+            pass
+    if out == "DENIED":
+        return {"ok": False, "code": "DENIED"}
+    return {"ok": False, "code": "NODATA", "message": out[:200]}
+
+
+@router.get("/api/phone/locate_pc")
+async def phone_locate_pc(
+    request: Request,
+    x_locwarp_token: str | None = Header(default=None, alias="X-LocWarp-Token"),
+    t: str | None = None,
+):
+    """Where the PC really is: Windows Location (Wi-Fi positioning) first,
+    then IP geolocation, the same order as the desktop's 定位電腦. Only
+    reports the position; moving there is a separate teleport."""
+    _check_token(_resolve_token(request, x_locwarp_token, t))
+    import asyncio
+    win = await asyncio.to_thread(_windows_location)
+    if win["ok"]:
+        return {"lat": win["lat"], "lng": win["lng"], "accuracy": win["accuracy"], "via": "windows"}
+    if win["code"] == "DENIED":
+        raise HTTPException(status_code=409, detail={
+            "code": "location_denied",
+            "message": "電腦的 Windows 定位服務被關閉,請到電腦的 設定 > 隱私權與安全性 > 位置 開啟",
+        })
+    logger.info("phone locate-pc: Windows Location gave %s, trying IP", win["code"])
+    from api.geocode import real_location
+    try:
+        ip = await real_location()
+    except HTTPException:
+        raise HTTPException(status_code=502, detail={
+            "code": "locate_failed", "message": "電腦無法取得位置 (Wi-Fi 定位與 IP 定位都失敗)",
+        })
+    return {"lat": ip["lat"], "lng": ip["lng"], "accuracy": 5000.0, "via": "ip"}
+
+
 @router.get("/api/phone/recent")
 async def phone_recent(
     request: Request,

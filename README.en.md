@@ -277,6 +277,7 @@ Control LocWarp from a phone browser when you are away from the PC. The "Phone c
 
 - **Routes**: pick a route saved on the PC. The map previews it first, then you choose where to start (teleport to the start, or walk there from the current position) and how to run it: once, looping, or in Flower Farmer mode, circling every waypoint.
 - **Random walk**: centred on the current position; set the radius and the speed, then start.
+- **Locate PC**: finds where the PC really is (Windows Location, falling back to IP geolocation) and marks it on the map, where you can teleport or navigate to it.
 - **Map layer**: the layer button at the bottom right of the map switches the base map, with the same choices as the desktop. By default it follows the layer the desktop is showing; a layer picked on the phone takes over from then on.
 
 > The phone must be on the **same Wi-Fi** as the PC, and the PC firewall must allow port 8777. "Regenerate" issues a new PIN at once and invalidates phones paired earlier. Five wrong PINs in a row lock entry for 60 seconds.
