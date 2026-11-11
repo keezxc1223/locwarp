@@ -830,6 +830,86 @@ async def phone_bookmarks(
     }
 
 
+@router.get("/api/phone/routes")
+async def phone_routes(
+    request: Request,
+    x_locwarp_token: str | None = Header(default=None, alias="X-LocWarp-Token"),
+    t: str | None = None,
+):
+    """Read-only copy of the desktop's saved routes, in the same category
+    / item order the desktop shows. Waypoints are included so the phone
+    can preview a route on its map before starting it."""
+    _check_token(_resolve_token(request, x_locwarp_token, t))
+    from main import app_state
+    rm = app_state.route_manager
+    return {
+        "categories": [{"id": c.id, "name": c.name, "color": c.color} for c in rm.list_categories()],
+        "routes": [
+            {"id": r.id, "name": r.name, "category_id": r.category_id, "profile": r.profile,
+             "waypoints": [{"lat": w.lat, "lng": w.lng} for w in r.waypoints]}
+            for r in rm.list_routes()
+        ],
+    }
+
+
+class _RouteStartBody(BaseModel):
+    route_id: str = Field(min_length=1, max_length=100)
+    mode: str = "walking"  # walking / running / driving
+    speed_kmh: float | None = Field(default=None, ge=0.1, le=300.0)
+    # False: walk the waypoints once and stop. True: keep circling back
+    # to the first waypoint until stopped.
+    loop: bool = False
+    # True: jump to the first waypoint before starting. False: walk there
+    # from the current virtual position (engines without one still jump).
+    teleport_to_start: bool = True
+
+
+@router.post("/api/phone/route/start")
+async def phone_route_start(
+    body: _RouteStartBody,
+    request: Request,
+    x_locwarp_token: str | None = Header(default=None, alias="X-LocWarp-Token"),
+    t: str | None = None,
+):
+    """Run one of the desktop's saved routes on every connected device."""
+    _check_token(_resolve_token(request, x_locwarp_token, t))
+    from main import app_state
+    route = next((r for r in app_state.route_manager.list_routes() if r.id == body.route_id), None)
+    if route is None:
+        raise HTTPException(status_code=404, detail={
+            "code": "route_not_found", "message": "找不到這條路線,可能已在電腦上刪除",
+        })
+    if len(route.waypoints) < 2:
+        raise HTTPException(status_code=400, detail={
+            "code": "route_too_short", "message": "這條路線少於 2 個點,無法執行",
+        })
+    engines = _all_engines()
+    from api.location import _spawn
+    from models.schemas import Coordinate, MovementMode
+    try:
+        mode = MovementMode(body.mode)
+    except ValueError:
+        mode = MovementMode.WALKING
+    first = route.waypoints[0]
+
+    async def _to_start(e):
+        if body.teleport_to_start or e.current_position is None:
+            await e.teleport(first.lat, first.lng)
+
+    await _fanout("route start", _to_start)
+    # Fire-and-forget, like navigate: each engine runs its own sim and the
+    # call only returns once the route ends. Each engine gets its own
+    # waypoint list so nothing a sim does can touch the saved route.
+    for e in engines:
+        wps = [Coordinate(lat=w.lat, lng=w.lng) for w in route.waypoints]
+        if body.loop:
+            _spawn(e.start_loop(wps, mode, speed_kmh=body.speed_kmh, pause_enabled=False))
+        else:
+            _spawn(e.multi_stop(wps, mode, 0, False, speed_kmh=body.speed_kmh, pause_enabled=False))
+    return {"status": "started", "name": route.name, "waypoints": len(route.waypoints),
+            "loop": body.loop, "mode": mode.value}
+
+
 @router.get("/api/phone/recent")
 async def phone_recent(
     request: Request,

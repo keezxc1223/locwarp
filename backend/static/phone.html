@@ -243,6 +243,7 @@
   .tile .ds { font-size: 11px; color: var(--muted); line-height: 1.3; }
   .tile[data-kind="navigate"] .ic { background: rgba(77,210,138,0.18); color: var(--ok); }
   .tile[data-kind="bookmarks"] .ic { background: rgba(255,200,87,0.18); color: #ffd27a; }
+  .tile[data-kind="routes"] .ic { background: rgba(90,215,200,0.18); color: #7fe0d2; }
   .tile[data-kind="recent"] .ic { background: rgba(120,200,255,0.18); color: #8fd3ff; }
   .tile[data-kind="search"] .ic { background: rgba(170,150,240,0.2); color: #c3b1ff; }
   .tile[data-kind="stop"] .ic { background: rgba(245,185,85,0.18); color: var(--warn); }
@@ -469,15 +470,19 @@
       <span class="ic"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M12 3l2.7 5.6 6.1.8-4.5 4.3 1.1 6.1L12 16.9 6.6 19.8l1.1-6.1L3.2 9.4l6.1-.8L12 3z" /></svg></span>
       <span class="tx"><span class="tt" data-i18n="bookmarks"></span><span class="ds" data-i18n="bookmarks_ds"></span></span>
     </button>
-    <button type="button" class="tile" data-kind="recent" style="--i:3">
+    <button type="button" class="tile" data-kind="routes" style="--i:3">
+      <span class="ic"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><circle cx="6" cy="19" r="2.5" /><circle cx="18" cy="5" r="2.5" /><path d="M8.5 19H15a3.5 3.5 0 0 0 0-7H9a3.5 3.5 0 0 1 0-7h6.5" /></svg></span>
+      <span class="tx"><span class="tt" data-i18n="routes"></span><span class="ds" data-i18n="routes_ds"></span></span>
+    </button>
+    <button type="button" class="tile" data-kind="recent" style="--i:4">
       <span class="ic"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><circle cx="12" cy="12" r="9" /><path d="M12 7v5l3 2" /></svg></span>
       <span class="tx"><span class="tt" data-i18n="recent"></span><span class="ds" data-i18n="recent_ds"></span></span>
     </button>
-    <button type="button" class="tile" data-kind="search" style="--i:4">
+    <button type="button" class="tile" data-kind="search" style="--i:5">
       <span class="ic"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><circle cx="11" cy="11" r="7" /><path d="m21 21-4.3-4.3" /></svg></span>
       <span class="tx"><span class="tt" data-i18n="search"></span><span class="ds" data-i18n="search_ds"></span></span>
     </button>
-    <button type="button" class="tile" data-kind="coord" style="--i:5">
+    <button type="button" class="tile wide" data-kind="coord" style="--i:6">
       <span class="ic"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M20 10c0 6-8 12-8 12s-8-6-8-12a8 8 0 0 1 16 0z" /><circle cx="12" cy="10" r="3" /></svg></span>
       <span class="tx"><span class="tt" data-i18n="coord"></span><span class="ds" data-i18n="coord_ds"></span></span>
     </button>
@@ -485,15 +490,15 @@
 
   <div class="group-label" data-i18n="g_control"></div>
   <div class="grid">
-    <button type="button" class="tile" data-kind="stop" style="--i:6">
+    <button type="button" class="tile" data-kind="stop" style="--i:7">
       <span class="ic"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><rect x="6" y="6" width="12" height="12" rx="2" /></svg></span>
       <span class="tx"><span class="tt" data-i18n="stop"></span><span class="ds" id="stop-ds"></span></span>
     </button>
-    <button type="button" class="tile" data-kind="restore" style="--i:7">
+    <button type="button" class="tile" data-kind="restore" style="--i:8">
       <span class="ic"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M3 12a9 9 0 1 0 3-6.7" /><path d="M3 4v5h5" /></svg></span>
       <span class="tx"><span class="tt" data-i18n="restore"></span><span class="ds" data-i18n="restore_ds"></span></span>
     </button>
-    <button type="button" class="tile wide" data-kind="install" id="install-tile" style="--i:8">
+    <button type="button" class="tile wide" data-kind="install" id="install-tile" style="--i:9">
       <span class="ic"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><rect x="6" y="2.5" width="12" height="19" rx="3" /><path d="M12 8v6M9 11h6" /></svg></span>
       <span class="tx"><span class="tt" data-i18n="install"></span><span class="ds" data-i18n="install_ds"></span></span>
     </button>
@@ -505,6 +510,12 @@
   <div class="grabber"></div>
   <div class="sheet-head"><h2 id="confirm-title"></h2></div>
   <div class="coord-line" id="confirm-coord"></div>
+  <div id="confirm-route" style="display:none">
+    <label class="field-label" data-i18n="route_start_label"></label>
+    <div class="seg" id="route-start-seg"></div>
+    <label class="field-label" data-i18n="route_repeat_label"></label>
+    <div class="seg" id="route-repeat-seg"></div>
+  </div>
   <div id="confirm-speed" style="display:none">
     <div class="seg" data-speed-seg></div>
     <label class="field-label" for="confirm-custom" data-i18n="custom_speed"></label>
@@ -632,6 +643,11 @@
       teleport: '瞬移', teleport_ds: '點地圖直接跳過去',
       navigate: '導航', navigate_ds: '沿著道路走過去', navigate_blocked: '需要先瞬移取得位置',
       bookmarks: '座標清單', bookmarks_ds: '電腦上存的座標',
+      routes: '路線清單', routes_ds: '電腦上存的路線',
+      empty_routes: '還沒有儲存的路線。\n在電腦版儲存路線後,這裡就會出現。',
+      n_points: '{n} 個點', start_route: '開始', sent_route: '已開始路線',
+      route_start_label: '起點', route_tp: '瞬移到起點', route_walk: '從目前位置走過去',
+      route_repeat_label: '次數', route_once: '走一趟', route_loop: '循環到停止',
       recent: '最近去過', recent_ds: '再去一次',
       search: '搜尋地址', search_ds: '用地名或地址找', search_ph: '輸入地名或地址',
       coord: '輸入座標', coord_ds: '貼上經緯度', coord_ph: '貼上座標,例如 {ex}',
@@ -671,6 +687,11 @@
       teleport: 'Teleport', teleport_ds: 'Tap the map to jump there',
       navigate: 'Navigate', navigate_ds: 'Walk there along roads', navigate_blocked: 'Teleport first to get a position',
       bookmarks: 'Saved', bookmarks_ds: 'Coordinates saved on the PC',
+      routes: 'Routes', routes_ds: 'Routes saved on the PC',
+      empty_routes: 'No saved routes yet.\nSave a route in the desktop app and it will show up here.',
+      n_points: '{n} points', start_route: 'Start', sent_route: 'Route started',
+      route_start_label: 'Start from', route_tp: 'Teleport to the start', route_walk: 'Walk from current position',
+      route_repeat_label: 'Repeat', route_once: 'Once', route_loop: 'Loop until stopped',
       recent: 'Recent', recent_ds: 'Go there again',
       search: 'Search', search_ds: 'Find by name or address', search_ph: 'Place name or address',
       coord: 'Coordinates', coord_ds: 'Paste a lat/lng', coord_ph: 'Paste coordinates, e.g. {ex}',
@@ -908,6 +929,9 @@
     }).addTo(map);
   }
   function clearPendingPin() { if (pendingMarker) { pendingMarker.remove(); pendingMarker = null; } }
+  // Dashed outline of a saved route while its confirm sheet is open.
+  let previewLine = null;
+  function clearPreview() { if (previewLine) { previewLine.remove(); previewLine = null; } }
   function setRoutePath(coords) {
     if (!coords || coords.length < 2) { if (routePolyline) { routePolyline.remove(); routePolyline = null; } return; }
     const latlngs = coords.map((c) => [c.lat, c.lng]);
@@ -944,7 +968,7 @@
     scrim.classList.remove('show');
     fab.classList.remove('hidden'); recenter.classList.remove('hidden'); nowbar.classList.remove('hidden');
     fab.setAttribute('aria-expanded', 'false');
-    if (wasConfirm) { pendingAction = null; setPendingMode(null); clearPendingPin(); }
+    if (wasConfirm) { pendingAction = null; setPendingMode(null); clearPendingPin(); clearPreview(); }
   }
   scrim.addEventListener('click', hideSheet);
   document.querySelectorAll('.sheet [data-close]').forEach((b) => b.addEventListener('click', hideSheet));
@@ -1164,14 +1188,51 @@
     b.addEventListener('click', onClick);
     return b;
   }
-  function openConfirm(kind, place) {
-    pendingAction = { kind, place: place || null };
+  // Saved-route options: where to start from, and once vs. looping.
+  let routeTeleport = true, routeLoop = false;
+  function renderRouteSegs() {
+    const fill = (id, options) => {
+      const seg = $(id);
+      seg.innerHTML = '';
+      options.forEach(([label, active, onPick]) => {
+        const b = document.createElement('button');
+        b.type = 'button';
+        b.className = 'press' + (active ? ' active' : '');
+        b.textContent = label;
+        b.addEventListener('click', () => { if (onPick() !== false) renderRouteSegs(); });
+        seg.appendChild(b);
+      });
+    };
+    fill('route-start-seg', [
+      [t('route_tp'), routeTeleport, () => { routeTeleport = true; }],
+      // Walking to the start needs a position to walk from.
+      [t('route_walk'), !routeTeleport, () => {
+        if (!hasPosition()) { toast(t('no_position'), 'err'); return false; }
+        routeTeleport = false;
+      }],
+    ]);
+    fill('route-repeat-seg', [
+      [t('route_once'), !routeLoop, () => { routeLoop = false; }],
+      [t('route_loop'), routeLoop, () => { routeLoop = true; }],
+    ]);
+  }
+  function openConfirm(kind, place, route) {
+    pendingAction = { kind, place: place || null, route: route || null };
     const title = $('confirm-title'), coord = $('confirm-coord'), row = $('confirm-buttons');
-    $('confirm-speed').style.display = kind === 'navigate' ? '' : 'none';
+    $('confirm-speed').style.display = (kind === 'navigate' || kind === 'route') ? '' : 'none';
+    $('confirm-route').style.display = kind === 'route' ? '' : 'none';
     row.innerHTML = '';
     if (place) coord.textContent = formatCoord(place.lat, place.lng);
     const cancel = button('', t('cancel'), hideSheet);
-    if (kind === 'place') {
+    if (kind === 'route') {
+      title.textContent = route.name;
+      coord.textContent = t('n_points', { n: route.waypoints.length });
+      routeTeleport = true; routeLoop = false;
+      if (SPEEDS.some((s) => s[0] === route.profile)) speedMode = route.profile;
+      renderSpeedSegs(); renderRouteSegs();
+      $('confirm-custom').value = '';
+      row.append(cancel, button('primary', t('start_route'), () => runConfirm('route')));
+    } else if (kind === 'place') {
       title.textContent = place.name || formatCoord(place.lat, place.lng, 5);
       const nav = button('go', t('navigate'), () => {
         if (!hasPosition()) { toast(t('no_position'), 'err'); return; }
@@ -1213,6 +1274,13 @@
         if (kmh) body.speed_kmh = kmh;
         await api('/api/phone/navigate', { method: 'POST', body });
         toast(kmh ? t('sent_navigate_kmh', { kmh }) : t('sent_navigate'));
+      } else if (kind === 'route') {
+        const kmh = readCustomKmh('confirm-custom');
+        const body = { route_id: pendingAction.route.id, mode: speedMode, loop: routeLoop, teleport_to_start: routeTeleport };
+        if (kmh) body.speed_kmh = kmh;
+        await api('/api/phone/route/start', { method: 'POST', body });
+        restoredPos = null;
+        toast(t('sent_route'));
       } else if (kind === 'stop') {
         await api('/api/phone/stop', { method: 'POST' });
         toast(t('sent_stop'));
@@ -1236,6 +1304,20 @@
     setPendingPin(place.lat, place.lng);
     map.setView([place.lat, place.lng], Math.max(map.getZoom(), 15));
     openConfirm('place', place);
+  }
+
+  // Outline a saved route on the map and offer to run it.
+  function offerRoute(route) {
+    clearPreview(); clearPendingPin();
+    const latlngs = route.waypoints.map((w) => [w.lat, w.lng]);
+    previewLine = L.polyline(latlngs, { color: accentColor(), weight: 3, opacity: 0.9, dashArray: '6 8', interactive: false }).addTo(map);
+    setPendingPin(latlngs[0][0], latlngs[0][1]);
+    // Leave room for the confirm sheet covering the lower part of the map.
+    const size = map.getSize();
+    map.fitBounds(previewLine.getBounds(), {
+      paddingTopLeft: [30, 70], paddingBottomRight: [30, Math.round(size.y * 0.55)], maxZoom: 17,
+    });
+    openConfirm('route', null, route);
   }
 
   // ── Now-moving bar actions ────────────────────────────────
@@ -1294,8 +1376,9 @@
     list.innerHTML = '';
     if (!placesData) return;
     const frag = document.createDocumentFragment();
-    if (placesKind === 'bookmarks') {
-      const cats = placesData.categories || [], all = placesData.bookmarks || [];
+    if (placesKind === 'bookmarks' || placesKind === 'routes') {
+      const isRoutes = placesKind === 'routes';
+      const cats = placesData.categories || [], all = (isRoutes ? placesData.routes : placesData.bookmarks) || [];
       const color = {}, cname = {};
       cats.forEach((c) => { color[c.id] = safeColor(c.color); cname[c.id] = c.name; });
       chips.innerHTML = '';
@@ -1310,11 +1393,20 @@
       });
       const items = all.filter((b) =>
         (placesCat === 'all' || b.category_id === placesCat) && (!q || (b.name || '').toLowerCase().includes(q)));
-      if (items.length === 0) frag.appendChild(emptyNode(all.length ? t('empty_filter') : t('empty_bookmarks')));
+      if (items.length === 0) frag.appendChild(emptyNode(all.length ? t('empty_filter') : t(isRoutes ? 'empty_routes' : 'empty_bookmarks')));
       items.forEach((b) => {
         const lead = '<span class="bar" style="background:' + (color[b.category_id] || '#6c8cff') + '"></span>';
-        const sub = (placesCat === 'all' && cname[b.category_id] ? cname[b.category_id] + ' · ' : '') + formatCoord(b.lat, b.lng, 5);
-        frag.appendChild(placeRow(lead, b.name, sub, () => offerPlace({ lat: b.lat, lng: b.lng, name: b.name })));
+        const catPrefix = placesCat === 'all' && cname[b.category_id] ? cname[b.category_id] + ' · ' : '';
+        if (isRoutes) {
+          const n = (b.waypoints || []).length;
+          frag.appendChild(placeRow(lead, b.name, catPrefix + t('n_points', { n }), () => {
+            if (n < 2) { toast(t('failed', { msg: t('n_points', { n }) }), 'err'); return; }
+            offerRoute(b);
+          }));
+        } else {
+          frag.appendChild(placeRow(lead, b.name, catPrefix + formatCoord(b.lat, b.lng, 5),
+            () => offerPlace({ lat: b.lat, lng: b.lng, name: b.name })));
+        }
       });
     } else {
       const items = placesData.filter((r) => !q || (r.name || '').toLowerCase().includes(q));
@@ -1333,12 +1425,12 @@
     placesKind = kind; placesData = null; placesCat = 'all';
     $('places-title').textContent = t(kind);
     $('places-filter').value = '';
-    $('places-chips').style.display = kind === 'bookmarks' ? '' : 'none';
+    $('places-chips').style.display = kind === 'recent' ? 'none' : '';
     $('places-chips').innerHTML = '';
     $('places-list').innerHTML = '';
     showSheet('places');
     try {
-      const data = await api(kind === 'bookmarks' ? '/api/phone/bookmarks' : '/api/phone/recent');
+      const data = await api('/api/phone/' + kind);
       if (openId !== 'places' || placesKind !== kind) return;
       placesData = data;
       renderPlaces();
@@ -1376,7 +1468,7 @@
         if (!hasPosition()) { toast(t('no_position'), 'err'); return; }
         hideSheet(); setPendingMode('navigate');
       }
-      else if (kind === 'bookmarks' || kind === 'recent') openPlaces(kind);
+      else if (kind === 'bookmarks' || kind === 'routes' || kind === 'recent') openPlaces(kind);
       else if (kind === 'search') { hideSheet(); openSearch(); }
       else if (kind === 'coord') { hideSheet(); openCoord(); }
       else if (kind === 'stop' || kind === 'restore') openConfirm(kind);
