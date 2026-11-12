@@ -190,6 +190,7 @@ Connect **up to five** devices at once. Teleport, Navigate, every movement mode,
 - Before any action starts, all devices are teleported to the same coordinate so their paths match.
 - Random Walk shares one random seed, so every device walks the same route.
 - With a speed range or random pauses, every device draws the same speed and pause length, so they do not drift apart.
+- Connected devices are labelled A to E in the sidebar, in connection order, each with its own colour.
 - While moving, the progress bar lists each device's own estimated arrival time as A to E.
 - A device plugged in later syncs to the current position and joins the task already running.
 - Each device can be restored, disconnected, or have its Developer Mode option revealed on its own.
