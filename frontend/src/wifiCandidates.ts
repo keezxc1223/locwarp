@@ -38,7 +38,8 @@ export interface CandidateInput {
 }
 
 /** Group-mode device cap, USB and WiFi together; the backend enforces the same. */
-export const MAX_DEVICES = 3;
+export { MAX_DEVICES } from './deviceSlots';
+import { MAX_DEVICES } from './deviceSlots';
 
 /**
  * Where a candidate came from. `subnet` is the TCP scan fallback: it only

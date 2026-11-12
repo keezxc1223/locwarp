@@ -1,9 +1,7 @@
 import React from 'react';
 import { useT } from '../i18n';
 import type { RuntimesMap } from '../hooks/useSimulation';
-import { DEVICE_COLORS, type DeviceLetter } from './DeviceChip';
-
-const DEVICE_LETTERS: DeviceLetter[] = ['A', 'B', 'C'];
+import { DEVICE_COLORS, DEVICE_LETTERS } from '../deviceSlots';
 
 interface EtaBarProps {
   state: string;
@@ -15,7 +13,7 @@ interface EtaBarProps {
   legEta?: number; // seconds to next waypoint
   runtimes?: RuntimesMap;
   // Connected device udids in chip order, so the per-device ETAs carry the
-  // same A / B / C letter and colour as the device chips.
+  // same A-E letter and colour as the device chips.
   deviceOrder?: string[];
 }
 
@@ -223,10 +221,10 @@ const EtaBar: React.FC<EtaBarProps> = ({
       {isGroup && (
         <>
           {separator}
-          <div style={{ display: 'flex', alignItems: 'center', gap: 6, fontSize: 11, opacity: 0.85 }}>
+          <div style={{ display: 'flex', alignItems: 'center', flexWrap: 'wrap', columnGap: 6, rowGap: 2, fontSize: 11, opacity: 0.85 }}>
             <span style={{ opacity: 0.6 }}>{t('eta.group_progress')}</span>
             {groupEtas.map(({ r, letter }) => (
-              <span key={r.udid} style={{ color: DEVICE_COLORS[letter], fontWeight: 600 }}>
+              <span key={r.udid} style={{ color: DEVICE_COLORS[letter], fontWeight: 600, whiteSpace: 'nowrap' }}>
                 {letter} {formatTime(r.eta || 0)}
               </span>
             ))}

@@ -7,8 +7,7 @@ import {
   type SavedTunnelIp,
 } from '../utils/savedTunnelIps';
 import { getHostPrefix } from '../utils/hostNetwork';
-
-const MAX_TUNNEL_DEVICES = 3;
+import { MAX_DEVICES as MAX_TUNNEL_DEVICES } from '../deviceSlots';
 
 interface Device {
   id: string;
@@ -158,7 +157,7 @@ const DeviceStatus: React.FC<DeviceStatusProps> = ({
       let msg: { ok: boolean; text: string };
       if (r.connected > 0) msg = { ok: true, text: t('device.wifi_scan_connected', { n: r.connected }) };
       else if (r.failed > 0) msg = { ok: false, text: t('device.wifi_scan_failed', { n: r.failed }) };
-      else if (r.connectedAfter >= 3) msg = { ok: true, text: t('device.max_reached') };
+      else if (r.connectedAfter >= MAX_TUNNEL_DEVICES) msg = { ok: true, text: t('device.max_reached', { max: MAX_TUNNEL_DEVICES }) };
       else msg = { ok: false, text: t('device.wifi_scan_none') };
       setWifiScanMsg(msg);
     } catch {

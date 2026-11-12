@@ -42,7 +42,7 @@ async def wifi_tunnel_connect(req: WifiTunnelConnectRequest):
     from main import app_state
     from core.device_manager import UnsupportedIosVersionError
     dm = _dm()
-    # Max 3 devices (group mode). connect_wifi_tunnel may reconnect an existing udid;
+    # Max MAX_DEVICES devices (group mode). connect_wifi_tunnel may reconnect an existing udid;
     # we can only cheaply check the pre-state here.
     if len(dm._connections) >= MAX_DEVICES:
         raise HTTPException(
@@ -98,7 +98,7 @@ _tunnel_logger = logging.getLogger("wifi_tunnel")
 
 # Group-mode device cap. Same value gates USB auto-connect, /wifi/tunnel,
 # /wifi/tunnel/start, /wifi/tunnel/start-and-connect, and /{udid}/connect.
-MAX_DEVICES = 3
+MAX_DEVICES = 5
 
 # Per-device tunnel registry. Each connected iOS 17+ device that uses
 # WiFi (instead of USB) gets its own TunnelRunner. v0.2.83 lifted the
@@ -1128,7 +1128,7 @@ async def wifi_tunnel_start(req: WifiTunnelStartRequest):
     candidate udids (req.udid > USB-tracked > cached pair records) and
     keeps the one whose pair-verify handshake actually succeeds. The
     tunnel cap is enforced separately from the device cap so we don't
-    accidentally start a 4th tunnel while only 3 devices are visible to
+    accidentally start one tunnel too many while fewer devices are visible to
     dm._connections.
 
     Requests for different IPs run at the same time: _tunnels_lock is held

@@ -8,7 +8,7 @@
 
 <p align="center">
   <b>A virtual location tool that controls iPhone / iPad GPS from Windows</b><br>
-  No jailbreak · USB or Wi-Fi · Up to three devices at once · Free and open source
+  No jailbreak · USB or Wi-Fi · Up to five devices at once · Free and open source
 </p>
 
 <p align="center">
@@ -43,7 +43,7 @@
 
 - **Six movement modes**: Teleport, navigate, multi-stop routes, flower-farming circles, random walk and joystick, at preset, fixed or randomised speeds.
 - **USB and Wi-Fi**: Plug in and it connects. On iOS 17 and later a Wi-Fi Tunnel lets you unplug, and a pinned device reconnects on every launch.
-- **Multi-device sync**: Up to three devices at once. Every action is applied to all of them and they walk exactly the same route.
+- **Multi-device sync**: Up to five devices at once. Every action is applied to all of them and they walk exactly the same route.
 - **Saved coordinates and routes**: Search, categories and drag-and-drop ordering; one click to go. JSON and GPX import and export.
 - **Mushroom map**: Shows the mushroom, flower and smoke spots from pipimushroom.com on the map, filterable by size and type, one click to go.
 - **Phone web control**: Away from the PC, a phone browser can teleport, navigate, run saved routes, start a random walk, pause and change speed.
@@ -173,7 +173,7 @@ When an engine fails, that leg falls back to a straight line and the next leg tr
 - **Wi-Fi Tunnel** (iOS 17+, requires one prior USB pairing):
   - **Scan WiFi devices** on the Connection page finds iPhones on the same Wi-Fi and connects the ones that are not connected yet; connected devices are left alone. It looks over mDNS first, then scans the local network, and only counts devices confirmed to be iPhones.
   - "Auto-detect" inside the Wi-Fi panel only lists what it finds and leaves the choice to you.
-  - Auto-connect at startup fills the remaining device slots (three at most): with one device already connected (for example over USB), the others still connect by themselves. It uses only mDNS and previously connected IPs and never scans the local network in the background.
+  - Auto-connect at startup fills the remaining device slots (five at most): with one device already connected (for example over USB), the others still connect by themselves. It uses only mDNS and previously connected IPs and never scans the local network in the background.
   - Devices connecting at the same time do not wait for each other, so one that fails does not slow the rest.
   - Previously used IPs are remembered. You can also pin a device so that it connects on every launch and retries after a drop. Once any device is pinned, only pinned devices auto-connect on launch; the connection page points it out when the device in use is not pinned.
   - "Keep connection alive when the screen dims" (experimental) keeps re-sending the position to reduce drops after the iPhone locks.
@@ -185,12 +185,12 @@ When an engine fails, that leg falls back to a straight line and the next leg tr
 <details>
 <summary><b>Multi-device group mode</b></summary>
 
-Connect **up to three** devices at once. Teleport, Navigate, every movement mode, pause, resume, stop, apply speed, and restore are sent to all devices together, from both the desktop UI and the phone web control.
+Connect **up to five** devices at once. Teleport, Navigate, every movement mode, pause, resume, stop, apply speed, and restore are sent to all devices together, from both the desktop UI and the phone web control.
 
 - Before any action starts, all devices are teleported to the same coordinate so their paths match.
 - Random Walk shares one random seed, so every device walks the same route.
 - With a speed range or random pauses, every device draws the same speed and pause length, so they do not drift apart.
-- While moving, the progress bar lists each device's own estimated arrival time as A / B / C.
+- While moving, the progress bar lists each device's own estimated arrival time as A to E.
 - A device plugged in later syncs to the current position and joins the task already running.
 - Each device can be restored, disconnected, or have its Developer Mode option revealed on its own.
 

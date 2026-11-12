@@ -1,13 +1,12 @@
-import { DeviceChip, type DeviceLetter } from './DeviceChip'
+import { DeviceChip } from './DeviceChip'
+import { MAX_DEVICES, DEVICE_LETTERS } from '../deviceSlots'
 import { useT } from '../i18n'
 import type { DeviceInfo } from '../hooks/useDevice'
 import type { RuntimesMap } from '../hooks/useSimulation'
 
-const MAX_DEVICES = 3
-const LETTERS: DeviceLetter[] = ['A', 'B', 'C']
 
 interface Props {
-  devices: DeviceInfo[]           // connected devices in order (max 3)
+  devices: DeviceInfo[]           // connected devices in order (max MAX_DEVICES)
   runtimes: RuntimesMap
   onAdd: () => void               // opens add-device picker
   onDisconnect: (udid: string) => void
@@ -26,7 +25,7 @@ export function DeviceChipRow({ devices, runtimes, onAdd, onDisconnect, onRestor
       flexWrap: 'wrap',
     }}>
       {devices.slice(0, MAX_DEVICES).map((d, i) => {
-        const letter = LETTERS[i]
+        const letter = DEVICE_LETTERS[i]
         return (
           <DeviceChip
             key={d.udid}

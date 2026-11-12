@@ -53,6 +53,7 @@ interface ContextMenuState {
 
 import type { DeviceRuntime, RuntimesMap } from '../hooks/useSimulation';
 import type { DeviceInfo } from '../hooks/useDevice';
+import { MAX_DEVICES, DEVICE_LETTERS, DEVICE_COLORS as DEVICE_SLOT_COLORS } from '../deviceSlots';
 
 interface MapViewProps {
   currentPosition: Position | null;
@@ -233,7 +234,7 @@ function TransportButtons({
   );
 }
 
-const DEVICE_COLORS = ['#4285f4', '#ff9800'];
+const DEVICE_COLORS = DEVICE_LETTERS.map((l) => DEVICE_SLOT_COLORS[l]);
 
 function escapeHtml(s: string): string {
   return s
@@ -243,7 +244,6 @@ function escapeHtml(s: string): string {
     .replace(/"/g, '&quot;')
     .replace(/'/g, '&#39;');
 }
-const DEVICE_LETTERS = ['A', 'B'];
 
 function haversineM(a: Position, b: Position): number {
   const R = 6371000;
@@ -1648,7 +1648,7 @@ const MapView: React.FC<MapViewProps> = ({
     }
 
     const activeUdids = new Set<string>();
-    devices.slice(0, 2).forEach((dev, i) => {
+    devices.slice(0, MAX_DEVICES).forEach((dev, i) => {
       const rt: DeviceRuntime | undefined = runtimes[dev.udid];
       if (!rt) return;
       activeUdids.add(dev.udid);
@@ -1741,7 +1741,7 @@ const MapView: React.FC<MapViewProps> = ({
     }
 
     const dests: { dev: DeviceInfo; color: string; letter: string; dest: Position }[] = [];
-    devices.slice(0, 2).forEach((dev, i) => {
+    devices.slice(0, MAX_DEVICES).forEach((dev, i) => {
       const rt = runtimes[dev.udid];
       if (rt && rt.destination) {
         dests.push({ dev, color: DEVICE_COLORS[i], letter: DEVICE_LETTERS[i], dest: rt.destination });

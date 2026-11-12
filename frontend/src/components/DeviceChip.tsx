@@ -4,13 +4,9 @@ import { useT } from '../i18n'
 import type { DeviceInfo } from '../hooks/useDevice'
 import type { DeviceRuntime } from '../hooks/useSimulation'
 
-export const DEVICE_COLORS: Record<'A' | 'B' | 'C', string> = {
-  A: '#4285f4',
-  B: '#ff9800',
-  C: '#9c6ade',
-}
+import { DEVICE_COLORS, type DeviceLetter } from '../deviceSlots'
 
-export type DeviceLetter = 'A' | 'B' | 'C'
+export { DEVICE_COLORS, type DeviceLetter }
 
 interface Props {
   letter: DeviceLetter

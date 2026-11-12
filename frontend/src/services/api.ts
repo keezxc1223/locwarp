@@ -1,3 +1,5 @@
+import { MAX_DEVICES } from '../deviceSlots'
+
 const API = 'http://127.0.0.1:8777'
 
 // Connection-refused means backend isn't up yet, retry with backoff.
@@ -52,8 +54,8 @@ const ERROR_I18N: Record<string, { zh: string; en: string }> = {
     en: 'USB cable disconnected — plug it back in and retry',
   },
   max_devices_reached: {
-    zh: '已連接最多 3 台裝置',
-    en: 'Maximum 3 devices connected',
+    zh: `已連接最多 ${MAX_DEVICES} 台裝置`,
+    en: `Maximum ${MAX_DEVICES} devices connected`,
   },
   ios_unsupported: {
     zh: '裝置 iOS 版本過舊,LocWarp 僅支援 iOS 16 以上。請升級 iOS 後再試。',

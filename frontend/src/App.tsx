@@ -22,6 +22,7 @@ import EtaBar from './components/EtaBar'
 import PauseControl from './components/PauseControl'
 import StatusBar from './components/StatusBar'
 import { DeviceChipRow } from './components/DeviceChipRow'
+import { MAX_DEVICES, DEVICE_LETTERS } from './deviceSlots'
 import type { FanoutOutcome } from './hooks/useSimulation'
 
 // Summarise a group fan-out result into a single toast string.
@@ -39,8 +40,7 @@ export function toastForFanout<T>(
   const statusFor = (udid: string) =>
     outcome.ok.some((o) => o.udid === udid) ? 'OK'
       : outcome.failed.find((f) => f.udid === udid)?.reason ?? 'error'
-  const letters = ['A', 'B', 'C']
-  const parts = devices.slice(0, 3).map((d, i) => `${letters[i]} ${statusFor(d.udid)}`)
+  const parts = devices.slice(0, MAX_DEVICES).map((d, i) => `${DEVICE_LETTERS[i]} ${statusFor(d.udid)}`)
   return `${action}: ${parts.join(', ')}`
 }
 
@@ -389,8 +389,8 @@ const App: React.FC = () => {
   // will surface them when the user opens it).
   //
   // Multi-device: tries every IP/port pair in `locwarp.tunnel.savedips`
-  // in parallel (up to MAX_TUNNEL_DEVICES = 3) so a user with two or
-  // three iPhones gets all of them connecting at once, not just the
+  // in parallel (up to MAX_DEVICES) so a user with several iPhones
+  // gets all of them connecting at once, not just the
   // most recent one. Falls back to the legacy single-IP keys for users
   // upgrading from a build that didn't track multiple IPs yet.
   //
@@ -1451,8 +1451,8 @@ const App: React.FC = () => {
           devices={device.connectedDevices}
           runtimes={sim.runtimes}
           onAdd={() => {
-            if (device.connectedDevices.length >= 3) {
-              setToastMsg(t('device.max_reached'))
+            if (device.connectedDevices.length >= MAX_DEVICES) {
+              setToastMsg(t('device.max_reached', { max: MAX_DEVICES }))
               return
             }
             device.scan()
