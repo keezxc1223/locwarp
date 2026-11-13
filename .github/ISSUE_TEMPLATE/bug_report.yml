@@ -3,11 +3,17 @@ description: 回報使用上遇到的問題或異常行為
 title: "[Bug] "
 labels: ["bug"]
 body:
+  - type: markdown
+    attributes:
+      value: |
+        開 Issue 前請先確認已更新到[最新版](https://github.com/keezxc1223/locwarp/releases),並看過 README 的[疑難排解](https://github.com/keezxc1223/locwarp#疑難排解)。
+
   - type: input
     id: locwarp-version
     attributes:
       label: LocWarp 版本
-      placeholder: 例如 v0.1.16
+      description: 在程式上方的「設定」頁可以看到
+      placeholder: 例如 v0.2.217
     validations:
       required: true
 
@@ -16,6 +22,7 @@ body:
     attributes:
       label: iOS 版本
       options:
+        - iOS 27.x
         - iOS 26.x
         - iOS 18.x
         - iOS 17.x
@@ -25,10 +32,10 @@ body:
       required: true
 
   - type: input
-    id: iphone-model
+    id: ios-version-detail
     attributes:
-      label: iPhone 機型
-      placeholder: 例如 iPhone 16 Pro Max
+      label: 完整 iOS 版本與機型
+      placeholder: 例如 iOS 26.4.1 / iPhone 16 Pro Max
 
   - type: dropdown
     id: connection
@@ -37,7 +44,16 @@ body:
       options:
         - USB 有線
         - WiFi Tunnel(iOS 17+)
-        - 舊版 WiFi 直連(iOS 17 以下)
+    validations:
+      required: true
+
+  - type: dropdown
+    id: device-count
+    attributes:
+      label: 同時連線的裝置數
+      options:
+        - 1 台
+        - 2 台以上
     validations:
       required: true
 
@@ -48,3 +64,9 @@ body:
       description: 請描述遇到的問題、重現步驟、錯誤訊息、截圖等
     validations:
       required: true
+
+  - type: textarea
+    id: log
+    attributes:
+      label: backend.log
+      description: 「設定」頁的「Log 資料夾」按鈕可以開啟 `~/.locwarp/logs/`,請把 backend.log 拖曳到這裡上傳。連線、移動相關的問題沒有 log 通常無法判斷原因
