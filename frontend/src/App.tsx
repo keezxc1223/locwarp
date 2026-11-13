@@ -106,6 +106,12 @@ const App: React.FC = () => {
   const sim = useSimulation(ws.subscribe, device.primaryDevice?.udid)
   const joystick = useJoystick(ws.sendMessage, sim.mode === SimMode.Joystick)
   const bm = useBookmarks()
+  // A coordinate saved from the phone page lands in the same store; the
+  // backend announces it so this list updates without a restart.
+  const bmRefresh = bm.refresh
+  useEffect(() => ws.subscribe((m) => {
+    if (m.type === 'bookmarks_changed') bmRefresh()
+  }), [ws.subscribe, bmRefresh])
 
   // Stable bookmark-pin array for the map. Re-mapping inline in JSX builds a
   // fresh array every render, which churns MapView's clustering effect (it

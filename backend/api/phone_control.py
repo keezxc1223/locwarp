@@ -1146,6 +1146,79 @@ async def phone_geocode(
     ]
 
 
+async def _reverse_lookup(lat: float, lng: float) -> tuple[str, str]:
+    """Best-effort (short name, country code) for a spot; ('', '') when
+    the lookup fails or takes too long, so saving never waits on it."""
+    import asyncio
+    from api.geocode import geocoding_service
+    try:
+        r = await asyncio.wait_for(geocoding_service.reverse(lat, lng, True), timeout=8)
+    except Exception:
+        logger.debug("phone reverse lookup failed", exc_info=True)
+        return "", ""
+    if not r:
+        return "", ""
+    short = (r.short_name or (r.display_name or "").split(",")[0]).strip()
+    return short, (r.country_code or "").lower()
+
+
+@router.get("/api/phone/reverse")
+async def phone_reverse(
+    request: Request,
+    lat: float,
+    lng: float,
+    x_locwarp_token: str | None = Header(default=None, alias="X-LocWarp-Token"),
+    t: str | None = None,
+):
+    """Suggested name for a spot, used to pre-fill 存成座標 on the phone."""
+    _check_token(_resolve_token(request, x_locwarp_token, t))
+    name, cc = await _reverse_lookup(lat, lng)
+    return {"name": name, "country_code": cc}
+
+
+class _BookmarkCreateBody(BaseModel):
+    name: str = Field(min_length=1, max_length=200)
+    lat: float = Field(ge=-90.0, le=90.0)
+    lng: float = Field(ge=-180.0, le=180.0)
+    category_id: str = Field(default="default", max_length=100)
+    country_code: str = Field(default="", max_length=8)
+
+
+@router.post("/api/phone/bookmarks")
+async def phone_bookmark_create(
+    body: _BookmarkCreateBody,
+    request: Request,
+    x_locwarp_token: str | None = Header(default=None, alias="X-LocWarp-Token"),
+    t: str | None = None,
+):
+    """Save a coordinate from the phone into the desktop's saved list (the
+    same store the desktop 收藏 tab edits), then tell the desktop UI so it
+    shows up there right away."""
+    _check_token(_resolve_token(request, x_locwarp_token, t))
+    from main import app_state
+    name = body.name.strip()
+    if not name:
+        raise HTTPException(status_code=400, detail="name is empty")
+    bm = app_state.bookmark_manager
+    for b in bm.list_bookmarks():
+        if abs(b.lat - body.lat) < 1e-6 and abs(b.lng - body.lng) < 1e-6:
+            raise HTTPException(status_code=409, detail={"code": "duplicate", "message": b.name})
+    cc = (body.country_code or "").lower()
+    if not cc:
+        _, cc = await _reverse_lookup(body.lat, body.lng)
+    created = bm.create_bookmark(
+        name=name, lat=body.lat, lng=body.lng,
+        category_id=body.category_id or "default", country_code=cc,
+    )
+    try:
+        from api.websocket import broadcast
+        await broadcast("bookmarks_changed", {"id": created.id, "source": "phone"})
+    except Exception:
+        logger.debug("bookmarks_changed broadcast failed", exc_info=True)
+    return {"id": created.id, "name": created.name, "lat": created.lat, "lng": created.lng,
+            "category_id": created.category_id, "country_code": created.country_code}
+
+
 # ── Mobile page ──────────────────────────────────────────────
 
 

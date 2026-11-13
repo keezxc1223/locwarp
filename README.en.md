@@ -46,7 +46,7 @@
 - **Multi-device sync**: Up to five devices at once. Every action is applied to all of them and they walk exactly the same route.
 - **Saved coordinates and routes**: Search, categories and drag-and-drop ordering; one click to go. JSON and GPX import and export.
 - **Mushroom map**: Shows the mushroom, flower and smoke spots from pipimushroom.com on the map, filterable by size and type, one click to go.
-- **Phone web control**: Away from the PC, a phone browser can teleport, navigate, run saved routes, start a random walk, pause and change speed.
+- **Phone web control**: Away from the PC, a phone browser can teleport, navigate, run saved routes, start a flower run or a random walk, pause and change speed, and save spots as coordinates.
 - **Coordinate formats**: Switch between WGS84, GCJ02 and BD09 and choose the axis order; display, copy and input stay consistent.
 - **In-app updates**: Download a new version inside the app and restart into it. Nothing is downloaded on its own.
 - **No sign-up**: Routing, address search and map layers all use free public services. No telemetry.
@@ -276,12 +276,13 @@ LocWarp never handles your Google password. The login data stays on this PC (`~/
 <details>
 <summary><b>Phone web control</b></summary>
 
-Control LocWarp from a phone browser when you are away from the PC. The "Phone control" button in the status bar shows a LAN address and a 6-digit PIN. Enter them on the phone to get a mobile map with teleport, navigate to a point (walk / bike / drive or a custom speed), address search, coordinate input, stop, and restore, plus a live view of the route running on the desktop. While moving it shows progress, remaining distance and time, and lets you pause, resume or change the speed. The coordinates saved on the PC and the recent list (50 entries) are available directly. The page can be added to the phone's home screen to open full screen like an app, and it follows the desktop's theme colour and coordinate format.
+Control LocWarp from a phone browser when you are away from the PC. The "Phone control" button in the status bar shows a LAN address and a 6-digit PIN. Enter them on the phone to get a mobile map with the main actions in a bottom toolbar: Teleport, Navigate (tap the map to pick a point; walk / bike / drive or a custom speed), Places and More, plus a live view of the route running on the desktop. While moving it shows progress, remaining distance and time, and lets you pause, resume or change the speed. Places puts the coordinates and routes saved on the PC and the recent list (50 entries) on one page; the box at the top searches addresses and also recognizes pasted coordinates. The page can be added to the phone's home screen to open full screen like an app, and it follows the desktop's theme colour and coordinate format.
 
-- **Routes**: pick a route saved on the PC. The map previews it first, then you choose where to start (teleport to the start, or walk there from the current position) and how to run it: once, looping, or in Flower Farmer mode, circling every waypoint.
+- **Save as coordinate**: the confirm sheet for a map tap, a search result, pasted coordinates or Locate PC has a "Save as coordinate" button, and the top of the Saved tab can save the current position. The name is pre-filled with the nearby address; pick a category and it goes into the PC's saved list, which updates on the desktop right away.
+- **Routes**: pick a route saved on the PC from the Routes tab in Places. The map previews it first, then you choose where to start (teleport to the start, or walk there from the current position) and how to run it: once, looping, or in Flower Farmer mode, circling every waypoint. Flower under More opens the route list with Flower Farmer mode already selected.
 - **Random walk**: centred on the current position; set the radius and the speed, then start.
 - **Locate PC**: finds where the PC really is (Windows Location, falling back to IP geolocation) and marks it on the map, where you can teleport or navigate to it.
-- **Map layer**: the layer button at the bottom right of the map switches the base map, with the same choices as the desktop. By default it follows the layer the desktop is showing; a layer picked on the phone takes over from then on.
+- **Map layer**: switch the base map under More, with the same choices as the desktop. By default it follows the layer the desktop is showing; a layer picked on the phone takes over from then on.
 
 > The phone must be on the **same Wi-Fi** as the PC, and the PC firewall must allow port 8777. "Regenerate" issues a new PIN at once and invalidates phones paired earlier. Five wrong PINs in a row lock entry for 60 seconds.
 

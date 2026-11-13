@@ -131,44 +131,46 @@
   }
   #hint.show { transform: translate(-50%, 0) scale(1); opacity: 1; }
 
-  /* ── Floating controls (bottom) ─────────────────────────────── */
-  #fab {
-    position: fixed; right: 16px; bottom: calc(var(--safe-b) + 20px); z-index: 5100;
-    width: 58px; height: 58px; border-radius: 20px; border: 1px solid rgba(255,255,255,0.32);
-    background: linear-gradient(150deg, rgba(140,165,255,0.95), rgba(84,112,240,0.95));
-    color: #fff; cursor: pointer;
-    box-shadow: inset 0 1px 0 rgba(255,255,255,0.45), inset 0 -2px 6px rgba(40,60,180,0.5), 0 10px 26px rgba(70,100,235,0.5);
-    display: flex; align-items: center; justify-content: center;
-    transition: transform 0.26s var(--spring), opacity 0.16s ease, background 0.2s ease, box-shadow 0.2s ease;
+  /* ── Bottom toolbar ─────────────────────────────────────────── */
+  #dock {
+    position: fixed; left: 12px; right: 12px; bottom: calc(var(--safe-b) + 14px); z-index: 5100;
+    max-width: 480px; margin: 0 auto; height: 64px; border-radius: 24px; padding: 6px;
+    display: grid; grid-template-columns: repeat(4, 1fr); gap: 4px;
+    transition: transform 0.26s var(--spring), opacity 0.16s ease;
   }
-  #fab:active { transform: scale(0.93); transition-duration: 0.08s; }
-  #fab svg { width: 26px; height: 26px; transition: transform 0.3s var(--spring); }
-  #fab.armed {
-    background: linear-gradient(150deg, rgba(60,66,84,0.95), rgba(34,38,50,0.95));
-    box-shadow: inset 0 1px 0 rgba(255,255,255,0.2), 0 8px 20px rgba(0,0,0,0.5);
+  #dock.hidden { opacity: 0; transform: translateY(16px); pointer-events: none; }
+  .dk {
+    border: none; background: transparent; border-radius: 18px; cursor: pointer;
+    display: flex; flex-direction: column; align-items: center; justify-content: center; gap: 3px;
+    font-size: 11.5px; font-weight: 620; color: var(--text); min-width: 0;
+    transition: background-color 0.15s ease, opacity 0.15s ease;
   }
-  #fab.armed svg { transform: rotate(135deg); }
-  #fab.hidden { transform: scale(0.6); opacity: 0; pointer-events: none; }
+  .dk:active { background: var(--fill); }
+  .dk .ib { width: 34px; height: 26px; display: flex; align-items: center; justify-content: center; }
+  .dk .ib svg { width: 22px; height: 22px; }
+  .dk .lb { white-space: nowrap; overflow: hidden; text-overflow: ellipsis; max-width: 100%; }
+  .dk[data-dock="teleport"] .ib { color: var(--accent-light); }
+  .dk[data-dock="navigate"] .ib { color: var(--ok); }
+  .dk.on { background: var(--accent-soft); }
+  .dk.on .ib { color: #fff; }
+  .dk.dim { opacity: 0.35; }
+  .dk.blocked .ib, .dk.blocked .lb { opacity: 0.4; }
 
   #recenter {
-    position: fixed; right: 22px; bottom: calc(var(--safe-b) + 92px); z-index: 5100;
+    position: fixed; right: 16px; bottom: calc(var(--safe-b) + 90px); z-index: 5100;
     width: 46px; height: 46px; border-radius: 50%; cursor: pointer;
     display: flex; align-items: center; justify-content: center; color: var(--text);
+    transition: bottom 0.3s var(--spring), opacity 0.16s ease;
   }
+  body.moving #recenter { bottom: calc(var(--safe-b) + 158px); }
   #recenter svg { width: 21px; height: 21px; }
   #recenter.off { color: var(--muted); }
   #recenter.hidden { opacity: 0; pointer-events: none; }
-  #layerbtn {
-    position: fixed; right: 22px; bottom: calc(var(--safe-b) + 146px); z-index: 5100;
-    width: 46px; height: 46px; border-radius: 50%; cursor: pointer;
-    display: flex; align-items: center; justify-content: center; color: var(--text);
-  }
-  #layerbtn svg { width: 21px; height: 21px; }
-  #layerbtn.hidden { opacity: 0; pointer-events: none; }
 
   /* Now-moving bar: progress + pause / speed / stop while a route runs. */
   #nowbar {
-    position: fixed; left: 16px; right: 86px; bottom: calc(var(--safe-b) + 20px); z-index: 5100;
+    position: fixed; left: 12px; right: 12px; bottom: calc(var(--safe-b) + 86px); z-index: 5100;
+    max-width: 480px; margin: 0 auto;
     height: 58px; border-radius: 20px; padding: 0 6px 0 14px;
     display: flex; align-items: center; gap: 6px; overflow: hidden;
     transform: translateY(24px) scale(0.96); opacity: 0; pointer-events: none;
@@ -230,45 +232,58 @@
   .group-label { font-size: 11px; font-weight: 650; letter-spacing: 0.07em; color: var(--muted); margin: 14px 4px 7px; }
   .grid { display: grid; grid-template-columns: 1fr 1fr; gap: 8px; }
 
-  .tile {
-    display: flex; align-items: center; gap: 11px; min-height: 64px;
-    padding: 10px 12px; text-align: left; cursor: pointer;
-    background: var(--fill); border: 1px solid rgba(255,255,255,0.09); border-radius: 18px;
-    box-shadow: inset 0 1px 0 rgba(255,255,255,0.08);
-    opacity: 0; transform: translateY(12px) scale(0.98);
+  /* 更多: big icon buttons, no descriptions. */
+  .grid4 { display: grid; grid-template-columns: repeat(4, 1fr); gap: 8px; }
+  .big {
+    border: 1px solid rgba(255,255,255,0.08); background: var(--fill); border-radius: 18px; cursor: pointer;
+    min-height: 84px; padding: 10px 4px; display: flex; flex-direction: column; align-items: center; justify-content: center;
+    gap: 8px; font-size: 12px; font-weight: 600; text-align: center; line-height: 1.25; min-width: 0;
   }
-  .sheet.open .tile { animation: rise 0.36s var(--spring) forwards; animation-delay: calc(var(--i, 0) * 28ms + 50ms); }
-  @keyframes rise { to { opacity: 1; transform: none; } }
-  .tile:active { background: var(--fill-press); }
-  .tile .ic {
-    width: 40px; height: 40px; border-radius: 13px; flex-shrink: 0;
-    display: flex; align-items: center; justify-content: center;
-    background: var(--accent-soft); color: var(--accent-light);
-    box-shadow: inset 0 1px 0 rgba(255,255,255,0.16);
-    transition: transform 0.22s var(--spring);
-  }
-  .tile:active .ic { transform: scale(0.88); transition-duration: 0.08s; }
-  .tile .ic svg { width: 20px; height: 20px; }
-  .tile .tx { display: flex; flex-direction: column; gap: 2px; min-width: 0; }
-  .tile .tt { font-size: 14px; font-weight: 620; line-height: 1.2; }
-  .tile .ds { font-size: 11px; color: var(--muted); line-height: 1.3; }
-  .tile[data-kind="navigate"] .ic { background: rgba(77,210,138,0.18); color: var(--ok); }
-  .tile[data-kind="bookmarks"] .ic { background: rgba(255,200,87,0.18); color: #ffd27a; }
-  .tile[data-kind="randomwalk"] .ic { background: rgba(255,150,190,0.18); color: #ffa8c8; }
-  .tile[data-kind="locate"] .ic { background: rgba(140,220,120,0.18); color: #a5e58c; }
-  .tile[data-kind="routes"] .ic { background: rgba(90,215,200,0.18); color: #7fe0d2; }
-  .tile[data-kind="recent"] .ic { background: rgba(120,200,255,0.18); color: #8fd3ff; }
-  .tile[data-kind="search"] .ic { background: rgba(170,150,240,0.2); color: #c3b1ff; }
-  .tile[data-kind="stop"] .ic { background: rgba(245,185,85,0.18); color: var(--warn); }
-  .tile[data-kind="restore"] .ic { background: rgba(255,107,107,0.18); color: var(--danger); }
-  .tile[data-kind="restore"] .tt { color: #ff9a9a; }
-  .tile[data-kind="install"] .ic { background: rgba(255,255,255,0.1); color: var(--text); }
-  .tile.wide { grid-column: 1 / -1; min-height: 54px; }
+  .big:active { background: var(--fill-press); }
+  .big .ic { width: 38px; height: 38px; border-radius: 12px; display: flex; align-items: center; justify-content: center; background: var(--accent-soft); color: var(--accent-light); }
+  .big .ic svg { width: 20px; height: 20px; }
+  .big[data-more="randomwalk"] .ic { background: rgba(255,150,190,0.18); color: #ffa8c8; }
+  .big[data-more="flower"] .ic { background: rgba(255,200,87,0.18); color: #ffd27a; }
+  .big[data-more="locate"] .ic { background: rgba(140,220,120,0.18); color: #a5e58c; }
+  .big[data-more="install"] .ic { background: rgba(255,255,255,0.1); color: var(--text); }
   /* Unavailable right now: still tappable so the tap can explain why. */
-  .tile.blocked .ic, .tile.blocked .tt { opacity: 0.45; }
-  .tile.blocked .ds { color: var(--warn); }
-  /* Something is moving: Stop becomes the highlighted action. */
-  .tile.live { border-color: rgba(245,185,85,0.55); background: rgba(245,185,85,0.1); }
+  .big.blocked { opacity: 0.45; }
+  .danger-row {
+    margin-top: 16px; width: 100%; min-height: 50px; border-radius: 16px; cursor: pointer;
+    border: 1px solid rgba(255,107,107,0.35); background: rgba(255,107,107,0.10); color: #ff9a9a;
+    font-size: 15px; font-weight: 640; display: flex; align-items: center; justify-content: center; gap: 8px; flex-shrink: 0;
+  }
+  .danger-row svg { width: 18px; height: 18px; }
+
+  /* 地點: one search box over tabs. */
+  .search-wrap { position: relative; flex-shrink: 0; }
+  .search-wrap > svg { position: absolute; left: 13px; top: 50%; transform: translateY(-50%); width: 17px; height: 17px; color: var(--muted); pointer-events: none; }
+  .search-wrap .input { padding-left: 40px; padding-right: 44px; margin-bottom: 0; }
+  .search-wrap .clear { position: absolute; right: 5px; top: 50%; transform: translateY(-50%); width: 34px; height: 34px; }
+  .search-wrap .clear.hidden { display: none; }
+  .tabs { display: grid; grid-template-columns: repeat(3, 1fr); gap: 4px; padding: 4px; margin: 10px 0 8px; border-radius: 14px; background: rgba(0,0,0,0.25); flex-shrink: 0; }
+  .tabs button {
+    border: none; background: transparent; min-height: 36px; border-radius: 10px; cursor: pointer;
+    font-size: 13px; font-weight: 600; color: var(--muted); display: flex; align-items: center; justify-content: center; gap: 6px;
+  }
+  .tabs button .n { font-size: 10.5px; font-variant-numeric: tabular-nums; opacity: 0.7; }
+  .tabs button.active { background: rgba(255,255,255,0.12); color: var(--text); box-shadow: inset 0 1px 0 rgba(255,255,255,0.12); }
+  .tabs.hidden, .chips.hidden { display: none; }
+  .tabhint { font-size: 11.5px; color: var(--muted); margin: 0 4px 8px; }
+  .list-label { font-size: 11px; font-weight: 650; letter-spacing: 0.07em; color: var(--muted); margin: 10px 6px 6px; }
+  .row.hl { background: var(--accent-soft); border-color: rgba(var(--accent-rgb),0.4); }
+  .row .rc.star { color: #ffd27a; }
+
+  /* 存成座標 */
+  .saverow {
+    width: 100%; min-height: 44px; margin: 0 0 12px; border-radius: 14px; cursor: pointer; flex-shrink: 0;
+    border: 1px dashed rgba(255,210,122,0.45); background: rgba(255,200,87,0.08); color: #ffd27a;
+    font-size: 14px; font-weight: 620; display: flex; align-items: center; justify-content: center; gap: 8px;
+  }
+  .saverow svg { width: 17px; height: 17px; flex-shrink: 0; }
+  .saverow.done { cursor: default; border-style: solid; border-color: rgba(255,255,255,0.1); background: var(--fill); color: var(--muted); font-weight: 560; }
+  .chips.wrap { flex-wrap: wrap; overflow: visible; padding-bottom: 14px; }
+  .layer-chips { flex-wrap: wrap; overflow: visible; padding-bottom: 2px; }
 
   /* Buttons in sheets / modals */
   .btn-row { display: flex; gap: 8px; margin-top: 4px; flex-shrink: 0; }
@@ -419,7 +434,6 @@
 
   @media (prefers-reduced-motion: reduce) {
     *, *::before, *::after { animation-duration: 0.01s !important; animation-iteration-count: 1 !important; transition-duration: 0.01s !important; }
-    .tile { opacity: 1; transform: none; }
   }
 </style>
 </head>
@@ -450,90 +464,40 @@
   <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><circle cx="12" cy="12" r="3.2" /><path d="M12 2v3M12 19v3M2 12h3M19 12h3" /><circle cx="12" cy="12" r="7.5" /></svg>
 </button>
 
-<button id="layerbtn" type="button" class="glass press" data-i18n-aria="layers_title">
-  <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M12 3 3 8l9 5 9-5-9-5z" /><path d="m3 13 9 5 9-5" /></svg>
-</button>
-
-<button id="fab" type="button" aria-haspopup="dialog" aria-expanded="false" aria-controls="menu">
-  <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.4" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M12 5v14M5 12h14" /></svg>
-</button>
+<!-- Bottom toolbar: the two map-pick actions plus the two sheets. -->
+<nav id="dock" class="glass" data-i18n-aria="menu_title">
+  <button type="button" class="dk" data-dock="teleport"><span class="ib"></span><span class="lb"></span></button>
+  <button type="button" class="dk" data-dock="navigate"><span class="ib"></span><span class="lb"></span></button>
+  <button type="button" class="dk" data-dock="places" aria-haspopup="dialog"><span class="ib"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M12 3l2.7 5.6 6.1.8-4.5 4.3 1.1 6.1L12 16.9 6.6 19.8l1.1-6.1L3.2 9.4l6.1-.8L12 3z" /></svg></span><span class="lb" data-i18n="places"></span></button>
+  <button type="button" class="dk" data-dock="more" aria-haspopup="dialog"><span class="ib"><svg viewBox="0 0 24 24" fill="currentColor" aria-hidden="true"><circle cx="5" cy="12" r="2" /><circle cx="12" cy="12" r="2" /><circle cx="19" cy="12" r="2" /></svg></span><span class="lb" data-i18n="more"></span></button>
+</nav>
 
 <div id="scrim"></div>
 
-<!-- Action menu -->
-<div id="menu" class="sheet glass dense" role="dialog" aria-modal="true" aria-labelledby="menu-title" tabindex="-1">
+<!-- 更多: map layer, less used actions, Restore GPS kept apart -->
+<div id="more" class="sheet glass dense" role="dialog" aria-modal="true" aria-labelledby="more-title" tabindex="-1">
   <div class="grabber"></div>
   <div class="sheet-head">
-    <div style="min-width:0">
-      <h2 id="menu-title" data-i18n="menu_title"></h2>
+    <div style="min-width:0;flex:1">
+      <h2 id="more-title" data-i18n="more"></h2>
       <div class="sheet-sub"><span class="dot off" id="menu-dot"></span><span id="menu-status"></span></div>
     </div>
     <div class="head-actions">
       <button type="button" class="icon-btn lang-btn press" data-lang-toggle></button>
-      <button type="button" class="icon-btn press" data-close data-i18n-aria="close">
-        <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round" aria-hidden="true"><path d="M6 6l12 12M18 6L6 18" /></svg>
-      </button>
+      <button type="button" class="icon-btn press" data-close data-i18n-aria="close"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round" aria-hidden="true"><path d="M6 6l12 12M18 6L6 18" /></svg></button>
     </div>
   </div>
-
-  <div class="group-label" data-i18n="g_move"></div>
-  <div class="grid">
-    <button type="button" class="tile" data-kind="teleport" style="--i:0">
-      <span class="ic"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M13 2 4 14h7l-1 8 9-12h-7l1-8z" /></svg></span>
-      <span class="tx"><span class="tt" data-i18n="teleport"></span><span class="ds" data-i18n="teleport_ds"></span></span>
-    </button>
-    <button type="button" class="tile" data-kind="navigate" style="--i:1">
-      <span class="ic"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><polygon points="3 11 22 2 13 21 11 13 3 11" /></svg></span>
-      <span class="tx"><span class="tt" data-i18n="navigate"></span><span class="ds" id="navigate-ds"></span></span>
-    </button>
-    <button type="button" class="tile wide" data-kind="randomwalk" style="--i:2">
-      <span class="ic"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M3 17l4-9 4 6 3-8 3 7 4-3" /><circle cx="3" cy="17" r="1.4" /><circle cx="21" cy="10" r="1.4" /></svg></span>
-      <span class="tx"><span class="tt" data-i18n="randomwalk"></span><span class="ds" id="randomwalk-ds"></span></span>
-    </button>
-  </div>
-
-  <div class="group-label" data-i18n="g_places"></div>
-  <div class="grid">
-    <button type="button" class="tile" data-kind="bookmarks" style="--i:2">
-      <span class="ic"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M12 3l2.7 5.6 6.1.8-4.5 4.3 1.1 6.1L12 16.9 6.6 19.8l1.1-6.1L3.2 9.4l6.1-.8L12 3z" /></svg></span>
-      <span class="tx"><span class="tt" data-i18n="bookmarks"></span><span class="ds" data-i18n="bookmarks_ds"></span></span>
-    </button>
-    <button type="button" class="tile" data-kind="routes" style="--i:3">
-      <span class="ic"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><circle cx="6" cy="19" r="2.5" /><circle cx="18" cy="5" r="2.5" /><path d="M8.5 19H15a3.5 3.5 0 0 0 0-7H9a3.5 3.5 0 0 1 0-7h6.5" /></svg></span>
-      <span class="tx"><span class="tt" data-i18n="routes"></span><span class="ds" data-i18n="routes_ds"></span></span>
-    </button>
-    <button type="button" class="tile" data-kind="recent" style="--i:4">
-      <span class="ic"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><circle cx="12" cy="12" r="9" /><path d="M12 7v5l3 2" /></svg></span>
-      <span class="tx"><span class="tt" data-i18n="recent"></span><span class="ds" data-i18n="recent_ds"></span></span>
-    </button>
-    <button type="button" class="tile" data-kind="search" style="--i:5">
-      <span class="ic"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><circle cx="11" cy="11" r="7" /><path d="m21 21-4.3-4.3" /></svg></span>
-      <span class="tx"><span class="tt" data-i18n="search"></span><span class="ds" data-i18n="search_ds"></span></span>
-    </button>
-    <button type="button" class="tile" data-kind="coord" style="--i:6">
-      <span class="ic"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M20 10c0 6-8 12-8 12s-8-6-8-12a8 8 0 0 1 16 0z" /><circle cx="12" cy="10" r="3" /></svg></span>
-      <span class="tx"><span class="tt" data-i18n="coord"></span><span class="ds" data-i18n="coord_ds"></span></span>
-    </button>
-    <button type="button" class="tile" data-kind="locate" style="--i:7">
-      <span class="ic"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><rect x="3" y="4" width="18" height="12" rx="2" /><path d="M8 20h8M12 16v4" /><circle cx="12" cy="10" r="2.2" /></svg></span>
-      <span class="tx"><span class="tt" data-i18n="locate_pc"></span><span class="ds" id="locate-ds"></span></span>
-    </button>
-  </div>
-
-  <div class="group-label" data-i18n="g_control"></div>
-  <div class="grid">
-    <button type="button" class="tile" data-kind="stop" style="--i:7">
-      <span class="ic"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><rect x="6" y="6" width="12" height="12" rx="2" /></svg></span>
-      <span class="tx"><span class="tt" data-i18n="stop"></span><span class="ds" id="stop-ds"></span></span>
-    </button>
-    <button type="button" class="tile" data-kind="restore" style="--i:8">
-      <span class="ic"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M3 12a9 9 0 1 0 3-6.7" /><path d="M3 4v5h5" /></svg></span>
-      <span class="tx"><span class="tt" data-i18n="restore"></span><span class="ds" data-i18n="restore_ds"></span></span>
-    </button>
-    <button type="button" class="tile wide" data-kind="install" id="install-tile" style="--i:9">
-      <span class="ic"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><rect x="6" y="2.5" width="12" height="19" rx="3" /><path d="M12 8v6M9 11h6" /></svg></span>
-      <span class="tx"><span class="tt" data-i18n="install"></span><span class="ds" data-i18n="install_ds"></span></span>
-    </button>
+  <div style="overflow-y:auto;min-height:0">
+    <div class="group-label" data-i18n="layers_title"></div>
+    <div class="chips layer-chips" id="layer-chips"></div>
+    <div class="group-label" data-i18n="g_actions"></div>
+    <div class="grid4">
+      <button type="button" class="big press" data-more="randomwalk"><span class="ic"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M3 17l4-9 4 6 3-8 3 7 4-3" /></svg></span><span data-i18n="randomwalk"></span></button>
+      <button type="button" class="big press" data-more="flower"><span class="ic"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><circle cx="12" cy="8" r="3" /><circle cx="8" cy="11.5" r="3" /><circle cx="16" cy="11.5" r="3" /><path d="M12 11v10M12 17c-2-1.6-4-1.6-5.5-.6M12 18.5c2-1.6 4-1.6 5.5-.6" /></svg></span><span data-i18n="route_flower"></span></button>
+      <button type="button" class="big press" data-more="locate"><span class="ic"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><rect x="3" y="4" width="18" height="12" rx="2" /><path d="M8 20h8M12 16v4" /><circle cx="12" cy="10" r="2.2" /></svg></span><span id="locate-label"></span></button>
+      <button type="button" class="big press" data-more="install" id="install-tile"><span class="ic"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><rect x="6" y="2.5" width="12" height="19" rx="3" /><path d="M12 8v6M9 11h6" /></svg></span><span data-i18n="install"></span></button>
+    </div>
+    <button type="button" class="danger-row press" data-more="restore"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M3 12a9 9 0 1 0 3-6.7" /><path d="M3 4v5h5" /></svg><span data-i18n="restore"></span></button>
   </div>
 </div>
 
@@ -542,6 +506,7 @@
   <div class="grabber"></div>
   <div class="sheet-head"><button type="button" class="icon-btn press back-btn" data-back data-i18n-aria="back"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.4" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M15 6l-6 6 6 6" /></svg></button><h2 id="confirm-title"></h2></div>
   <div class="coord-line" id="confirm-coord"></div>
+  <div id="confirm-save"></div>
   <div id="confirm-route" style="display:none">
     <label class="field-label" data-i18n="route_start_label"></label>
     <div class="seg" id="route-start-seg"></div>
@@ -585,19 +550,26 @@
   </div>
 </div>
 
-<!-- Saved coordinates / recent -->
+<!-- 地點: search / paste box over 座標 / 路線 / 最近 -->
 <div id="places" class="sheet glass dense tall" role="dialog" aria-modal="true" aria-labelledby="places-title" tabindex="-1">
   <div class="grabber"></div>
   <div class="sheet-head">
-    <button type="button" class="icon-btn press back-btn" data-back data-i18n-aria="back"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.4" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M15 6l-6 6 6 6" /></svg></button>
-    <h2 id="places-title"></h2>
+    <h2 id="places-title" data-i18n="places"></h2>
     <div class="head-actions">
-      <button type="button" class="icon-btn press" data-close data-i18n-aria="close">
-        <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round" aria-hidden="true"><path d="M6 6l12 12M18 6L6 18" /></svg>
-      </button>
+      <button type="button" class="icon-btn press" data-close data-i18n-aria="close"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round" aria-hidden="true"><path d="M6 6l12 12M18 6L6 18" /></svg></button>
     </div>
   </div>
-  <input class="input" type="text" id="places-filter" autocomplete="off" style="margin-bottom:10px" />
+  <div class="search-wrap">
+    <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" aria-hidden="true"><circle cx="11" cy="11" r="7" /><path d="m21 21-4.3-4.3" /></svg>
+    <input class="input" type="text" id="places-q" autocomplete="off" enterkeyhint="search" />
+    <button type="button" class="icon-btn clear press hidden" id="places-clear" data-i18n-aria="clear"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.4" stroke-linecap="round" aria-hidden="true"><path d="M7 7l10 10M17 7 7 17" /></svg></button>
+  </div>
+  <div class="format-note" id="places-format-note" style="margin:6px 4px 0"></div>
+  <div class="tabs" id="places-tabs" role="tablist">
+    <button type="button" role="tab" data-tab="bookmarks"><span data-i18n="tab_bookmarks"></span><span class="n"></span></button>
+    <button type="button" role="tab" data-tab="routes"><span data-i18n="tab_routes"></span><span class="n"></span></button>
+    <button type="button" role="tab" data-tab="recent"><span data-i18n="tab_recent"></span><span class="n"></span></button>
+  </div>
   <div class="chips" id="places-chips"></div>
   <div class="list" id="places-list"></div>
 </div>
@@ -610,44 +582,20 @@
   <div class="btn-row"><button type="button" class="btn primary press" data-close data-i18n="got_it"></button></div>
 </div>
 
-<!-- Base map picker -->
-<div id="layers" class="sheet glass dense" role="dialog" aria-modal="true" aria-labelledby="layers-title" tabindex="-1">
-  <div class="grabber"></div>
-  <div class="sheet-head">
-    <h2 id="layers-title" data-i18n="layers_title"></h2>
-    <div class="head-actions">
-      <button type="button" class="icon-btn press" data-close data-i18n-aria="close">
-        <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round" aria-hidden="true"><path d="M6 6l12 12M18 6L6 18" /></svg>
-      </button>
-    </div>
-  </div>
-  <div class="list" id="layers-list"></div>
-</div>
-
 <div id="toast" class="glass" role="status" aria-live="polite"></div>
 
-<!-- Search -->
-<div class="modal" id="search-modal">
+<!-- 存成座標: top card so the keyboard never covers the name field -->
+<div class="modal" id="save-modal" role="dialog" aria-modal="true" aria-labelledby="save-title">
   <div class="card glass dense">
-    <h3 data-i18n="search"></h3>
-    <input class="input" type="text" id="search-input" autocomplete="off" />
-    <div class="list" id="search-results" style="max-height:50vh"></div>
+    <h3 id="save-title" data-i18n="save_coord"></h3>
+    <label class="field-label" for="save-name" data-i18n="save_name"></label>
+    <input class="input" type="text" id="save-name" autocomplete="off" maxlength="60" enterkeyhint="done" />
+    <div class="coord-line" id="save-coord" style="margin-top:-4px"></div>
+    <label class="field-label" data-i18n="save_cat"></label>
+    <div class="chips wrap" id="save-cats"></div>
     <div class="btn-row">
-      <button type="button" class="btn press" id="search-back" data-i18n="back"></button>
-      <button type="button" class="btn press" id="search-close" data-i18n="close"></button>
-    </div>
-  </div>
-</div>
-
-<!-- Enter coordinate -->
-<div class="modal" id="coord-modal">
-  <div class="card glass dense">
-    <h3 data-i18n="coord"></h3>
-    <input class="input" type="text" id="coord-input" autocomplete="off" />
-    <div class="format-note" id="coord-format-note"></div>
-    <div class="btn-row">
-      <button type="button" class="btn press" id="coord-close" data-i18n="back"></button>
-      <button type="button" class="btn primary press" id="coord-go" data-i18n="next"></button>
+      <button type="button" class="btn press" id="save-cancel" data-i18n="cancel"></button>
+      <button type="button" class="btn primary press" id="save-ok" data-i18n="save"></button>
     </div>
   </div>
 </div>
@@ -753,6 +701,15 @@
       s_idle: '待命', s_teleporting: '瞬移中', s_navigating: '導航中', s_looping: '循環中', s_joystick: '搖桿',
       s_random_walk: '隨機漫步', s_multi_stop: '多點路徑', s_flower: '種花中', s_paused: '已暫停', s_reconnecting: '重連中', s_disconnected: '已斷線',
       lang_other: 'EN',
+      places: '地點', more: '更多', g_actions: '功能', clear: '清除',
+      q_ph: '搜尋地址,或貼上座標',
+      tab_bookmarks: '座標', tab_routes: '路線', tab_recent: '最近',
+      my_coords: '我的座標', addr_results: '地址搜尋結果', searching: '搜尋中...',
+      go_coord: '前往 {c}', go_coord_ds: '認出座標,點一下選瞬移或導航',
+      save_here: '存下目前位置', save_coord: '存成座標', saved_in: '已在座標清單 · {cat}',
+      save_name: '名稱', save_cat: '分類', save: '儲存', sent_saved: '已存成座標 ({cat})',
+      dup_saved: '這個座標已經存過了', name_needed: '請輸入名稱',
+      route_hint: '點路線後選走法:走一趟、循環或種花', route_hint_flower: '點一條路線開始種花',
     },
     en: {
       menu_title: 'Actions', back: 'Back', close: 'Close', cancel: 'Cancel', apply: 'Apply', next: 'Next', got_it: 'Got it',
@@ -804,6 +761,15 @@
       s_idle: 'Idle', s_teleporting: 'Teleporting', s_navigating: 'Navigating', s_looping: 'Looping', s_joystick: 'Joystick',
       s_random_walk: 'Random walk', s_multi_stop: 'Multi-stop', s_flower: 'Flower run', s_paused: 'Paused', s_reconnecting: 'Reconnecting', s_disconnected: 'Disconnected',
       lang_other: '中文',
+      places: 'Places', more: 'More', g_actions: 'ACTIONS', clear: 'Clear',
+      q_ph: 'Search an address or paste coordinates',
+      tab_bookmarks: 'Saved', tab_routes: 'Routes', tab_recent: 'Recent',
+      my_coords: 'MY COORDINATES', addr_results: 'ADDRESS RESULTS', searching: 'Searching...',
+      go_coord: 'Go to {c}', go_coord_ds: 'Coordinates recognized, tap to teleport or navigate',
+      save_here: 'Save current position', save_coord: 'Save as coordinate', saved_in: 'Already saved · {cat}',
+      save_name: 'Name', save_cat: 'Category', save: 'Save', sent_saved: 'Saved to {cat}',
+      dup_saved: 'This spot is already saved', name_needed: 'Enter a name',
+      route_hint: 'Pick a route, then choose once, loop or flower', route_hint_flower: 'Pick a route to start the flower run',
     },
   };
   function ls(key, val) {
@@ -827,8 +793,8 @@
     document.querySelectorAll('[data-i18n]').forEach((el) => { el.textContent = t(el.getAttribute('data-i18n')); });
     document.querySelectorAll('[data-i18n-aria]').forEach((el) => { el.setAttribute('aria-label', t(el.getAttribute('data-i18n-aria'))); });
     document.querySelectorAll('[data-lang-toggle]').forEach((el) => { el.textContent = t('lang_other'); });
-    $('search-input').placeholder = t('search_ph');
-    $('places-filter').placeholder = t('filter_ph');
+    $('places-q').placeholder = t('q_ph');
+    renderDock();
     renderSpeedSegs();
     refreshFormatTexts();
     refreshAll();
@@ -937,10 +903,11 @@
     return names[fmt.datum] + ' · ' + axes;
   }
   function refreshFormatTexts() {
-    $('coord-input').placeholder = t('coord_ph', { ex: formatCoord(25.0375, 121.5637, 4) });
+    // Pasted coordinates are read in the desktop's format; say which one
+    // when it isn't the plain WGS84 lat, lng default.
     const isDefault = fmt.datum === 'wgs84' && fmt.order === 'latlng';
-    $('coord-format-note').textContent = isDefault ? '' : t('format_note', { f: formatBadge() });
-    $('coord-format-note').style.display = isDefault ? 'none' : '';
+    $('places-format-note').textContent = isDefault ? '' : t('format_note', { f: formatBadge() });
+    $('places-format-note').style.display = isDefault ? 'none' : '';
   }
 
   // ── Toast ─────────────────────────────────────────────────
@@ -972,7 +939,9 @@
     if (!res.ok) {
       let detail = res.statusText;
       try { const j = await res.json(); detail = (j.detail && (j.detail.message || j.detail)) || detail; } catch (e) {}
-      throw new Error(typeof detail === 'string' ? detail : JSON.stringify(detail));
+      const err = new Error(typeof detail === 'string' ? detail : JSON.stringify(detail));
+      err.status = res.status;
+      throw err;
     }
     return res.json();
   }
@@ -1101,7 +1070,7 @@
   // One sheet at a time. Modal sheets dim the map and close on a tap
   // outside; the confirm sheet has no scrim so the map stays usable and
   // the pin can still be moved.
-  const scrim = $('scrim'), fab = $('fab'), recenter = $('recenter'), nowbar = $('nowbar'), layerbtn = $('layerbtn');
+  const scrim = $('scrim'), dock = $('dock'), recenter = $('recenter'), nowbar = $('nowbar');
   let openId = null;
   // `back`, when given, is what the sheet's back button does: return to
   // the sheet this one was opened from instead of dropping to the map.
@@ -1115,8 +1084,7 @@
     const backBtn = el.querySelector('[data-back]');
     if (backBtn) backBtn.classList.toggle('on', !!sheetBack);
     scrim.classList.toggle('show', id !== 'confirm');
-    fab.classList.add('hidden'); recenter.classList.add('hidden'); nowbar.classList.add('hidden'); layerbtn.classList.add('hidden');
-    fab.setAttribute('aria-expanded', id === 'menu' ? 'true' : 'false');
+    dock.classList.add('hidden'); recenter.classList.add('hidden'); nowbar.classList.add('hidden');
     el.focus({ preventScroll: true });
   }
   function hideSheet() {
@@ -1125,39 +1093,67 @@
     $(openId).classList.remove('open');
     openId = null;
     scrim.classList.remove('show');
-    fab.classList.remove('hidden'); recenter.classList.remove('hidden'); nowbar.classList.remove('hidden'); layerbtn.classList.remove('hidden');
-    fab.setAttribute('aria-expanded', 'false');
+    dock.classList.remove('hidden'); recenter.classList.remove('hidden'); nowbar.classList.remove('hidden');
     if (wasConfirm) { pendingAction = null; setPendingMode(null); clearPendingPin(); clearPreview(); }
   }
   scrim.addEventListener('click', hideSheet);
   document.querySelectorAll('.sheet [data-close]').forEach((b) => b.addEventListener('click', hideSheet));
   document.querySelectorAll('[data-back]').forEach((b) => b.addEventListener('click', () => { if (sheetBack) sheetBack(); }));
-  function openMenu() { refreshMenu(); showSheet('menu'); }
+  function openMore() { refreshMore(); renderLayers(); showSheet('more'); }
   // Going from the confirm sheet to another sheet skips hideSheet, so the
   // pin / route preview it put on the map is cleared here.
   function leaveConfirm() { pendingAction = null; setPendingMode(null); clearPendingPin(); clearPreview(); }
-  const backToMenu = () => { leaveConfirm(); openMenu(); };
+  const backToMore = () => { leaveConfirm(); openMore(); };
   // The list is still rendered underneath, so it comes back as it was.
-  const backToPlaces = () => { leaveConfirm(); showSheet('places', openMenu); };
+  const backToPlaces = () => { leaveConfirm(); showSheet('places'); };
   document.addEventListener('keydown', (e) => {
     if (e.key !== 'Escape') return;
     const m = document.querySelector('.modal.open');
     if (m) m.classList.remove('open'); else hideSheet();
   });
 
+  // ── Bottom toolbar ────────────────────────────────────────
+  // 瞬移 / 導航 arm a tap-the-map pick; while armed, the same button
+  // turns into 取消 and the other buttons dim.
+  const ICON_BOLT = '<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M13 2 4 14h7l-1 8 9-12h-7l1-8z" /></svg>';
+  const ICON_NAV = '<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><polygon points="3 11 22 2 13 21 11 13 3 11" /></svg>';
+  const ICON_X = '<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.4" stroke-linecap="round" aria-hidden="true"><path d="M6 6l12 12M18 6L6 18" /></svg>';
+  function renderDock() {
+    dock.querySelectorAll('.dk').forEach((b) => {
+      const k = b.getAttribute('data-dock'), on = !!pendingMode && k === pendingMode;
+      b.classList.toggle('on', on);
+      b.classList.toggle('dim', !!pendingMode && !on);
+      if (k === 'teleport' || k === 'navigate') {
+        b.querySelector('.ib').innerHTML = on ? ICON_X : (k === 'teleport' ? ICON_BOLT : ICON_NAV);
+        b.querySelector('.lb').textContent = on ? t('cancel') : t(k);
+        b.setAttribute('aria-label', on ? t('cancel_pick') : t(k));
+      }
+    });
+    dock.querySelector('[data-dock="navigate"]').classList.toggle('blocked', !hasPosition());
+  }
   function setPendingMode(mode) {
     pendingMode = mode;
     const hint = $('hint');
     if (mode) hint.textContent = t('hint_' + mode);
     hint.classList.toggle('show', !!mode);
-    // While a tap-the-map mode is armed the FAB cancels it.
-    fab.classList.toggle('armed', !!mode);
-    fab.setAttribute('aria-label', mode ? t('cancel_pick') : t('open_menu'));
+    renderDock();
   }
-  fab.addEventListener('click', () => {
-    if (pendingMode) { setPendingMode(null); clearPendingPin(); return; }
-    refreshMenu();
-    showSheet('menu');
+  dock.addEventListener('click', (e) => {
+    const b = e.target.closest('.dk');
+    if (!b) return;
+    const k = b.getAttribute('data-dock');
+    if (k === 'teleport' || k === 'navigate') {
+      if (pendingMode === k) { setPendingMode(null); clearPendingPin(); return; }
+      // Navigate routes from the *current* virtual position; without
+      // one the backend has no origin, so explain instead of arming.
+      if (k === 'navigate' && !hasPosition()) { toast(t('no_position'), 'err'); return; }
+      clearPendingPin();
+      setPendingMode(k);
+      return;
+    }
+    setPendingMode(null); clearPendingPin();
+    if (k === 'places') openPlaces();
+    else if (k === 'more') openMore();
   });
 
   // ── Status ────────────────────────────────────────────────
@@ -1215,6 +1211,7 @@
   function renderNowbar() {
     const moving = isMoving();
     nowbar.classList.toggle('show', moving);
+    document.body.classList.toggle('moving', moving);
     if (!moving) return;
     const s = lastStatus, paused = isPaused();
     nowbar.classList.toggle('paused', paused);
@@ -1237,7 +1234,7 @@
     }
     $('nb-pause').setAttribute('aria-label', paused ? t('resume') : t('pause'));
   }
-  function refreshMenu() {
+  function refreshMore() {
     const connected = isConnected(), moving = isMoving();
     $('menu-dot').className = 'dot' + (!connected ? ' off' : moving ? ' busy' : '');
     if (!connected) $('menu-status').textContent = t('no_device');
@@ -1247,18 +1244,13 @@
       const more = devices.length > 1 ? t('n_devices', { n: lang === 'zh' ? devices.length : devices.length - 1 }) : '';
       $('menu-status').textContent = (primary.name || primary.udid.slice(0, 8)) + more + ' · ' + stateLabel(lastStatus.state);
     }
-    document.querySelector('.tile[data-kind="navigate"]').classList.toggle('blocked', !hasPosition());
-    $('navigate-ds').textContent = hasPosition() ? t('navigate_ds') : t('navigate_blocked');
-    $('locate-ds').textContent = t(locating ? 'locate_busy' : 'locate_pc_ds');
-    document.querySelector('.tile[data-kind="randomwalk"]').classList.toggle('blocked', !hasPosition());
-    $('randomwalk-ds').textContent = hasPosition() ? t('randomwalk_ds') : t('navigate_blocked');
-    document.querySelector('.tile[data-kind="stop"]').classList.toggle('live', moving);
-    $('stop-ds').textContent = moving ? t('stop_live', { state: stateLabel(lastStatus.state) }) : t('stop_ds');
+    document.querySelector('[data-more="randomwalk"]').classList.toggle('blocked', !hasPosition());
+    $('locate-label').textContent = t(locating ? 'locate_busy' : 'locate_pc');
+    document.querySelector('[data-more="locate"]').classList.toggle('blocked', locating);
   }
   function refreshAll() {
-    renderDevicePills(); renderNowbar(); refreshMenu();
+    renderDevicePills(); renderNowbar(); refreshMore(); renderDock();
     recenter.classList.toggle('off', !hasPosition());
-    fab.setAttribute('aria-label', pendingMode ? t('cancel_pick') : t('open_menu'));
     if (pendingMode) $('hint').textContent = t('hint_' + pendingMode);
   }
 
@@ -1310,7 +1302,8 @@
       lastState = s.state;
       renderDevicePills(); renderNowbar();
       recenter.classList.toggle('off', !hasPosition());
-      if (openId === 'menu') refreshMenu();
+      renderDock();
+      if (openId === 'more') refreshMore();
     } catch (e) { /* silently */ }
   }
   // Poll faster while something is moving so the progress bar and the
@@ -1366,6 +1359,9 @@
   // Saved-route options: where to start from, and how to run it: once
   // along the route, looping, or 種花模式 (circling every waypoint).
   let routeTeleport = true, routeStyle = 'once', flowerTeleport = false;
+  // Set when the route list was opened from 更多 > 種花, so the picked
+  // route opens with 種花 already selected.
+  let routeStylePreset = null;
   function readNum(id, fallback, min, max) {
     const n = parseFloat($(id).value);
     return Number.isFinite(n) ? Math.min(max, Math.max(min, n)) : fallback;
@@ -1410,11 +1406,12 @@
     $('confirm-route').style.display = kind === 'route' ? '' : 'none';
     row.innerHTML = '';
     if (place) coord.textContent = formatCoord(place.lat, place.lng) + (place.note ? ' · ' + place.note : '');
+    renderSaveRow(place && (kind === 'place' || kind === 'teleport' || kind === 'navigate') ? place : null);
     const cancel = button('', t('cancel'), hideSheet);
     if (kind === 'route') {
       title.textContent = route.name;
       coord.textContent = t('n_points', { n: route.waypoints.length });
-      routeTeleport = true; routeStyle = 'once';
+      routeTeleport = true; routeStyle = routeStylePreset || 'once';
       if (SPEEDS.some((s) => s[0] === route.profile)) speedMode = route.profile;
       renderSpeedSegs(); renderRouteSegs();
       $('confirm-custom').value = '';
@@ -1505,6 +1502,104 @@
       buttons.forEach((b) => { b.disabled = false; });
     } finally { busy = false; }
   }
+  // ── 存成座標 ─────────────────────────────────────────────
+  // Saves into the desktop's own saved-coordinate list; the backend tells
+  // the desktop UI so it shows up there at once.
+  const ICON_STAR = '<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M12 3l2.7 5.6 6.1.8-4.5 4.3 1.1 6.1L12 16.9 6.6 19.8l1.1-6.1L3.2 9.4l6.1-.8L12 3z" /></svg>';
+  const ICON_STAR_ADD = '<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M11 3.5l2.3 4.8 5.2.7-3.8 3.6.9 5.2L11 15.3l-4.6 2.5.9-5.2-3.8-3.6 5.2-.7L11 3.5z" /><path d="M19 15v6M16 18h6" /></svg>';
+  let bmCache = null;  // last /api/phone/bookmarks answer
+  async function loadBookmarks(force) {
+    if (bmCache && !force) return bmCache;
+    bmCache = await api('/api/phone/bookmarks');
+    return bmCache;
+  }
+  function findSaved(lat, lng) {
+    if (!bmCache) return null;
+    return (bmCache.bookmarks || []).find((b) => Math.abs(b.lat - lat) < 1e-6 && Math.abs(b.lng - lng) < 1e-6) || null;
+  }
+  function catName(id) {
+    const c = ((bmCache && bmCache.categories) || []).find((x) => x.id === id);
+    return c ? c.name : '';
+  }
+  let saveRowPlace = null;
+  function renderSaveRow(place) {
+    saveRowPlace = place;
+    const host = $('confirm-save');
+    host.innerHTML = '';
+    if (!place) return;
+    const hit = findSaved(place.lat, place.lng);
+    const el = document.createElement(hit ? 'div' : 'button');
+    el.className = 'saverow' + (hit ? ' done' : ' press');
+    el.innerHTML = hit ? ICON_STAR : ICON_STAR_ADD;
+    el.appendChild(document.createTextNode(hit ? t('saved_in', { cat: catName(hit.category_id) || '-' }) : t('save_coord')));
+    if (!hit) { el.type = 'button'; el.addEventListener('click', () => openSave(place, () => renderSaveRow(saveRowPlace))); }
+    host.appendChild(el);
+    // The list may not be loaded yet; check again once it is.
+    if (!bmCache) loadBookmarks().then(() => { if (saveRowPlace === place) renderSaveRow(place); }).catch(() => {});
+  }
+
+  const saveModal = $('save-modal'), saveName = $('save-name');
+  let saveCtx = null, saveCat = ls('locwarp.phone.savecat') || 'default', saveBusy = false;
+  function renderSaveCats() {
+    const host = $('save-cats');
+    host.innerHTML = '';
+    const cats = (bmCache && bmCache.categories) || [{ id: 'default', name: t('all'), color: '#6c8cff' }];
+    if (!cats.some((c) => c.id === saveCat)) saveCat = cats[0].id;
+    cats.forEach((c) => {
+      const chip = document.createElement('button');
+      chip.type = 'button';
+      chip.className = 'chip press' + (c.id === saveCat ? ' active' : '');
+      const dot = document.createElement('i'); dot.style.background = safeColor(c.color); chip.appendChild(dot);
+      chip.appendChild(document.createTextNode(c.name));
+      chip.addEventListener('click', () => { saveCat = c.id; renderSaveCats(); });
+      host.appendChild(chip);
+    });
+  }
+  async function openSave(place, after) {
+    const ctx = { lat: place.lat, lng: place.lng, after, touched: false, cc: '' };
+    saveCtx = ctx;
+    // A searched / saved place keeps its name; a bare map tap or pasted
+    // coordinate gets the nearest address once the lookup answers.
+    const generic = !place.name || place.name === t('locate_title');
+    saveName.value = generic ? '' : place.name;
+    saveName.placeholder = formatCoord(place.lat, place.lng, 5);
+    $('save-coord').textContent = formatCoord(place.lat, place.lng);
+    renderSaveCats();
+    saveModal.classList.add('open');
+    setTimeout(() => { try { saveName.focus(); saveName.select(); } catch (e) { /* ignore */ } }, 200);
+    loadBookmarks().then(() => { if (saveCtx === ctx) renderSaveCats(); }).catch(() => {});
+    if (generic) {
+      try {
+        const r = await api('/api/phone/reverse?lat=' + place.lat + '&lng=' + place.lng);
+        if (saveCtx !== ctx) return;
+        ctx.cc = r.country_code || '';
+        if (!ctx.touched && !saveName.value && r.name) { saveName.value = r.name; saveName.select(); }
+      } catch (e) { /* keep the field empty; the coordinate is the fallback */ }
+    }
+  }
+  saveName.addEventListener('input', () => { if (saveCtx) saveCtx.touched = true; });
+  saveName.addEventListener('keydown', (e) => { if (e.key === 'Enter') $('save-ok').click(); });
+  $('save-cancel').addEventListener('click', () => { saveCtx = null; saveModal.classList.remove('open'); });
+  saveModal.addEventListener('click', (e) => { if (e.target === saveModal) { saveCtx = null; saveModal.classList.remove('open'); } });
+  $('save-ok').addEventListener('click', async () => {
+    const ctx = saveCtx;
+    if (!ctx || saveBusy) return;
+    const name = saveName.value.trim() || saveName.placeholder;
+    if (!name) { toast(t('name_needed'), 'err'); saveName.focus(); return; }
+    saveBusy = true; $('save-ok').disabled = true;
+    try {
+      await api('/api/phone/bookmarks', { method: 'POST', body: { name, lat: ctx.lat, lng: ctx.lng, category_id: saveCat, country_code: ctx.cc } });
+      ls('locwarp.phone.savecat', saveCat);
+      await loadBookmarks(true).catch(() => {});
+      saveCtx = null; saveModal.classList.remove('open'); saveName.blur();
+      toast(t('sent_saved', { cat: catName(saveCat) || '-' }));
+      if (ctx.after) ctx.after();
+    } catch (e) {
+      if (e.status === 409) toast(t('dup_saved'), 'err');
+      else fail(e);
+    } finally { saveBusy = false; $('save-ok').disabled = false; }
+  });
+
   // Show a place on the map and offer teleport / navigate for it.
   function offerPlace(place, back) {
     setPendingPin(place.lat, place.lng);
@@ -1549,14 +1644,24 @@
     } catch (e) { fail(e); }
   });
 
-  // ── Saved coordinates / recent ────────────────────────────
+  // ── 地點: one box over 座標 / 路線 / 最近 ─────────────────
+  // Typing filters the saved coordinates and searches addresses; a pasted
+  // coordinate is recognized and offered straight away.
   const CHEV = '<span class="chev"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.6" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M9 6l6 6-6 6" /></svg></span>';
-  const ICON_BOLT = '<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M13 2 4 14h7l-1 8 9-12h-7l1-8z" /></svg>';
-  const ICON_NAV = '<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><polygon points="3 11 22 2 13 21 11 13 3 11" /></svg>';
-  let placesKind = 'bookmarks', placesData = null, placesCat = 'all';
+  const ICON_PIN = '<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M20 10c0 6-8 12-8 12s-8-6-8-12a8 8 0 0 1 16 0z" /><circle cx="12" cy="10" r="3" /></svg>';
+  const ICON_SEARCH = '<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" aria-hidden="true"><circle cx="11" cy="11" r="7" /><path d="m21 21-4.3-4.3" /></svg>';
+  let placesTab = 'bookmarks', placesCat = 'all';
+  const placesData = { bookmarks: null, routes: null, recent: null };
+  const placesErr = { bookmarks: null, routes: null, recent: null };
+  let geoItems = null, geoState = 'idle', geoErr = '';  // address search for the current text
   function emptyNode(text) {
     const d = document.createElement('div');
     d.className = 'empty'; d.textContent = text;
+    return d;
+  }
+  function labelNode(text) {
+    const d = document.createElement('div');
+    d.className = 'list-label'; d.textContent = text;
     return d;
   }
   function placeRow(lead, name, sub, onClick) {
@@ -1576,76 +1681,183 @@
     return t('day_ago', { n: Math.floor(s / 86400) });
   }
   const safeColor = (c) => (/^#[0-9a-fA-F]{3,8}$/.test(c || '') ? c : '#6c8cff');
+  const placesQuery = () => $('places-q').value.trim();
+  function bookmarkRow(b, cats) {
+    const c = cats.find((x) => x.id === b.category_id);
+    const lead = '<span class="bar" style="background:' + safeColor(c && c.color) + '"></span>';
+    const prefix = placesCat === 'all' && c ? c.name + ' · ' : '';
+    return placeRow(lead, b.name, prefix + formatCoord(b.lat, b.lng, 5),
+      () => offerPlace({ lat: b.lat, lng: b.lng, name: b.name }, backToPlaces));
+  }
+  function renderCatChips(cats) {
+    const chips = $('places-chips');
+    chips.innerHTML = '';
+    [{ id: 'all', name: t('all') }].concat(cats).forEach((c) => {
+      const chip = document.createElement('button');
+      chip.type = 'button';
+      chip.className = 'chip press' + (placesCat === c.id ? ' active' : '');
+      if (c.color) { const dot = document.createElement('i'); dot.style.background = safeColor(c.color); chip.appendChild(dot); }
+      chip.appendChild(document.createTextNode(c.name));
+      chip.addEventListener('click', () => { placesCat = c.id; renderPlaces(); });
+      chips.appendChild(chip);
+    });
+  }
+  function renderTabs(searching) {
+    const tabs = $('places-tabs');
+    tabs.classList.toggle('hidden', searching);
+    tabs.querySelectorAll('button').forEach((b) => {
+      const k = b.getAttribute('data-tab'), d = placesData[k];
+      b.classList.toggle('active', k === placesTab);
+      b.setAttribute('aria-selected', String(k === placesTab));
+      const n = !d ? '' : k === 'recent' ? d.length : (k === 'routes' ? d.routes : d.bookmarks || []).length;
+      b.querySelector('.n').textContent = n === '' ? '' : String(n);
+    });
+  }
   function renderPlaces() {
     const list = $('places-list'), chips = $('places-chips');
-    const q = $('places-filter').value.trim().toLowerCase();
+    const q = placesQuery(), ql = q.toLowerCase();
+    const coord = q ? parseCoord(q) : null;
+    const searching = !!q && !coord;
+    $('places-clear').classList.toggle('hidden', !q);
+    renderTabs(searching);
     list.innerHTML = '';
-    if (!placesData) return;
     const frag = document.createDocumentFragment();
-    if (placesKind === 'bookmarks' || placesKind === 'routes') {
-      const isRoutes = placesKind === 'routes';
-      const cats = placesData.categories || [], all = (isRoutes ? placesData.routes : placesData.bookmarks) || [];
-      const color = {}, cname = {};
-      cats.forEach((c) => { color[c.id] = safeColor(c.color); cname[c.id] = c.name; });
-      chips.innerHTML = '';
-      [{ id: 'all', name: t('all') }].concat(cats).forEach((c) => {
-        const chip = document.createElement('button');
-        chip.type = 'button';
-        chip.className = 'chip press' + (placesCat === c.id ? ' active' : '');
-        if (c.color) { const dot = document.createElement('i'); dot.style.background = safeColor(c.color); chip.appendChild(dot); }
-        chip.appendChild(document.createTextNode(c.name));
-        chip.addEventListener('click', () => { placesCat = c.id; renderPlaces(); });
-        chips.appendChild(chip);
+    if (coord) {
+      const row = placeRow('<span class="rc">' + ICON_PIN + '</span>', t('go_coord', { c: formatCoord(coord.lat, coord.lng, 5) }), t('go_coord_ds'),
+        () => { $('places-q').blur(); offerPlace({ lat: coord.lat, lng: coord.lng, name: null }, backToPlaces); });
+      row.classList.add('hl');
+      frag.appendChild(row);
+    }
+    if (searching) {
+      // Matching saved coordinates first, then the address search.
+      chips.classList.add('hidden');
+      const bd = placesData.bookmarks;
+      const cats = (bd && bd.categories) || [];
+      const hits = ((bd && bd.bookmarks) || []).filter((b) => (b.name || '').toLowerCase().includes(ql));
+      if (hits.length) {
+        frag.appendChild(labelNode(t('my_coords')));
+        hits.forEach((b) => frag.appendChild(bookmarkRow(b, cats)));
+      }
+      frag.appendChild(labelNode(t('addr_results')));
+      if (q.length < 2 || geoState === 'loading') frag.appendChild(emptyNode(t('searching')));
+      else if (geoState === 'error') frag.appendChild(emptyNode(t('search_failed', { msg: geoErr })));
+      else if (!geoItems || geoItems.length === 0) frag.appendChild(emptyNode(t('no_results')));
+      else geoItems.forEach((it) => {
+        const name = it.short_name || it.display_name;
+        frag.appendChild(placeRow('<span class="rc">' + ICON_SEARCH + '</span>', name, it.display_name, () => {
+          $('places-q').blur();
+          offerPlace({ lat: it.lat, lng: it.lng, name }, backToPlaces);
+        }));
       });
-      const items = all.filter((b) =>
-        (placesCat === 'all' || b.category_id === placesCat) && (!q || (b.name || '').toLowerCase().includes(q)));
-      if (items.length === 0) frag.appendChild(emptyNode(all.length ? t('empty_filter') : t(isRoutes ? 'empty_routes' : 'empty_bookmarks')));
+      list.appendChild(frag);
+      return;
+    }
+    const data = placesData[placesTab];
+    chips.classList.toggle('hidden', placesTab === 'recent');
+    if (placesTab !== 'recent') chips.innerHTML = '';
+    if (placesErr[placesTab]) { frag.appendChild(emptyNode(t('load_failed', { msg: placesErr[placesTab] }))); list.appendChild(frag); return; }
+    if (!data) { list.appendChild(frag); return; }
+    if (placesTab === 'bookmarks') {
+      const cats = data.categories || [], all = data.bookmarks || [];
+      renderCatChips(cats);
+      // 存下目前位置 sits on top of the saved list.
+      const cp = hasPosition() ? lastStatus.current_position : null;
+      const here = placeRow('<span class="rc star">' + ICON_STAR_ADD + '</span>', t('save_here'),
+        cp ? formatCoord(cp.lat, cp.lng, 5) : t('no_position'), () => {
+          if (!hasPosition()) { toast(t('no_position'), 'err'); return; }
+          const p = lastStatus.current_position;
+          openSave({ lat: p.lat, lng: p.lng, name: null }, () => renderPlaces());
+        });
+      frag.appendChild(here);
+      const items = all.filter((b) => placesCat === 'all' || b.category_id === placesCat);
+      if (items.length === 0) frag.appendChild(emptyNode(all.length ? t('empty_filter') : t('empty_bookmarks')));
+      items.forEach((b) => frag.appendChild(bookmarkRow(b, cats)));
+    } else if (placesTab === 'routes') {
+      const cats = data.categories || [], all = data.routes || [];
+      renderCatChips(cats);
+      const hint = document.createElement('div');
+      hint.className = 'tabhint';
+      hint.textContent = t(routeStylePreset === 'flower' ? 'route_hint_flower' : 'route_hint');
+      frag.appendChild(hint);
+      const items = all.filter((b) => placesCat === 'all' || b.category_id === placesCat);
+      if (items.length === 0) frag.appendChild(emptyNode(all.length ? t('empty_filter') : t('empty_routes')));
       items.forEach((b) => {
-        const lead = '<span class="bar" style="background:' + (color[b.category_id] || '#6c8cff') + '"></span>';
-        const catPrefix = placesCat === 'all' && cname[b.category_id] ? cname[b.category_id] + ' · ' : '';
-        if (isRoutes) {
-          const n = (b.waypoints || []).length;
-          frag.appendChild(placeRow(lead, b.name, catPrefix + t('n_points', { n }), () => {
-            if (n < 2) { toast(t('failed', { msg: t('n_points', { n }) }), 'err'); return; }
-            offerRoute(b);
-          }));
-        } else {
-          frag.appendChild(placeRow(lead, b.name, catPrefix + formatCoord(b.lat, b.lng, 5),
-            () => offerPlace({ lat: b.lat, lng: b.lng, name: b.name }, backToPlaces)));
-        }
+        const c = cats.find((x) => x.id === b.category_id);
+        const lead = '<span class="bar" style="background:' + safeColor(c && c.color) + '"></span>';
+        const n = (b.waypoints || []).length;
+        frag.appendChild(placeRow(lead, b.name, (placesCat === 'all' && c ? c.name + ' · ' : '') + t('n_points', { n }), () => {
+          if (n < 2) { toast(t('failed', { msg: t('n_points', { n }) }), 'err'); return; }
+          offerRoute(b);
+        }));
       });
     } else {
-      const items = placesData.filter((r) => !q || (r.name || '').toLowerCase().includes(q));
-      if (items.length === 0) frag.appendChild(emptyNode(placesData.length ? t('empty_filter') : t('empty_recent')));
-      items.forEach((r) => {
+      if (data.length === 0) frag.appendChild(emptyNode(t('empty_recent')));
+      data.forEach((r) => {
         const isNav = r.kind === 'navigate' || r.kind === 'coord_navigate';
-        const coord = formatCoord(r.lat, r.lng, 5);
+        const c = formatCoord(r.lat, r.lng, 5);
         const lead = '<span class="rc">' + (isNav ? ICON_NAV : ICON_BOLT) + '</span>';
-        frag.appendChild(placeRow(lead, r.name || coord, (r.name ? coord + ' · ' : '') + timeAgo(r.ts),
+        frag.appendChild(placeRow(lead, r.name || c, (r.name ? c + ' · ' : '') + timeAgo(r.ts),
           () => offerPlace({ lat: r.lat, lng: r.lng, name: r.name || null }, backToPlaces)));
       });
     }
     list.appendChild(frag);
   }
-  async function openPlaces(kind) {
-    placesKind = kind; placesData = null; placesCat = 'all';
-    $('places-title').textContent = t(kind);
-    $('places-filter').value = '';
-    $('places-chips').style.display = kind === 'recent' ? 'none' : '';
-    $('places-chips').innerHTML = '';
-    $('places-list').innerHTML = '';
-    showSheet('places', openMenu);
+  async function loadPlaces(kind) {
     try {
-      const data = await api('/api/phone/' + kind);
-      if (openId !== 'places' || placesKind !== kind) return;
-      placesData = data;
-      renderPlaces();
+      const d = kind === 'bookmarks' ? await loadBookmarks(true) : await api('/api/phone/' + kind);
+      placesData[kind] = d; placesErr[kind] = null;
     } catch (e) {
-      $('places-list').innerHTML = '';
-      $('places-list').appendChild(emptyNode(t('load_failed', { msg: e.message })));
+      placesErr[kind] = e.message;
     }
+    if (openId === 'places') renderPlaces();
   }
-  $('places-filter').addEventListener('input', renderPlaces);
+  // opts.tab picks the tab; opts.flower comes from 更多 > 種花.
+  function openPlaces(opts) {
+    opts = opts || {};
+    routeStylePreset = opts.flower ? 'flower' : null;
+    if (opts.tab) { placesTab = opts.tab; placesCat = 'all'; }
+    showSheet('places');
+    renderPlaces();
+    ['bookmarks', 'routes', 'recent'].forEach(loadPlaces);
+  }
+  $('places-tabs').addEventListener('click', (e) => {
+    const b = e.target.closest('[data-tab]');
+    if (!b) return;
+    placesTab = b.getAttribute('data-tab'); placesCat = 'all';
+    renderPlaces();
+  });
+  let geoTimer = null, geoSeq = 0;
+  $('places-q').addEventListener('input', () => {
+    const q = placesQuery();
+    if (geoTimer) clearTimeout(geoTimer);
+    geoItems = null;
+    geoState = q.length >= 2 && !parseCoord(q) ? 'loading' : 'idle';
+    renderPlaces();
+    if (geoState !== 'loading') return;
+    geoTimer = setTimeout(async () => {
+      const seq = ++geoSeq;
+      try {
+        const items = await api('/api/phone/geocode?q=' + encodeURIComponent(q));
+        if (seq !== geoSeq) return;
+        geoItems = items || []; geoState = 'done';
+      } catch (e) {
+        if (seq !== geoSeq) return;
+        geoState = 'error'; geoErr = e.message;
+      }
+      if (openId === 'places' && placesQuery() === q) renderPlaces();
+    }, 400);
+  });
+  $('places-q').addEventListener('keydown', (e) => {
+    if (e.key !== 'Enter') return;
+    const c = parseCoord(placesQuery());
+    if (c) { $('places-q').blur(); offerPlace({ lat: c.lat, lng: c.lng, name: null }, backToPlaces); }
+  });
+  $('places-clear').addEventListener('click', () => {
+    $('places-q').value = '';
+    geoItems = null; geoState = 'idle';
+    renderPlaces();
+    $('places-q').focus();
+  });
 
   // ── Locate PC ─────────────────────────────────────────────
   // Same idea as the desktop's 定位電腦: ask the PC where it really is,
@@ -1655,42 +1867,41 @@
   async function locatePc() {
     if (locating) return;
     locating = true;
-    refreshMenu();
+    refreshMore();
     try {
       // Windows can take up to 15 s to get a fix.
       const r = await api('/api/phone/locate_pc');
       const note = r.via === 'windows' ? t('locate_note', { m: Math.round(r.accuracy) }) : t('locate_note_ip');
       locating = false;
-      offerPlace({ lat: r.lat, lng: r.lng, name: t('locate_title'), note }, backToMenu);
+      refreshMore();
+      offerPlace({ lat: r.lat, lng: r.lng, name: t('locate_title'), note }, backToMore);
     } catch (e) {
       locating = false;
-      refreshMenu();
+      refreshMore();
       fail(e);
     }
   }
 
-  // ── Base map picker ───────────────────────────────────────
-  const ICON_CHECK = '<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.6" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M5 12.5l4.5 4.5L19 7.5" /></svg>';
+  // ── Base map picker (in 更多) ─────────────────────────────
   function renderLayers() {
-    const list = $('layers-list');
-    list.innerHTML = '';
-    const options = [{ key: 'auto', name: t('layer_auto'), sub: t('layer_auto_ds', { name: layerName(layerDef(desktopLayer)) }) }]
-      .concat(LAYERS.map((l) => ({ key: l.key, name: layerName(l), sub: '' })));
+    const host = $('layer-chips');
+    host.innerHTML = '';
+    const options = [{ key: 'auto', name: t('layer_auto') + ' (' + layerName(layerDef(desktopLayer)) + ')' }]
+      .concat(LAYERS.map((l) => ({ key: l.key, name: layerName(l) })));
     options.forEach((o) => {
-      const row = placeRow('', o.name, o.sub, () => {
+      const chip = document.createElement('button');
+      chip.type = 'button';
+      chip.className = 'chip press' + (o.key === layerChoice ? ' active' : '');
+      chip.textContent = o.name;
+      chip.addEventListener('click', () => {
         layerChoice = o.key;
         ls('locwarp.phone.layer', o.key);
         applyBaseLayer();
-        hideSheet();
+        renderLayers();
       });
-      if (!o.sub) row.querySelector('.rs').style.display = 'none';
-      const mark = row.querySelector('.chev');
-      if (o.key === layerChoice) { row.classList.add('current'); mark.className = 'check'; mark.innerHTML = ICON_CHECK; }
-      else mark.remove();
-      list.appendChild(row);
+      host.appendChild(chip);
     });
   }
-  layerbtn.addEventListener('click', () => { renderLayers(); showSheet('layers'); });
 
   // ── Add to Home Screen ────────────────────────────────────
   const standalone = window.navigator.standalone === true ||
@@ -1705,91 +1916,24 @@
       li.textContent = t(k);
       steps.appendChild(li);
     });
-    showSheet('install', openMenu);
+    showSheet('install', openMore);
   }
 
-  // ── Menu tiles ────────────────────────────────────────────
-  document.querySelectorAll('#menu .tile').forEach((btn) => {
+  // ── 更多 buttons ──────────────────────────────────────────
+  document.querySelectorAll('#more [data-more]').forEach((btn) => {
     btn.addEventListener('click', () => {
-      const kind = btn.getAttribute('data-kind');
-      if (kind === 'teleport') { hideSheet(); setPendingMode('teleport'); }
-      else if (kind === 'navigate') {
-        // Navigate routes from the *current* virtual position; without
-        // one the backend has no origin, so explain instead of arming.
-        if (!hasPosition()) { toast(t('no_position'), 'err'); return; }
-        hideSheet(); setPendingMode('navigate');
-      }
-      else if (kind === 'randomwalk') {
+      const kind = btn.getAttribute('data-more');
+      if (kind === 'randomwalk') {
         // The walk is centred on the current virtual position.
         if (!hasPosition()) { toast(t('no_position'), 'err'); return; }
-        openConfirm('randomwalk', null, null, backToMenu);
+        openConfirm('randomwalk', null, null, backToMore);
       }
-      else if (kind === 'bookmarks' || kind === 'routes' || kind === 'recent') openPlaces(kind);
-      else if (kind === 'search') { hideSheet(); openSearch(); }
-      else if (kind === 'coord') { hideSheet(); openCoord(); }
+      else if (kind === 'flower') openPlaces({ tab: 'routes', flower: true });
       else if (kind === 'locate') locatePc();
-      else if (kind === 'stop' || kind === 'restore') openConfirm(kind, null, null, backToMenu);
       else if (kind === 'install') openInstall();
+      else if (kind === 'restore') openConfirm('restore', null, null, backToMore);
     });
   });
-
-  // ── Search ────────────────────────────────────────────────
-  const searchModal = $('search-modal'), searchInput = $('search-input'), searchResults = $('search-results');
-  $('search-close').addEventListener('click', () => searchModal.classList.remove('open'));
-  $('search-back').addEventListener('click', () => { searchModal.classList.remove('open'); openMenu(); });
-  searchModal.addEventListener('click', (e) => { if (e.target === searchModal) searchModal.classList.remove('open'); });
-  function openSearch() {
-    searchInput.value = ''; searchResults.innerHTML = '';
-    searchModal.classList.add('open');
-    setTimeout(() => searchInput.focus(), 120);
-  }
-  let searchTimer = null, searchSeq = 0;
-  searchInput.addEventListener('input', () => {
-    if (searchTimer) clearTimeout(searchTimer);
-    const q = searchInput.value.trim();
-    if (q.length < 2) { searchResults.innerHTML = ''; return; }
-    searchTimer = setTimeout(async () => {
-      const seq = ++searchSeq;
-      try {
-        const items = await api('/api/phone/geocode?q=' + encodeURIComponent(q));
-        if (seq !== searchSeq) return;
-        searchResults.innerHTML = '';
-        if (!items || items.length === 0) { searchResults.appendChild(emptyNode(t('no_results'))); return; }
-        items.forEach((it) => {
-          const name = it.short_name || it.display_name;
-          searchResults.appendChild(placeRow('', name, it.display_name, () => {
-            searchModal.classList.remove('open');
-            searchInput.blur();
-            // Back returns to the results, which are still in the card.
-            offerPlace({ lat: it.lat, lng: it.lng, name }, () => { hideSheet(); searchModal.classList.add('open'); });
-          }));
-        });
-      } catch (e) {
-        if (seq !== searchSeq) return;
-        searchResults.innerHTML = '';
-        searchResults.appendChild(emptyNode(t('search_failed', { msg: e.message })));
-      }
-    }, 350);
-  });
-
-  // ── Enter coordinate ──────────────────────────────────────
-  const coordModal = $('coord-modal'), coordInput = $('coord-input');
-  $('coord-close').addEventListener('click', () => { coordModal.classList.remove('open'); openMenu(); });
-  coordModal.addEventListener('click', (e) => { if (e.target === coordModal) coordModal.classList.remove('open'); });
-  function openCoord() {
-    coordInput.value = '';
-    coordModal.classList.add('open');
-    setTimeout(() => coordInput.focus(), 120);
-  }
-  function submitCoord() {
-    const parsed = parseCoord(coordInput.value);
-    if (!parsed) { toast(t('bad_coord'), 'err'); return; }
-    coordModal.classList.remove('open');
-    coordInput.blur();
-    offerPlace({ lat: parsed.lat, lng: parsed.lng, name: null }, () => { hideSheet(); coordModal.classList.add('open'); });
-  }
-  $('coord-go').addEventListener('click', submitCoord);
-  coordInput.addEventListener('keydown', (e) => { if (e.key === 'Enter') submitCoord(); });
 
   // ── PIN gate ──────────────────────────────────────────────
   const gate = $('gate'), pinInput = $('pin-input'), pinSubmit = $('pin-submit'), pinErr = $('pin-err');
