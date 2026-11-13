@@ -53,7 +53,10 @@ body:
       label: 同時連線的裝置數
       options:
         - 1 台
-        - 2 台以上
+        - 2 台
+        - 3 台
+        - 4 台
+        - 5 台
     validations:
       required: true
 
