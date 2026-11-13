@@ -218,6 +218,7 @@ Connect **up to five** devices at once. Teleport, Navigate, every movement mode,
 - Ctrl-click or Shift-click selects several items, which can then be moved or deleted together.
 - Drag an item to reorder it, or onto another category to move it there. Categories can be dragged into a new order as well.
 - Sort manually, by name, by date added, or by last used (last updated for routes).
+- Spots saved with "Save as coordinate" on the phone web control show up here right away, without restarting the app.
 
 </details>
 
