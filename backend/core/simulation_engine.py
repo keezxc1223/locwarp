@@ -114,7 +114,7 @@ class SimulationEngine:
         self._stop_event = asyncio.Event()
 
         # Sub-handlers
-        self.route_service = RouteService()
+        self.route_service = RouteService(on_fallback=self._on_route_fallback)
         self.eta_tracker = EtaTracker()
         self._teleport_handler = TeleportHandler(self)
         self._navigator = Navigator(self)
@@ -731,6 +731,11 @@ class SimulationEngine:
         )
 
     # ── Internal helpers ─────────────────────────────────────
+
+    async def _on_route_fallback(self, engine: str) -> None:
+        """The routing engine failed and a leg fell back to a straight
+        line. Tell the UI so the user knows why the path ignores roads."""
+        await self._emit("route_fallback", {"engine": engine})
 
     async def _emit(self, event_type: str, data: dict) -> None:
         """Send an event to the WebSocket callback, if one is registered."""

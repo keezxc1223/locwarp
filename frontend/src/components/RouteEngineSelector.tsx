@@ -17,7 +17,11 @@ const ENGINE_META: Record<RouteEngine, { color: string; dot: string; label: stri
   brouter:      { color: 'rgba(140, 220, 140, 0.18)', dot: '#7fd17f', label: 'BRouter' },
 };
 
-const RouteEngineSelector: React.FC<Props> = ({ value, onChange, disabled }) => {
+export function routeEngineLabel(engine: string): string {
+  return ENGINE_META[engine as RouteEngine]?.label ?? engine;
+}
+
+const RouteEngineSelector: React.FC<Props> =({ value, onChange, disabled }) => {
   const t = useT();
   const [open, setOpen] = useState(false);
   const meta = ENGINE_META[value];

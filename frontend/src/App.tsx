@@ -1,6 +1,7 @@
 import React, { useState, useCallback, useEffect, useRef, useMemo } from 'react'
 import { createPortal } from 'react-dom'
 import { useT } from './i18n'
+import { routeEngineLabel } from './components/RouteEngineSelector'
 import { useWebSocket } from './hooks/useWebSocket'
 import { useDevice } from './hooks/useDevice'
 import { useSimulation } from './hooks/useSimulation'
@@ -221,6 +222,19 @@ const App: React.FC = () => {
       toastTimerRef.current = null
     }, ms)
   }, [])
+
+  // The routing engine failed and the backend walked a leg in a straight
+  // line. Say so, but at most once per 20 s: a loop retries every leg, and
+  // each device in a group reports its own failure.
+  const routeFallbackAtRef = useRef(0)
+  useEffect(() => ws.subscribe((m) => {
+    if (m.type !== 'route_fallback') return
+    const now = Date.now()
+    if (now - routeFallbackAtRef.current < 20000) return
+    routeFallbackAtRef.current = now
+    const engine = routeEngineLabel(String(m.data?.engine ?? ''))
+    showToast(t('toast.route_fallback').replace('{engine}', engine), 6000)
+  }), [ws.subscribe, showToast, t])
 
   const handleRestore = useCallback(async () => {
     // The backend stop + DVT clear can take a few seconds, especially if

@@ -1,5 +1,5 @@
-﻿pymobiledevice3>=11.51.0
-fastapi>=0.162.4
+﻿pymobiledevice3>=11.55.0
+fastapi>=0.162.7
 starlette>=1.10.0
 uvicorn[standard]>=0.54.0
 websockets>=17.4

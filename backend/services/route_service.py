@@ -165,6 +165,12 @@ def _normalise_engine(engine: str | None) -> str:
 class RouteService:
     """Async wrapper around the supported routing engines."""
 
+    def __init__(self, on_fallback=None) -> None:
+        # Optional ``async (engine: str) -> None`` called when the chosen
+        # engine fails and a leg is served as a straight line, so the UI
+        # can tell the user why the route suddenly ignores the roads.
+        self.on_fallback = on_fallback
+
     # ------------------------------------------------------------------
     # Public helpers
     # ------------------------------------------------------------------
@@ -245,6 +251,11 @@ class RouteService:
                 "%s failed (%s); using straight-line fallback for this leg",
                 engine, type(e).__name__,
             )
+            if self.on_fallback is not None:
+                try:
+                    await self.on_fallback(engine)
+                except Exception:
+                    logger.exception("route fallback callback failed")
             return _straight_line_fallback(waypoints)
 
     # ------------------------------------------------------------------
