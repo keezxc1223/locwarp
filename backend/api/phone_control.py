@@ -367,6 +367,9 @@ class _NavigateBody(BaseModel):
     # Optional: explicit speed in km/h, overrides the mode preset.
     speed_kmh: float | None = Field(default=None, ge=0.1, le=300.0)
     name: str | None = Field(default=None, max_length=200)
+    # True: skip the routing engine and move in straight lines, like the
+    # desktop's 使用直線路徑.
+    straight_line: bool = False
 
 
 class _SpeedBody(BaseModel):
@@ -766,7 +769,8 @@ async def phone_navigate(
     for e in engines:
         if e.current_position is None:
             continue
-        asyncio.create_task(e.navigate(dest, mode, speed_kmh=body.speed_kmh))
+        asyncio.create_task(e.navigate(dest, mode, speed_kmh=body.speed_kmh,
+                                       straight_line=body.straight_line))
     _push_recent(body.lat, body.lng, "navigate", body.name)
     return {
         "status": "started",
@@ -896,6 +900,7 @@ class _RouteStartBody(BaseModel):
     # Set to run the route in 種花模式 (circle around every waypoint)
     # instead of walking along it. `loop` is ignored then.
     flower: _FlowerOpts | None = None
+    straight_line: bool = False
 
 
 @router.post("/api/phone/route/start")
@@ -939,11 +944,14 @@ async def phone_route_start(
         if body.flower is not None:
             f = body.flower
             _spawn(e.flower(wps, mode, radius_m=f.radius_m, circles=f.circles, rounds=f.rounds,
-                            teleport=f.teleport, speed_kmh=body.speed_kmh))
+                            teleport=f.teleport, speed_kmh=body.speed_kmh,
+                            straight_line=body.straight_line))
         elif body.loop:
-            _spawn(e.start_loop(wps, mode, speed_kmh=body.speed_kmh, pause_enabled=False))
+            _spawn(e.start_loop(wps, mode, speed_kmh=body.speed_kmh, pause_enabled=False,
+                                straight_line=body.straight_line))
         else:
-            _spawn(e.multi_stop(wps, mode, 0, False, speed_kmh=body.speed_kmh, pause_enabled=False))
+            _spawn(e.multi_stop(wps, mode, 0, False, speed_kmh=body.speed_kmh, pause_enabled=False,
+                                straight_line=body.straight_line))
     return {"status": "started", "name": route.name, "waypoints": len(route.waypoints),
             "loop": body.loop, "flower": body.flower is not None, "mode": mode.value}
 
@@ -952,6 +960,7 @@ class _RandomWalkBody(BaseModel):
     radius_m: float = Field(default=500.0, ge=10.0, le=50000.0)
     mode: str = "walking"  # walking / running / driving
     speed_kmh: float | None = Field(default=None, ge=0.1, le=300.0)
+    straight_line: bool = False
 
 
 @router.post("/api/phone/randomwalk")
@@ -994,7 +1003,8 @@ async def phone_random_walk(
     seed = secrets.randbelow(2 ** 31)
     for e in engines:
         _spawn(e.random_walk(center, body.radius_m, mode, speed_kmh=body.speed_kmh,
-                             pause_enabled=False, seed=seed))
+                             pause_enabled=False, seed=seed,
+                             straight_line=body.straight_line))
     return {"status": "started", "radius_m": body.radius_m, "mode": mode.value}
 
 
