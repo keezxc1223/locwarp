@@ -306,6 +306,10 @@
   .tbl th { width: 28%; font-weight: 600; color: var(--ink); white-space: nowrap; }
   .tbl td { color: var(--ink-2); }
 
+  .support { margin-top: 72px; display: flex; flex-direction: column; align-items: center; gap: 14px; text-align: center; }
+  .support p { margin: 0; color: var(--ink-2); font-size: 15px; line-height: 1.7; }
+  .support .btn { min-width: 220px; font-size: 16px; }
+  .support + footer { margin-top: 40px; }
   footer { margin-top: 72px; padding-top: 24px; border-top: 1px solid var(--line); display: flex; flex-wrap: wrap; justify-content: space-between; gap: 8px 20px; font-size: 13.5px; color: var(--ink-3); }
   footer a { color: var(--ink-2); }
 
@@ -430,7 +434,6 @@
       <svg width="16" height="16"><use href="#i-github"/></svg>GitHub<span id="ghStars"></span>
     </a>
   </div>
-  <div class="top-progress" aria-hidden="true"><i id="topProgress"></i></div>
 </header>
 
 <div class="layout" id="top">
@@ -475,7 +478,7 @@
       </div>
     </section>
 
-    <h2 class="sec" id="install"><a class="anchor" href="#install">四個步驟</a><small id="progressText">完成一步就打勾，進度會記在這台電腦上</small></h2>
+    <h2 class="sec" id="install"><a class="anchor" href="#install">四個步驟</a></h2>
 
     <ol class="route">
       <li class="step" id="step-1" data-step="1">
@@ -483,7 +486,6 @@
         <div class="step-body">
           <div class="step-head">
             <h3>下載並安裝 LocWarp</h3>
-            <label class="check"><input type="checkbox" data-done="1">這步完成</label>
           </div>
           <p>抓最新版的 Windows 安裝檔，檔名像 <code>LocWarp-Setup-X.X.XXX.exe</code>。兩個來源內容相同，上方的「下載安裝檔」會直接下載 GitHub 上的最新版。</p>
           <div class="aside caution"><svg width="18" height="18"><use href="#i-alert"/></svg><div><b class="t">出現「Windows 已保護您的電腦」</b>LocWarp 沒有做數位簽章，第一次執行會被 SmartScreen 擋。點「其他資訊」再點「仍要執行」即可。</div></div>
@@ -498,7 +500,6 @@
         <div class="step-body">
           <div class="step-head">
             <h3>安裝 Apple USB driver</h3>
-            <label class="check"><input type="checkbox" data-done="2">這步完成</label>
           </div>
           <p>Windows 沒有內建 Apple 的 USB driver。下列三種擇一安裝即可，多數人裝桌面版 iTunes 就能用。</p>
           <div class="options">
@@ -525,7 +526,6 @@
         <div class="step-body">
           <div class="step-head">
             <h3>USB 連接並信任電腦</h3>
-            <label class="check"><input type="checkbox" data-done="3">這步完成</label>
           </div>
           <p>用<strong>原廠或支援資料傳輸</strong>的 USB 線接上 iPhone。iPhone 跳出「要信任這部電腦嗎？」時點「信任」並輸入密碼。</p>
           <div class="fold" data-level="caution">
@@ -550,7 +550,6 @@
         <div class="step-body">
           <div class="step-head">
             <h3>開啟開發者模式</h3>
-            <label class="check"><input type="checkbox" data-done="4">這步完成</label>
           </div>
           <p>在 iPhone 上前往：</p>
           <div class="path"><span>設定</span><svg width="14" height="14"><use href="#i-right"/></svg><span>隱私權與安全性</span><svg width="14" height="14"><use href="#i-right"/></svg><span>開發者模式</span></div>
@@ -669,6 +668,11 @@
       </table>
     </div>
 
+    <div class="support">
+      <p>如果 LocWarp 有幫到你<br>歡迎請我喝杯咖啡支持</p>
+      <a class="btn line" href="https://lin.ee/UwdCrmf" target="_blank" rel="noopener"><svg width="18" height="18"><use href="#i-line"/></svg>官方 LINE</a>
+    </div>
+
     <footer>
       <div>
         <a href="https://github.com/keezxc1223/locwarp">GitHub</a> ·
@@ -696,11 +700,6 @@
     </ol>
   </nav>
 </div>
-
-<button class="pill hide" id="pill" type="button" aria-label="跳到下一個未完成的步驟">
-  <svg class="ring" viewBox="0 0 36 36" aria-hidden="true"><circle cx="18" cy="18" r="15" fill="none" stroke="currentColor" stroke-opacity=".25" stroke-width="4"/><circle id="pillRing" cx="18" cy="18" r="15" fill="none" stroke="currentColor" stroke-width="4" stroke-linecap="round" stroke-dasharray="94.25" stroke-dashoffset="94.25" transform="rotate(-90 18 18)" style="transition: stroke-dashoffset 600ms cubic-bezier(.23,1,.32,1)"/></svg>
-  <span id="pillText">安裝進度 0 / 4</span>
-</button>
 
 <button class="to-top" id="toTop" type="button" aria-label="回到頂部">
   <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round"><path d="m6 15 6-6 6 6"/></svg>
@@ -755,49 +754,6 @@
   loadJSON('locwarp-rel', 'https://api.github.com/repos/keezxc1223/locwarp/releases/latest', renderRelease, releaseFallback);
   loadJSON('locwarp-repo', 'https://api.github.com/repos/keezxc1223/locwarp', function (d) {
     if (d && d.stargazers_count != null) document.getElementById('ghStars').textContent = '★ ' + d.stargazers_count.toLocaleString('en-US');
-  });
-
-  // ---------- 安裝進度（勾選記在這台電腦） ----------
-  var steps = Array.prototype.slice.call(document.querySelectorAll('.step'));
-  var boxes = Array.prototype.slice.call(document.querySelectorAll('input[data-done]'));
-  var saved = {};
-  try { saved = JSON.parse(store.get('locwarp-steps') || '{}') || {}; } catch (e) {}
-  boxes.forEach(function (b) { b.checked = !!saved[b.getAttribute('data-done')]; });
-
-  function refresh() {
-    var done = 0, firstOpen = null;
-    steps.forEach(function (s) {
-      var n = s.getAttribute('data-step');
-      var box = s.querySelector('input[data-done]');
-      s.classList.toggle('done', box.checked);
-      if (box.checked) done++; else if (!firstOpen) firstOpen = s;
-      var link = document.querySelector('.side a[data-step="' + n + '"]');
-      if (link) link.classList.toggle('done', box.checked);
-    });
-    steps.forEach(function (s) { s.classList.toggle('current', s === firstOpen); });
-    var p = done / steps.length;
-    document.getElementById('topProgress').style.setProperty('--p', p);
-    document.getElementById('pillRing').style.strokeDashoffset = String(94.25 * (1 - p));
-    document.getElementById('pillText').textContent = done === steps.length ? '全部完成，開始使用吧' : '安裝進度 ' + done + ' / ' + steps.length;
-    document.getElementById('progressText').textContent = done === 0 ? '完成一步就打勾，進度會記在這台電腦上' : '已完成 ' + done + ' / ' + steps.length;
-    var fin = document.getElementById('finish');
-    fin.classList.toggle('all', done === steps.length);
-    document.getElementById('finishTitle').textContent = done === steps.length ? '全部完成，可以開始使用了' : '完成';
-    return firstOpen;
-  }
-  boxes.forEach(function (b) {
-    b.addEventListener('change', function () {
-      saved[b.getAttribute('data-done')] = b.checked;
-      store.set('locwarp-steps', JSON.stringify(saved));
-      refresh();
-    });
-  });
-  refresh();
-
-  var pill = document.getElementById('pill');
-  pill.addEventListener('click', function () {
-    var next = refresh();
-    (next || document.getElementById('finish')).scrollIntoView({ behavior: 'smooth', block: 'start' });
   });
 
   // ---------- 收合 ----------
@@ -896,9 +852,6 @@
     var sideId = id;
     if (current && ['modes', 'more', 'tech'].indexOf(current.id) > -1) sideId = current.id === 'tech' ? '#tech' : '#features';
     sideLinks.forEach(function (a) { a.classList.toggle('active', a.getAttribute('href') === sideId); });
-    var hero = document.querySelector('.hero').getBoundingClientRect().bottom;
-    var faqTop = document.getElementById('faq').getBoundingClientRect().top;
-    pill.classList.toggle('hide', hero > 0 || faqTop < window.innerHeight * 0.5);
   }
   var toTop = document.getElementById('toTop');
   toTop.addEventListener('click', function () { window.scrollTo({ top: 0, behavior: 'smooth' }); });
