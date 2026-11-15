@@ -178,8 +178,9 @@ When an engine fails, that leg falls back to a straight line and the next leg tr
   - Previously used IPs are remembered. You can also pin a device so that it connects on every launch and retries after a drop. Once any device is pinned, only pinned devices auto-connect on launch; the connection page points it out when the device in use is not pinned.
   - "Keep connection alive when the screen dims" (experimental) keeps re-sending the position to reduce drops after the iPhone locks.
   - "Re-pair" rebuilds a damaged pairing record over USB in one click.
-  - When it will not connect, press "**Can't connect? Run diagnosis**" below Start. In about 3 seconds it checks the computer's network, the subnet, whether the iPhone is reachable, the pairing record, Windows Firewall and automatic discovery, then says which one is broken and what to do. The result can be copied in one click.
-  - On startup LocWarp makes sure Windows Firewall lets it receive discovery replies from the iPhone, and adds the rule when it is blocked.
+  - When it will not connect, press "**Can't connect? Run diagnosis**" below Start. In about 3 seconds it checks the computer's network, the subnet, whether the iPhone is reachable over Wi-Fi, the pairing record, Windows Firewall and Wi-Fi automatic discovery, then says which one is broken and what to do. The result can be copied in one click.
+  - Finding the iPhone automatically over Wi-Fi needs Windows Firewall to allow the discovery replies. LocWarp checks this on startup and adds the rule when it is blocked (requires running as administrator). The diagnosis window also has a Repair firewall button.
+  - Wi-Fi automatic discovery asks several times, so a lost discovery packet no longer means the iPhone is missed. The wait is the same as before.
   - Stopping the tunnel while USB is still plugged in switches back to USB automatically.
 
 </details>
