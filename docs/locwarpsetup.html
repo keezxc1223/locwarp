@@ -306,10 +306,9 @@
   .tbl th { width: 28%; font-weight: 600; color: var(--ink); white-space: nowrap; }
   .tbl td { color: var(--ink-2); }
 
-  .support { margin-top: 72px; display: flex; flex-direction: column; align-items: center; gap: 14px; text-align: center; }
-  .support p { margin: 0; color: var(--ink-2); font-size: 15px; line-height: 1.7; }
-  .support .btn { min-width: 220px; font-size: 16px; }
-  .support + footer { margin-top: 40px; }
+  .support { margin-top: 20px; display: flex; flex-wrap: wrap; align-items: center; justify-content: space-between; gap: 12px 20px; padding: 16px 20px; border-radius: var(--radius); border: 1px solid var(--line); background: var(--surface); }
+  .support p { margin: 0; color: var(--ink-2); font-size: 15px; line-height: 1.6; }
+  .support .btn { min-width: 180px; }
   footer { margin-top: 72px; padding-top: 24px; border-top: 1px solid var(--line); display: flex; flex-wrap: wrap; justify-content: space-between; gap: 8px 20px; font-size: 13.5px; color: var(--ink-3); }
   footer a { color: var(--ink-2); }
 
@@ -476,6 +475,10 @@
           <a class="btn line" href="https://line.me/ti/g2/9ZlijG3sczL9rkgaXgvUHEJw7V3V41Z-OUXlSQ?utm_source=invitation&utm_medium=link_copy&utm_campaign=default" target="_blank" rel="noopener"><svg width="16" height="16"><use href="#i-line"/></svg>加入 LINE 社群</a>
         </div>
       </div>
+    <div class="support">
+      <p>如果 LocWarp 有幫到你<br>歡迎請我喝杯咖啡支持</p>
+      <a class="btn line" href="https://lin.ee/UwdCrmf" target="_blank" rel="noopener"><svg width="18" height="18"><use href="#i-line"/></svg>官方 LINE</a>
+    </div>
     </section>
 
     <h2 class="sec" id="install"><a class="anchor" href="#install">四個步驟</a></h2>
@@ -666,11 +669,6 @@
         <tr><th>WiFi Tunnel</th><td>pymobiledevice3 TCP tunnel 搭配 pytun-pmd3 建立 TUN 介面，wintun.dll 已打包</td></tr>
         <tr><th>支援版本</th><td>iOS 17 以上為主要支援，已驗證到 iOS 27.2。iOS 16.x 由社群維護，iOS 15 以下不支援。</td></tr>
       </table>
-    </div>
-
-    <div class="support">
-      <p>如果 LocWarp 有幫到你<br>歡迎請我喝杯咖啡支持</p>
-      <a class="btn line" href="https://lin.ee/UwdCrmf" target="_blank" rel="noopener"><svg width="18" height="18"><use href="#i-line"/></svg>官方 LINE</a>
     </div>
 
     <footer>
