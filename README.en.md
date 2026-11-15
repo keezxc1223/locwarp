@@ -178,6 +178,8 @@ When an engine fails, that leg falls back to a straight line and the next leg tr
   - Previously used IPs are remembered. You can also pin a device so that it connects on every launch and retries after a drop. Once any device is pinned, only pinned devices auto-connect on launch; the connection page points it out when the device in use is not pinned.
   - "Keep connection alive when the screen dims" (experimental) keeps re-sending the position to reduce drops after the iPhone locks.
   - "Re-pair" rebuilds a damaged pairing record over USB in one click.
+  - When it will not connect, press "**Can't connect? Run diagnosis**" below Start. In about 3 seconds it checks the computer's network, the subnet, whether the iPhone is reachable, the pairing record, Windows Firewall and automatic discovery, then says which one is broken and what to do. The result can be copied in one click.
+  - On startup LocWarp makes sure Windows Firewall lets it receive discovery replies from the iPhone, and adds the rule when it is blocked.
   - Stopping the tunnel while USB is still plugged in switches back to USB automatically.
 
 </details>
@@ -355,6 +357,7 @@ To unplug USB and go wireless:
 - The iPhone and the PC must be on the **same Wi-Fi subnet**.
 - The USB pairing from step 2 must already be done.
 - Start the Wi-Fi Tunnel from the Connection tab in LocWarp. Once it is up, USB can be unplugged.
+- If it will not connect, press "Can't connect? Run diagnosis" and follow the conclusion it shows.
 
 | Connection | iPhone screen lock | Recommendation |
 | --- | --- | --- |
@@ -381,10 +384,11 @@ Nothing is downloaded until you ask for it. You can also get the installer yours
 | Symptom | Likely cause and fix |
 | --- | --- |
 | A dialog says the backend program is missing | Antivirus quarantined the unsigned backend exe. Add the install folder to the exclusion list and reinstall |
+| Wi-Fi will not connect, or the tunnel start times out | Unlock the iPhone and try again. If it still fails, press "Can't connect? Run diagnosis" on the Connection page. It points to the IP, the subnet, the router, a VPN, the firewall or the pairing |
 | The tunnel starts but nothing connects | Make sure LocWarp runs as administrator, and try again with VPN or third-party firewall software turned off |
 | Wi-Fi has to be connected by hand on every launch | On the Connection page, check whether this device is pinned. Once any other device is pinned, only pinned devices auto-connect on launch |
 | The mushroom map shows no spots | Check in order: the panel says Logged in (otherwise press How to log in), the map is at zoom 15 or closer, and the location is in Taiwan, Hong Kong or Malaysia. When the panel shows Login expired, open the site in Chrome and log in again; the extension syncs by itself. A cookie pasted by hand has to be pasted again once it expires |
-| Wi-Fi auto-detect finds no device | Check that both are on the same Wi-Fi subnet and that the router has no client or AP isolation. Entering the IP by hand also works |
+| Wi-Fi auto-detect finds no device | Check that both are on the same Wi-Fi subnet and that the router has no client or AP isolation. If the diagnosis says the firewall is blocking it, press "Repair firewall". If it says the iPhone is reachable but discovery gets no reply, the router is not passing discovery traffic: enter the IP by hand and press Start, the port can stay empty |
 | The port scan says the IP answers on every port | A VPN or proxy is intercepting connections. Turn it off and retry. Auto-detect may also find nothing while a VPN is on |
 | `No such service: com.apple.instruments.dtservicehub`, or "No DDI detected" | Mount the DDI as described in [step 4](#4-mount-the-developer-disk-image-ios-17). If it still fails, turn Developer Mode off, reboot, turn it back on, and mount again |
 | Developer Mode is missing from the iPhone Settings | With the device connected, open the Settings tab at the top of LocWarp and press "Enable Developer Mode", then close and reopen the iPhone Settings app as described in [step 3](#3-turn-on-developer-mode). If the button does not work, use the [sideloading fallback](#appendix-revealing-developer-mode-by-sideloading) |
@@ -392,7 +396,7 @@ Nothing is downloaded until you ask for it. You can also get the installer yours
 | App crashes right at launch | Newer builds fall back to software rendering and relaunch on their own; if it still crashes, right-click the shortcut › Properties › Target and append `--no-sandbox --disable-gpu --in-process-gpu` |
 | The flag or place name does not appear | Both come from free public services that are sometimes briefly unresponsive. Teleport again a little later |
 
-When reporting a problem, include the iOS version, the connection type, and `~/.locwarp/logs/backend.log`.
+When reporting a problem, include the iOS version, the connection type, and `~/.locwarp/logs/backend.log`. For Wi-Fi connection problems, also include what "Copy result" in the diagnosis window gives you.
 
 ### Appendix: Revealing Developer Mode by sideloading
 
