@@ -585,8 +585,9 @@
         </div></div></div>
       </div>
       <div class="fold"><button type="button" aria-expanded="false"><span class="lvl"></span>畫面殘影或黑畫面<svg class="chev" width="18" height="18"><use href="#i-chev"/></svg></button><div class="fold-body"><div><div>到「設定」頁關閉硬體加速，重啟程式。</div></div></div></div>
+      <div class="fold"><button type="button" aria-expanded="false"><span class="lvl"></span>WiFi 連不上、Tunnel 啟動逾時<svg class="chev" width="18" height="18"><use href="#i-chev"/></svg></button><div class="fold-body"><div><div>先解鎖 iPhone 再試一次。仍然失敗就按「連線」頁 Start 下方的「連不上?連線診斷」，大約 3 秒會逐項檢查電腦網路、網段、能否連到 iPhone、配對紀錄、Windows 防火牆與自動偵測，直接告訴你是哪一項出問題、該怎麼處理。</div></div></div></div>
       <div class="fold"><button type="button" aria-expanded="false"><span class="lvl"></span>Tunnel 啟動後連不上<svg class="chev" width="18" height="18"><use href="#i-chev"/></svg></button><div class="fold-body"><div><div>確認以系統管理員身分啟動，暫時關閉 VPN 或第三方防火牆再試。</div></div></div></div>
-      <div class="fold"><button type="button" aria-expanded="false"><span class="lvl"></span>WiFi 掃描或自動偵測找不到裝置<svg class="chev" width="18" height="18"><use href="#i-chev"/></svg></button><div class="fold-body"><div><div>確認在同一個 WiFi 網段，路由器沒開裝置隔離（AP isolation），並暫時關閉 VPN 或代理軟體。可改為手動輸入 IP。</div></div></div></div>
+      <div class="fold"><button type="button" aria-expanded="false"><span class="lvl"></span>WiFi 掃描或自動偵測找不到裝置<svg class="chev" width="18" height="18"><use href="#i-chev"/></svg></button><div class="fold-body"><div><div>確認在同一個 WiFi 網段，路由器沒開裝置隔離（AP isolation），並暫時關閉 VPN 或代理軟體。按「連不上?連線診斷」：顯示防火牆擋住時，按視窗裡的「修復防火牆」；顯示「連得到 iPhone，但自動偵測收不到回應」時，是路由器沒有轉送偵測訊號，直接手動輸入 IP 按 Start 即可，Port 可以留空。</div></div></div></div>
       <div class="fold"><button type="button" aria-expanded="false"><span class="lvl"></span>WiFi 每次啟動都要手動連線<svg class="chev" width="18" height="18"><use href="#i-chev"/></svg></button><div class="fold-body"><div><div>到「連線」頁確認目前這台裝置有沒有「釘選」。只要釘選了其他裝置，啟動時就只會自動連線已釘選的那些；頁面上會出現提示，按一下「釘選」即可。</div></div></div></div>
       <div class="fold"><button type="button" aria-expanded="false"><span class="lvl"></span>改了設定但沒有生效<svg class="chev" width="18" height="18"><use href="#i-chev"/></svg></button><div class="fold-body"><div><div>「設定」頁的外觀、座標格式與提示音，修改後要按最下方的「儲存設定」才會保留。</div></div></div></div>
       <div class="fold"><button type="button" aria-expanded="false"><span class="lvl"></span>WiFi Tunnel 螢幕暗掉就斷線<svg class="chev" width="18" height="18"><use href="#i-chev"/></svg></button><div class="fold-body"><div><div>把 iPhone 的「自動鎖定」設為永不並接上充電，或在 LocWarp 開啟「螢幕暗掉維持連線」。</div></div></div></div>
@@ -594,7 +595,7 @@
       <div class="fold"><button type="button" aria-expanded="false"><span class="lvl"></span>國旗或地名沒出現<svg class="chev" width="18" height="18"><use href="#i-chev"/></svg></button><div class="fold-body"><div><div>這兩項來自免費公共服務，偶爾會暫時無回應，稍後再瞬移一次即可。</div></div></div></div>
       <div class="faq-empty" id="faqEmpty" hidden>找不到相關問題。可以到 <a href="https://github.com/keezxc1223/locwarp/issues" target="_blank" rel="noopener">GitHub Issues</a> 回報。</div>
     </div>
-    <p class="report">回報問題請附上 iOS 版本、連線方式，以及 <code>~/.locwarp/logs/backend.log</code>。狀態列的「Log 資料夾」按鈕可以直接開啟該資料夾。</p>
+    <p class="report">回報問題請附上 iOS 版本、連線方式，以及 <code>~/.locwarp/logs/backend.log</code>。WiFi 連不上的問題，請一併附上連線診斷按「複製結果」的內容。狀態列的「Log 資料夾」按鈕可以直接開啟該資料夾。</p>
 
     <h2 class="sec" id="features"><a class="anchor" href="#features">功能簡介</a></h2>
 
@@ -626,7 +627,7 @@
         <h4><svg width="16" height="16"><use href="#i-wifi"/></svg>連線</h4>
         <ul>
           <li><strong>USB</strong>：插上自動連線，iPhone 鎖定螢幕不受影響。拔除約 4 秒內偵測，重插自動恢復。</li>
-          <li><strong>WiFi Tunnel</strong>（iOS 17 以上）：「掃描 WiFi 裝置」會找到同一個 WiFi 上的 iPhone 並連上還沒連線的那些。連過的 IP 會記住，可「釘選」裝置；啟動時會自動補滿剩餘的裝置名額，一台連不上不會拖慢其他台。</li>
+          <li><strong>WiFi Tunnel</strong>（iOS 17 以上）：「掃描 WiFi 裝置」會找到同一個 WiFi 上的 iPhone 並連上還沒連線的那些。連過的 IP 會記住，可「釘選」裝置；啟動時會自動補滿剩餘的裝置名額，一台連不上不會拖慢其他台。連不上時按「連不上?連線診斷」，會指出是哪一項出問題。</li>
           <li><strong>多裝置</strong>：最多同時五台，所有動作同步套用，隨機漫步走一樣的路線。</li>
         </ul>
       </div>
