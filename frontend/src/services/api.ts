@@ -25,7 +25,9 @@ const ERROR_I18N: Record<string, { zh: string; en: string }> = {
   tunnel_script_missing: { zh: '找不到 wifi_tunnel.py 腳本', en: 'wifi_tunnel.py script not found' },
   tunnel_spawn_failed: { zh: '無法啟動 Tunnel 進程', en: 'Failed to spawn tunnel process' },
   tunnel_exited: { zh: 'Tunnel 進程異常結束', en: 'Tunnel process exited unexpectedly' },
-  tunnel_timeout: { zh: 'Tunnel 啟動逾時,請確認 iPhone 解鎖且與電腦同網段', en: 'Tunnel startup timed out, ensure iPhone is unlocked and on the same subnet' },
+  tunnel_timeout: { zh: 'Tunnel 啟動逾時。請先解鎖 iPhone 再試,仍然失敗可按「連線診斷」找出原因', en: 'Tunnel startup timed out. Unlock the iPhone and retry, or run the diagnosis to find the cause' },
+  bad_ip: { zh: 'IP 格式不正確', en: 'That is not a valid IP address' },
+  firewall_need_admin: { zh: '需要以系統管理員身分執行 LocWarp 才能修復', en: 'LocWarp must be run as administrator to repair this' },
   no_device: { zh: '尚未連接任何 iOS 裝置,請先透過 USB 連線', en: 'No iOS device connected, connect via USB first' },
   no_position: { zh: '尚未取得目前位置,請先跳點到一個座標', en: 'No current position, teleport to a coordinate first' },
   tunnel_lost: { zh: 'WiFi Tunnel 連線中斷,請重新建立', en: 'Wi-Fi tunnel dropped, please reconnect' },
@@ -163,6 +165,32 @@ export const wifiTunnelStop = (udid?: string) =>
   request<{ status: string; udid?: string; udids?: string[] }>(
     'POST', '/api/device/wifi/tunnel/stop', udid ? { udid } : {},
   )
+export interface WifiDiagnoseCheck {
+  id: 'adapter' | 'subnet' | 'reach' | 'pair' | 'firewall' | 'mdns_send' | 'mdns_browse'
+  status: 'ok' | 'warn' | 'fail' | 'skip'
+  // Each check fills only its own fields; see backend/api/wifi_diagnose.py.
+  data: {
+    name?: string; desc?: string; ip?: string; vpn?: boolean; others?: string[]
+    local_ip?: string; network?: string; via?: string
+    state?: string; ping?: boolean
+    count?: number
+    networks?: Array<{ alias: string; profile: string; status: string }>
+    admin?: boolean
+    devices?: Array<{ ip: string; port: number; host: string }>
+  }
+}
+export interface WifiDiagnoseResult {
+  ip: string | null
+  ip_source: 'input' | 'mdns' | null
+  local_ip: string | null
+  checks: WifiDiagnoseCheck[]
+  verdict: string
+  admin: boolean
+}
+export const wifiDiagnose = (ip: string) =>
+  request<WifiDiagnoseResult>('GET', `/api/device/wifi/diagnose?ip=${encodeURIComponent(ip.trim())}`)
+export const wifiFirewallRepair = () =>
+  request<{ status: string }>('POST', '/api/device/wifi/firewall/repair')
 export const wifiRepair = () => request<{ status: string; udid: string; name: string; ios_version: string; remote_record_regenerated: boolean }>('POST', '/api/device/wifi/repair')
 // WiFi tunnel keep-alive: backend re-pushes the current simulated location
 // to idle tunnels so iOS doesn't drop the RSD socket when the screen is off.

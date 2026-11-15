@@ -602,6 +602,69 @@ async def _discover_by_scan() -> list[dict]:
     return found
 
 
+# One mDNS browse sends a single query, and one lost multicast packet (busy
+# WiFi, a phone in power save) then looks exactly like "no iPhone here".
+# RFC 6762 5.2 has a querier ask again after a second; these browses start
+# that far apart and all end together, so the wait stays MDNS_BROWSE_WINDOW.
+MDNS_BROWSE_WINDOW = 3.0
+MDNS_QUERY_OFFSETS = (0.0, 1.0, 2.0)
+
+
+async def _browse_mdns_devices() -> list[dict]:
+    """Find iPhones advertising RemotePairing over mDNS / Bonjour.
+
+    Returns:
+        One ``{"ip", "port", "host", "name", "method": "mdns"}`` per
+        address, IPv4 only when the phone has one. Empty when nothing
+        answered.
+
+    Raises:
+        Exception: every browse failed (e.g. no mDNS socket could be opened).
+    """
+    from pymobiledevice3.bonjour import browse_remotepairing
+
+    async def _one(delay: float):
+        if delay:
+            await asyncio.sleep(delay)
+        return await browse_remotepairing(timeout=MDNS_BROWSE_WINDOW - delay)
+
+    runs = await asyncio.gather(
+        *[_one(d) for d in MDNS_QUERY_OFFSETS], return_exceptions=True,
+    )
+    errors = [r for r in runs if isinstance(r, BaseException)]
+    if len(errors) == len(runs):
+        raise errors[0]
+
+    devices: list[dict] = []
+    seen: set[tuple[str, int]] = set()
+    for run in runs:
+        if isinstance(run, BaseException):
+            continue
+        for inst in run:
+            # Newer pymobiledevice3 returns Address objects with .ip and
+            # .iface attributes; older releases returned plain string IPs.
+            # Pull the bare IP either way so the UI shows e.g.
+            # "192.168.0.185" not "Address(ip='192.168.0.185',
+            # iface='Intel(R) Ethernet Controller (3) I225-V')".
+            str_addrs = [
+                str(a.ip) if hasattr(a, "ip") else str(a)
+                for a in (inst.addresses or [])
+            ]
+            ipv4s = [a for a in str_addrs if ":" not in a]
+            for addr in (ipv4s or str_addrs):
+                if (addr, inst.port) in seen:
+                    continue
+                seen.add((addr, inst.port))
+                devices.append({
+                    "ip": addr,
+                    "port": inst.port,
+                    "host": inst.host,
+                    "name": inst.instance or inst.host,
+                    "method": "mdns",
+                })
+    return devices
+
+
 @router.get("/wifi/tunnel/discover")
 async def wifi_tunnel_discover(scan: bool = True):
     """Find iPhones on the local network. First tries mDNS (Bonjour RemotePairing
@@ -614,31 +677,7 @@ async def wifi_tunnel_discover(scan: bool = True):
 
     # --- 1) mDNS / Bonjour broadcast ---
     try:
-        from pymobiledevice3.bonjour import browse_remotepairing
-        instances = await browse_remotepairing(timeout=3.0)
-        for inst in instances:
-            # Newer pymobiledevice3 returns Address objects with .ip and
-            # .iface attributes; older releases returned plain string IPs.
-            # Pull the bare IP either way so the UI shows e.g.
-            # "192.168.0.185" not "Address(ip='192.168.0.185',
-            # iface='Intel(R) Ethernet Controller (3) I225-V')".
-            raw_addrs = inst.addresses or []
-            str_addrs: list[str] = []
-            for a in raw_addrs:
-                if hasattr(a, "ip"):
-                    str_addrs.append(str(a.ip))
-                else:
-                    str_addrs.append(str(a))
-            ipv4s = [s for s in str_addrs if ":" not in s]
-            addrs = ipv4s if ipv4s else str_addrs
-            for addr in addrs:
-                results.append({
-                    "ip": addr,
-                    "port": inst.port,
-                    "host": inst.host,
-                    "name": inst.instance or inst.host,
-                    "method": "mdns",
-                })
+        results.extend(await _browse_mdns_devices())
     except Exception as e:
         _tunnel_logger.warning("mDNS browse failed: %s", e)
 

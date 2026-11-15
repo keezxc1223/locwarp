@@ -745,6 +745,25 @@ async def _pipi_login_keepalive():
             logger.debug("pipi keepalive iteration failed", exc_info=True)
 
 
+async def _ensure_firewall_for_mdns():
+    """Make sure Windows Firewall lets mDNS replies reach this exe.
+
+    WiFi discovery finds nothing when it does not, and the only rules there
+    used to be came from Windows' first-run prompt (see services.firewall).
+    Packaged build only: in development the exe is the shared python.exe.
+    """
+    if sys.platform != "win32" or not getattr(sys, "frozen", False):
+        return
+    from services import firewall
+    try:
+        status = await asyncio.to_thread(firewall.ensure_mdns_allowed)
+        logger.info("Firewall check for WiFi discovery: %s", status)
+    except asyncio.CancelledError:
+        raise
+    except Exception:
+        logger.warning("Firewall check for WiFi discovery failed", exc_info=True)
+
+
 @asynccontextmanager
 async def lifespan(application: FastAPI):
     import asyncio
@@ -767,6 +786,7 @@ async def lifespan(application: FastAPI):
     watchdog_task = asyncio.create_task(_usbmux_presence_watchdog())
     keepalive_task = asyncio.create_task(_wifi_tunnel_keepalive())
     pipi_keepalive_task = asyncio.create_task(_pipi_login_keepalive())
+    firewall_task = asyncio.create_task(_ensure_firewall_for_mdns())
 
     yield
 
@@ -774,6 +794,7 @@ async def lifespan(application: FastAPI):
     watchdog_task.cancel()
     keepalive_task.cancel()
     pipi_keepalive_task.cancel()
+    firewall_task.cancel()
     for _t in (watchdog_task, keepalive_task):
         try:
             await _t
@@ -800,6 +821,7 @@ app.add_middleware(
 
 # Register routers
 from api.device import router as device_router
+from api.wifi_diagnose import router as wifi_diagnose_router
 from api.location import router as location_router
 from api.route import router as route_router
 from api.geocode import router as geocode_router
@@ -810,6 +832,8 @@ from api.system import router as system_router
 from api.phone_control import router as phone_router
 from api.pipi import router as pipi_router
 
+# Before device_router: its /{udid}/... routes are generic.
+app.include_router(wifi_diagnose_router)
 app.include_router(device_router)
 app.include_router(location_router)
 app.include_router(route_router)

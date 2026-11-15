@@ -2,6 +2,7 @@ import React, { useRef, useState } from 'react';
 import { createPortal } from 'react-dom';
 import { wifiTunnelDiscover, wifiTunnelFindPort, wifiRepair, wifiKeepaliveGet, wifiKeepaliveSet, type TunnelInfo } from '../services/api';
 import { useT } from '../i18n';
+import WifiDiagnoseDialog from './WifiDiagnoseDialog';
 import {
   readSavedIps, removeSavedIp as removeSavedIpEntry, entryPrefix,
   type SavedTunnelIp,
@@ -125,6 +126,7 @@ const DeviceStatus: React.FC<DeviceStatusProps> = ({
   const [tunnelConnecting, setTunnelConnecting] = useState(false);
   const [tunnelError, setTunnelError] = useState<string | null>(null);
   const [showIpHelp, setShowIpHelp] = useState(false);
+  const [showDiagnose, setShowDiagnose] = useState(false);
   const [discovering, setDiscovering] = useState(false);
   const [wifiExpanded, setWifiExpanded] = useState(false);
   const [showWifiWarning, setShowWifiWarning] = useState(false);
@@ -1030,6 +1032,17 @@ const DeviceStatus: React.FC<DeviceStatusProps> = ({
                           {tunnelError}
                         </div>
                       )}
+                      <button
+                        onClick={() => setShowDiagnose(true)}
+                        title={t('wifi.diag_tooltip')}
+                        style={{
+                          width: '100%', fontSize: 11, padding: '6px 0', marginTop: 6, borderRadius: 5,
+                          border: `1px solid ${tunnelError ? 'rgba(255,193,7,0.5)' : 'rgba(255,255,255,0.18)'}`,
+                          background: tunnelError ? 'rgba(255,193,7,0.1)' : 'rgba(255,255,255,0.05)',
+                          color: tunnelError ? '#ffc107' : 'rgba(255,255,255,0.75)',
+                          cursor: 'pointer',
+                        }}
+                      >{t('wifi.diag_button')}</button>
                       <div style={{ fontSize: 10, opacity: 0.4, marginTop: 6 }}>
                         {t('wifi.tunnel_admin_hint')}
                       </div>
@@ -1041,6 +1054,18 @@ const DeviceStatus: React.FC<DeviceStatusProps> = ({
             </div>
           )}
         </div>
+      )}
+
+      {showDiagnose && (
+        <WifiDiagnoseDialog
+          ip={tunnelIp}
+          onClose={() => setShowDiagnose(false)}
+          onUseDevice={(ip, port) => {
+            setTunnelIp(ip);
+            setTunnelPort(String(port));
+            setTunnelError(null);
+          }}
+        />
       )}
 
       {showWifiWarning && createPortal(
