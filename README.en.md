@@ -248,7 +248,7 @@ Connect **up to five** devices at once. Teleport, Navigate, every movement mode,
 <details>
 <summary><b>Mushroom map</b></summary>
 
-Shows the mushroom, flower and smoke spots from [pipimushroom.com](https://pipimushroom.com/) on the map (Taiwan, Hong Kong and Malaysia at the moment). Press the mushroom button in the toolbar on the left of the map to open its panel. The panel can be dragged by its title and folded down to the title alone.
+Shows the mushroom, flower and smoke spots from [pipimushroom.com](https://pipimushroom.com/) on the map. Coverage follows what the site provides, which is currently Taiwan only. Press the mushroom button in the toolbar on the left of the map to open its panel. The panel can be dragged by its title and folded down to the title alone.
 
 - Mushrooms, flowers and smoke can be switched on and off separately.
 - **Mushroom filters** (click to expand): filter by size, type and minimum time left. The choices come from the loaded data, and each group has Select all and None.
@@ -388,7 +388,7 @@ Nothing is downloaded until you ask for it. You can also get the installer yours
 | Wi-Fi will not connect, or the tunnel start times out | Unlock the iPhone and try again. If it still fails, press "Can't connect? Run diagnosis" on the Connection page. It points to the IP, the subnet, the router, a VPN, the firewall or the pairing |
 | The tunnel starts but nothing connects | Make sure LocWarp runs as administrator, and try again with VPN or third-party firewall software turned off |
 | Wi-Fi has to be connected by hand on every launch | On the Connection page, check whether this device is pinned. Once any other device is pinned, only pinned devices auto-connect on launch |
-| The mushroom map shows no spots | Check in order: the panel says Logged in (otherwise press How to log in), the map is at zoom 15 or closer, and the location is in Taiwan, Hong Kong or Malaysia. When the panel shows Login expired, open the site in Chrome and log in again; the extension syncs by itself. A cookie pasted by hand has to be pasted again once it expires |
+| The mushroom map shows no spots | Check in order: the panel says Logged in (otherwise press How to log in), the map is at zoom 15 or closer, and the location is within the area the site provides data for (currently Taiwan only). When the panel shows Login expired, open the site in Chrome and log in again; the extension syncs by itself. A cookie pasted by hand has to be pasted again once it expires |
 | Wi-Fi auto-detect finds no device | Check that both are on the same Wi-Fi subnet and that the router has no client or AP isolation. If the diagnosis says the firewall is blocking it, press "Repair firewall". If it says the iPhone is reachable but discovery gets no reply, the router is not passing discovery traffic: enter the IP by hand and press Start, the port can stay empty |
 | The port scan says the IP answers on every port | A VPN or proxy is intercepting connections. Turn it off and retry. Auto-detect may also find nothing while a VPN is on |
 | `No such service: com.apple.instruments.dtservicehub`, or "No DDI detected" | Mount the DDI as described in [step 4](#4-mount-the-developer-disk-image-ios-17). If it still fails, turn Developer Mode off, reboot, turn it back on, and mount again |
