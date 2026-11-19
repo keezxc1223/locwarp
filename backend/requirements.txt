@@ -1,11 +1,11 @@
-﻿pymobiledevice3>=11.55.0
-fastapi>=0.162.7
+﻿pymobiledevice3>=11.59.0
+fastapi>=0.165.0
 starlette>=1.10.0
 uvicorn[standard]>=0.54.0
 websockets>=17.4
 gpxpy>=1.6.0
 httpx>=0.27.0
 pydantic>=2.14.3
-python-multipart>=0.0.33
+python-multipart>=0.0.34
 psutil>=6.0
 cryptography>=43.0.0
