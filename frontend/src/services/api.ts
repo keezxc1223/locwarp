@@ -199,6 +199,13 @@ export const wifiHostNetwork = () =>
 export const wifiKeepaliveGet = () => request<{ enabled: boolean }>('GET', '/api/device/wifi/tunnel/keepalive')
 export const wifiKeepaliveSet = (enabled: boolean) =>
   request<{ enabled: boolean }>('POST', '/api/device/wifi/tunnel/keepalive', { enabled })
+export type PairedDevice = {
+  udid: string; name: string | null; usb: boolean; wifi: boolean; connected: boolean; last_used: number
+}
+export const listPairedDevices = () =>
+  request<{ devices: PairedDevice[] }>('GET', '/api/device/paired')
+export const unpairDevice = (udid: string) =>
+  request<{ status: string; udid: string; device_side: boolean }>('DELETE', `/api/device/paired/${encodeURIComponent(udid)}`)
 export const amfiRevealDeveloperMode = (udid: string) =>
   request<{ status: string }>('POST', `/api/device/${encodeURIComponent(udid)}/amfi/reveal-developer-mode`)
 

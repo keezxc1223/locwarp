@@ -1901,3 +1901,150 @@ async def device_info(udid: str):
         if d.udid == udid:
             return d
     raise HTTPException(status_code=404, detail="Device not found")
+
+
+# ── Paired devices (連線過的裝置) ─────────────────────────
+
+import re as _re
+from pathlib import Path as _Path
+
+# UDIDs: 8-16 hex (A12+) or 40 hex (older). SystemConfiguration.plist and
+# anything else in those folders is skipped.
+_UDID_RE = _re.compile(r"^(?:[0-9A-Fa-f]{8}-[0-9A-Fa-f]{16}|[0-9A-Fa-f]{40})$")
+
+
+def _pair_record_dirs() -> tuple[_Path, _Path]:
+    """(pymobiledevice3 home folder, Apple's shared Lockdown folder)."""
+    from pymobiledevice3.common import get_home_folder
+    from pymobiledevice3.osu.os_utils import get_os_utils
+    return get_home_folder(), _Path(get_os_utils().pair_record_path)
+
+
+def _collect_pair_records() -> dict[str, dict]:
+    """udid -> {usb: [paths], wifi: [paths], mtime}. USB = lockdown pair
+    record (ours or Apple's shared one), WiFi = RemotePairing record."""
+    home, apple = _pair_record_dirs()
+    out: dict[str, dict] = {}
+
+    def _add(udid: str, kind: str, path: _Path) -> None:
+        if not _UDID_RE.match(udid):
+            return
+        try:
+            mtime = path.stat().st_mtime
+        except OSError:
+            return
+        e = out.setdefault(udid, {"usb": [], "wifi": [], "mtime": 0.0})
+        e[kind].append(path)
+        e["mtime"] = max(e["mtime"], mtime)
+
+    for folder in (home, apple):
+        try:
+            for p in folder.glob("*.plist"):
+                if p.name.startswith("remote_"):
+                    _add(p.stem.split("remote_", 1)[1], "wifi", p)
+                else:
+                    _add(p.stem, "usb", p)
+        except OSError:
+            _tunnel_logger.debug("Could not list pair records in %s", folder, exc_info=True)
+    return out
+
+
+@router.get("/paired")
+async def list_paired_devices():
+    """Devices this PC holds pair records for, newest first."""
+    from core.device_manager import _load_device_name_cache
+    names = _load_device_name_cache()
+    dm = _dm()
+    records = _collect_pair_records()
+    result = []
+    for udid, e in records.items():
+        conn = dm._connections.get(udid)
+        result.append({
+            "udid": udid,
+            "name": names.get(udid) or (getattr(conn, "name", None) if conn else None),
+            "usb": bool(e["usb"]),
+            "wifi": bool(e["wifi"]),
+            "connected": conn is not None or udid in _tunnels,
+            "last_used": int(e["mtime"] * 1000),
+        })
+    result.sort(key=lambda d: d["last_used"], reverse=True)
+    return {"devices": result}
+
+
+@router.delete("/paired/{udid}")
+async def unpair_device(udid: str):
+    """Forget a device: disconnect it if needed, ask the iPhone to drop
+    this PC's trust when it's on USB, then delete every local pair record
+    (USB lockdown + WiFi RemotePairing). Next connect shows 信任 again."""
+    if not _UDID_RE.match(udid):
+        raise HTTPException(status_code=400, detail={"code": "bad_udid", "message": "UDID 格式不正確"})
+
+    dm = _dm()
+    if udid in dm._connections or udid in _tunnels:
+        try:
+            await disconnect_device(udid)
+        except Exception:
+            _tunnel_logger.exception("Unpair: disconnect failed for %s", udid)
+
+    # Device-side unpair. Only possible while the phone is visible over USB.
+    device_side = False
+    try:
+        from pymobiledevice3.usbmux import list_devices as _usbmux_list
+        from pymobiledevice3.lockdown import create_using_usbmux
+        usb_visible = any(
+            d.serial == udid and getattr(d, "is_usb", True)
+            for d in await asyncio.wait_for(_usbmux_list(), timeout=5)
+        )
+        if usb_visible:
+            lockdown = await asyncio.wait_for(
+                create_using_usbmux(serial=udid, autopair=False), timeout=10,
+            )
+            try:
+                if lockdown.paired:
+                    await asyncio.wait_for(lockdown.unpair(), timeout=10)
+                    device_side = True
+            finally:
+                try:
+                    await lockdown.close()
+                except Exception:
+                    pass
+    except Exception:
+        _tunnel_logger.info("Unpair: device-side unpair skipped for %s", udid, exc_info=True)
+
+    # Ask usbmuxd (Apple Mobile Device Service) to drop its copy, then
+    # delete whatever files are left. Users have write access to Apple's
+    # Lockdown folder, so this needs no admin rights.
+    try:
+        from pymobiledevice3 import usbmux
+        from pymobiledevice3.usbmux import PlistMuxConnection
+        mux = await asyncio.wait_for(usbmux.create_mux(), timeout=5)
+        try:
+            if isinstance(mux, PlistMuxConnection):
+                await mux.delete_pair_record(udid)
+        finally:
+            await mux.close()
+    except Exception:
+        _tunnel_logger.debug("Unpair: usbmux DeletePairRecord failed for %s", udid, exc_info=True)
+
+    removed: list[str] = []
+    failed: list[str] = []
+    e = _collect_pair_records().get(udid, {"usb": [], "wifi": []})
+    for p in [*e["usb"], *e["wifi"]]:
+        try:
+            p.unlink()
+            removed.append(str(p))
+        except FileNotFoundError:
+            pass
+        except OSError:
+            failed.append(str(p))
+            _tunnel_logger.warning("Unpair: could not delete %s", p, exc_info=True)
+
+    _tunnel_logger.info(
+        "Unpaired %s: device_side=%s removed=%d failed=%d", udid, device_side, len(removed), len(failed),
+    )
+    if failed:
+        raise HTTPException(
+            status_code=500,
+            detail={"code": "unpair_files_locked", "message": "部分配對資料無法刪除", "files": failed},
+        )
+    return {"status": "unpaired", "udid": udid, "device_side": device_side}

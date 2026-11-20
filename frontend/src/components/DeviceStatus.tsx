@@ -3,8 +3,9 @@ import { createPortal } from 'react-dom';
 import { wifiTunnelDiscover, wifiTunnelFindPort, wifiRepair, wifiKeepaliveGet, wifiKeepaliveSet, type TunnelInfo } from '../services/api';
 import { useT } from '../i18n';
 import WifiDiagnoseDialog from './WifiDiagnoseDialog';
+import PairedDevicesDialog from './PairedDevicesDialog';
 import {
-  readSavedIps, removeSavedIp as removeSavedIpEntry, entryPrefix,
+  readSavedIps, removeSavedIp as removeSavedIpEntry, removeSavedIpsForUdid, entryPrefix,
   type SavedTunnelIp,
 } from '../utils/savedTunnelIps';
 import { getHostPrefix } from '../utils/hostNetwork';
@@ -127,6 +128,7 @@ const DeviceStatus: React.FC<DeviceStatusProps> = ({
   const [tunnelError, setTunnelError] = useState<string | null>(null);
   const [showIpHelp, setShowIpHelp] = useState(false);
   const [showDiagnose, setShowDiagnose] = useState(false);
+  const [showPaired, setShowPaired] = useState(false);
   const [discovering, setDiscovering] = useState(false);
   const [wifiExpanded, setWifiExpanded] = useState(false);
   const [showWifiWarning, setShowWifiWarning] = useState(false);
@@ -428,6 +430,26 @@ const DeviceStatus: React.FC<DeviceStatusProps> = ({
         <div style={{ fontSize: 11, lineHeight: 1.45, marginBottom: 8, color: wifiScanMsg.ok ? '#7ee2a4' : '#ffb27a' }}>
           {wifiScanMsg.text}
         </div>
+      )}
+      <button
+        className="action-btn"
+        onClick={() => setShowPaired(true)}
+        style={{ width: '100%', marginBottom: 8, padding: '6px 8px', fontSize: 12 }}
+      >
+        {t('paired.button')}
+      </button>
+      {showPaired && (
+        <PairedDevicesDialog
+          onClose={() => setShowPaired(false)}
+          knownNames={{
+            ...savedNameByUdid,
+            ...Object.fromEntries(devices.filter((d) => d.name).map((d) => [d.id, d.name])),
+          }}
+          onUnpaired={(udid) => {
+            setSavedIps(removeSavedIpsForUdid(udid));
+            if (onTogglePin && pinnedUdids.includes(udid)) onTogglePin(udid);
+          }}
+        />
       )}
 
       {/* WiFi tunnel cards for additional devices not shown in the top row */}

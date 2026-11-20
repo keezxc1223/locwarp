@@ -104,6 +104,13 @@ export const removeSavedIp = (ip: string, port: number): SavedTunnelIp[] => {
   return next;
 };
 
+/** Drop every saved address of one device (used when it is unpaired). */
+export const removeSavedIpsForUdid = (udid: string): SavedTunnelIp[] => {
+  const next = readSavedIps().filter((e) => e.udid !== udid);
+  writeSavedIps(next);
+  return next;
+};
+
 /**
  * Entries worth trying on the LAN we're currently on, most recent first.
  * With no host prefix (offline, or the probe failed) every entry is a

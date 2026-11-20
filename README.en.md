@@ -182,6 +182,7 @@ When an engine fails, that leg falls back to a straight line and the next leg tr
   - Finding the iPhone automatically over Wi-Fi needs Windows Firewall to allow the discovery replies. LocWarp checks this on startup and adds the rule when it is blocked (requires running as administrator). The diagnosis window also has a Repair firewall button.
   - Wi-Fi automatic discovery asks several times, so a lost discovery packet no longer means the iPhone is missed. The wait is the same as before.
   - Stopping the tunnel while USB is still plugged in switches back to USB automatically.
+- **Paired devices**: "Paired devices" on the Connection page lists the iPhones this PC is paired with, marked USB / Wi-Fi with the last-used date. Press X to unpair: the device is disconnected and its saved IPs and pin are cleared. If the iPhone is on USB, its trust of this PC is removed too, so the next connection asks to Trust again. The pairing data is shared with iTunes / the Apple Devices app, which will also need to be trusted again.
 
 </details>
 
